@@ -138,7 +138,7 @@ POST /sessions    无请求     POST /sessions/wave  POST /sessions/end
     │  └─────────────────────────────┘            │
     │                                             │
     │  POST /api/game/sessions/end                 │
-    │  {sessionId, finalState, stats, nickname}   │
+    │  {sessionId, nickname, lastWave}            │
     │────────────────────────────────────────────▶│
     │                                             │ 最终验证
     │  {verified, ranking}                        │ 记录排行榜
@@ -160,7 +160,7 @@ POST /sessions    无请求     POST /sessions/wave  POST /sessions/end
 |-----|------|------|------|
 | `/api/game/sessions` | POST | 页面加载 | 创建会话，返回配置和第一波 |
 | `/api/game/sessions/wave` | POST | 每波结束 | 提交结果，返回下一波 |
-| `/api/game/sessions/end` | POST | 游戏结束 | 提交最终结果，返回排名 |
+| `/api/game/sessions/end` | POST | 游戏结束 | 提交最后一波并结束，返回排名 |
 
 ---
 
@@ -315,44 +315,43 @@ interface WaveResponse {
 
 ### POST /api/game/sessions/end
 
-提交游戏最终结果，获取排名。
+提交游戏最终结果（含最后一波数据），获取排名。
 
 #### 请求
 
 ```typescript
 interface GameEndRequest {
   sessionId: string;
-
-  // 最终状态
-  finalState: {
-    money: number;
-    score: number;
-    life: number;
-    wave: number;                  // 坚持到第几波
-    totalFrames: number;           // 游戏总帧数
-  };
-
-  // 全局统计
-  stats: {
-    totalKilled: number;
-    totalPassed: number;
-    totalDamage: number;
-    totalBuilt: number;
-    totalEarned: number;
-    totalSpent: number;
-  };
-
-  // 所有波次摘要
-  waveSummaries: Array<{
-    wave: number;
-    killed: number;
-    passed: number;
-    score: number;
-    money: number;
-  }>;
-
-  // 玩家昵称
   nickname: string;
+
+  // 最后一波数据（与 WaveRequest 结构相同，用于验证）
+  lastWave: {
+    waveNumber: number;
+    actions: Array<{
+      type: 'BUILD' | 'UPGRADE' | 'SELL';
+      frame: number;
+      buildingType?: string;
+      buildingId: string;
+      position?: [number, number];
+      level?: number;
+    }>;
+    result: {
+      killed: number;
+      killedByType: Record<number, number>;
+      passed: number;
+      totalDamageDealt: number;
+      totalLifeDestroyed: number;
+      waveDurationFrames: number;
+    };
+    buildings: Array<{
+      id: string;
+      type: string;
+      position: [number, number];
+      level: number;
+      damageDealt: number;
+      kills: number;
+    }>;
+  };
 }
 ```
 
@@ -752,8 +751,8 @@ class Command(BaseCommand):
 ### 服务端实现要点
 
 1. **创建会话**（POST /api/game/sessions）：生成 sessionId，存储配置和初始状态
-2. **波次提交**（POST /api/game/sessions/wave）：验证数据，更新 state
-3. **游戏结束**（POST /api/game/sessions/end）：最终验证，记录排行榜，删除会话
+2. **波次提交**（POST /api/game/sessions/wave）：验证数据，更新 state，保存 buildings
+3. **游戏结束**（POST /api/game/sessions/end）：验证 lastWave，计算最终分数，记录排行榜，删除会话
 4. **会话不存在**：返回 `SESSION_NOT_FOUND`，客户端提示用户重新开始
 
 ### 过期处理流程
