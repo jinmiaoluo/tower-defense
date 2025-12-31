@@ -301,7 +301,7 @@ interface WaveResponse {
       money: number;
       score: number;
     }>;
-    lifeReward?: number;           // 生命恢复奖励（每 5 波 +5，每 10 波 +10，不超过上限 100）
+    lifeReward?: number;           // 生命恢复奖励，下一波开始前应用（每 5 波 +5，每 10 波 +10，上限 100）
   };
 
   // 验证失败时返回
@@ -498,10 +498,35 @@ def process_actions(actions: list, session_buildings: list, config: dict) -> tup
 **新状态计算**：
 
 ```
+// 波次结束时（serverState 返回的值）
 new_money = old_money - spent + income + moneyGained
 new_score = old_score + scoreGained
-new_life  = min(old_life - lifeLost + lifeReward, 100)
+new_life  = old_life - lifeLost
+
+// 下一波开始前（客户端根据 nextWave.lifeReward 应用）
+if lifeReward > 0:
+    new_life = min(new_life + lifeReward, 100)
 ```
+
+**lifeReward 应用时序**：
+
+```
+第 5 波结束
+    │
+    ├─ 客户端提交 { result: { lifeLost: 3, ... } }
+    │
+    ├─ 服务端验证通过，计算新状态
+    │      └─ new_life = 97 - 3 = 94
+    │
+    ├─ 服务端返回
+    │      ├─ serverState.life = 94         ← 不含奖励
+    │      └─ nextWave.lifeReward = 5       ← 奖励信息
+    │
+    └─ 第 6 波开始前，客户端应用奖励
+           └─ life = min(94 + 5, 100) = 99
+```
+
+> **说明**：`serverState.life` 反映波次结束时的精确状态，`lifeReward` 作为下一波的奖励单独返回，由客户端在下一波开始前应用。
 
 ### Level 1：基础验证
 
