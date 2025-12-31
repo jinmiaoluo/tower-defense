@@ -79,7 +79,7 @@
 └──────────┘    └──────────┘    └──────────┘    └──────────┘
      │               │               │               │
      ▼               ▼               ▼               ▼
- GET /start       无请求        POST /wave      POST /end
+POST /sessions    无请求     POST /sessions/wave  POST /sessions/end
 ```
 
 ### 详细时序
@@ -91,7 +91,7 @@
     │                                             │
     │  ══════════ 页面加载 ══════════             │
     │                                             │
-    │  GET /api/game/start                        │
+    │  POST /api/game/sessions                    │
     │────────────────────────────────────────────▶│
     │                                             │ 创建会话
     │  {sessionId, config, firstWave}             │
@@ -114,7 +114,7 @@
     │                                             │
     │  ══════════ 第 1 波结束 ══════════          │
     │                                             │
-    │  POST /api/game/wave                        │
+    │  POST /api/game/sessions/wave               │
     │  {sessionId, waveNumber, actions,           │
     │   result, endState, buildings}              │
     │────────────────────────────────────────────▶│
@@ -137,7 +137,7 @@
     │  │ 弹出昵称输入框               │            │
     │  └─────────────────────────────┘            │
     │                                             │
-    │  POST /api/game/end                         │
+    │  POST /api/game/sessions/end                 │
     │  {sessionId, finalState, stats, nickname}   │
     │────────────────────────────────────────────▶│
     │                                             │ 最终验证
@@ -158,19 +158,19 @@
 
 | API | 方法 | 时机 | 说明 |
 |-----|------|------|------|
-| `/api/game/start` | GET | 页面加载 | 开始游戏，返回配置和第一波 |
-| `/api/game/wave` | POST | 每波结束 | 提交结果，返回下一波 |
-| `/api/game/end` | POST | 游戏结束 | 提交最终结果，返回排名 |
+| `/api/game/sessions` | POST | 页面加载 | 创建会话，返回配置和第一波 |
+| `/api/game/sessions/wave` | POST | 每波结束 | 提交结果，返回下一波 |
+| `/api/game/sessions/end` | POST | 游戏结束 | 提交最终结果，返回排名 |
 
 ---
 
-### GET /api/game/start
+### POST /api/game/sessions
 
 创建游戏会话，返回配置和第一波怪物。
 
 #### 请求
 
-无参数。
+无参数（空 body）。
 
 #### 响应
 
@@ -229,7 +229,7 @@ interface GameStartResponse {
 
 ---
 
-### POST /api/game/wave
+### POST /api/game/sessions/wave
 
 提交波次结果，获取下一波配置。
 
@@ -321,7 +321,7 @@ interface WaveResponse {
 
 ---
 
-### POST /api/game/end
+### POST /api/game/sessions/end
 
 提交游戏最终结果，获取排名。
 
@@ -545,7 +545,7 @@ import axios from 'axios'
 import { useGameStore } from '@/stores/game'
 import { useRouter } from 'vue-router'
 
-const api = axios.create({ baseURL: '/api/game' })
+const api = axios.create({ baseURL: '/api/game/sessions' })
 
 export function useGameApi() {
   const gameStore = useGameStore()
@@ -573,9 +573,9 @@ export function useGameApi() {
   }
 
   return {
-    startGame: () => request<GameStartResponse>('get', '/start'),
+    createSession: () => request<GameStartResponse>('post', ''),
     submitWave: (data: WaveRequest) => request<WaveResponse>('post', '/wave', data),
-    endGame: (data: GameEndRequest) => request<GameEndResponse>('post', '/end', data),
+    endSession: (data: GameEndRequest) => request<GameEndResponse>('post', '/end', data),
   }
 }
 ```
@@ -663,9 +663,9 @@ class Command(BaseCommand):
 
 ### 服务端实现要点
 
-1. **创建会话**（GET /api/game/start）：生成 sessionId，存储配置和初始状态
-2. **波次提交**（POST /api/game/wave）：验证数据，更新 state
-3. **游戏结束**（POST /api/game/end）：最终验证，记录排行榜，删除会话
+1. **创建会话**（POST /api/game/sessions）：生成 sessionId，存储配置和初始状态
+2. **波次提交**（POST /api/game/sessions/wave）：验证数据，更新 state
+3. **游戏结束**（POST /api/game/sessions/end）：最终验证，记录排行榜，删除会话
 4. **会话不存在**：返回 `SESSION_NOT_FOUND`，客户端提示用户重新开始
 
 ### 过期处理流程
