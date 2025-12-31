@@ -48,6 +48,7 @@
 ### 设计原则
 
 - **服务端权威**：怪物属性、建筑属性、波次配置由服务端定义
+- **客户端零配置**：客户端不内置任何游戏配置和默认状态，所有数值均从服务端获取
 - **客户端执行**：游戏逻辑在客户端执行，服务端验证结果
 - **批量提交**：每波结束时批量提交，而非实时上传
 - **渐进验证**：每波验证一次，而非游戏结束时一次性验证
@@ -95,7 +96,7 @@
     │                                             │
     │  ┌─────────────────────────────┐            │
     │  │ 渲染地图、建筑面板           │            │
-    │  │ 显示初始金钱 500、生命 100   │            │
+    │  │ 显示 config.initial 中的状态 │            │
     │  └─────────────────────────────┘            │
     │                                             │
     │  ══════════ 放置第一个建筑 ══════════       │
@@ -203,8 +204,8 @@ interface GameStartResponse {
     };
 
     initial: {
-      money: number;               // 初始金钱，默认 500
-      life: number;                // 初始生命，默认 100，上限 100
+      money: number;               // 初始金钱（服务端配置）
+      life: number;                // 初始生命（服务端配置，上限 100）
     };
   };
 
@@ -611,9 +612,9 @@ class GameSession(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     # 游戏状态
-    money = models.IntegerField(default=500)
+    money = models.IntegerField()
     score = models.IntegerField(default=0)
-    life = models.IntegerField(default=100)
+    life = models.IntegerField()
     wave_count = models.IntegerField(default=0)
 
     # 配置（JSON 存储）
