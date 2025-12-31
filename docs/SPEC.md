@@ -161,6 +161,7 @@ POST /sessions    无请求     POST /sessions/wave  POST /sessions/end
 | `/api/game/sessions` | POST | 页面加载 | 创建会话，返回配置和第一波 |
 | `/api/game/sessions/wave` | POST | 每波结束 | 提交结果，返回下一波 |
 | `/api/game/sessions/end` | POST | 游戏结束 | 提交最后一波并结束，返回排名 |
+| `/api/game/leaderboard` | GET | 查看排行榜 | 获取排行榜列表 |
 
 ---
 
@@ -373,6 +374,32 @@ interface GameEndResponse {
     code: string;
     message: string;
   };
+}
+```
+
+---
+
+### GET /api/game/leaderboard
+
+获取排行榜列表。
+
+#### 请求
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `limit` | number | 否 | 返回条数，默认 10，最大 100 |
+
+#### 响应
+
+```typescript
+interface LeaderboardResponse {
+  entries: Array<{
+    rank: number;                  // 排名（从 1 开始）
+    nickname: string;              // 玩家昵称
+    score: number;                 // 最终得分
+    wavesCompleted: number;        // 完成波次数
+    createdAt: string;             // 记录时间（ISO 8601）
+  }>;
 }
 ```
 
@@ -716,6 +743,21 @@ class GameSession(models.Model):
         indexes = [
             models.Index(fields=["created_at"]),
         ]
+
+
+class LeaderboardEntry(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    nickname = models.CharField(max_length=32)
+    score = models.IntegerField()
+    waves_completed = models.IntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "leaderboard"
+        ordering = ["-score", "-waves_completed"]
+        indexes = [
+            models.Index(fields=["-score"]),
+        ]
 ```
 
 ### 定时清理策略
@@ -753,7 +795,8 @@ class Command(BaseCommand):
 1. **创建会话**（POST /api/game/sessions）：生成 sessionId，存储配置和初始状态
 2. **波次提交**（POST /api/game/sessions/wave）：验证数据，更新 state，保存 buildings
 3. **游戏结束**（POST /api/game/sessions/end）：验证 lastWave，计算最终分数，记录排行榜，删除会话
-4. **会话不存在**：返回 `SESSION_NOT_FOUND`，客户端提示用户重新开始
+4. **排行榜查询**（GET /api/game/leaderboard）：按 score 降序、waves_completed 降序返回
+5. **会话不存在**：返回 `SESSION_NOT_FOUND`，客户端提示用户重新开始
 
 ### 过期处理流程
 
