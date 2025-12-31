@@ -327,7 +327,7 @@ interface GameEndRequest {
   sessionId: string;
   nickname: string;
 
-  // 最后一波数据（与 WaveRequest 结构相同，用于验证）
+  // 最后一波数据（与 WaveRequest 结构相同）
   lastWave: {
     waveNumber: number;
     actions: Array<{
@@ -342,6 +342,9 @@ interface GameEndRequest {
       killed: number;
       killedByType: Record<number, number>;
       passed: number;
+      scoreGained: number;
+      moneyGained: number;
+      lifeLost: number;
       totalDamageDealt: number;
       totalLifeDestroyed: number;
       waveDurationFrames: number;
@@ -615,6 +618,20 @@ def calc_monster_attrs(base: dict, difficulty: float) -> dict:
 
 > **验证兼容性**：现有的 Level 1、Level 2 验证逻辑无需修改，因为验证时使用的 `wave_config`（即 `session.next_wave`）已包含基于当前 difficulty 计算的怪物属性。
 
+### 波次连续性验证
+
+防止跳波或重复提交。
+
+```python
+def validate_wave_continuity(session: GameSession, wave_number: int) -> tuple[bool, str]:
+    """验证波次连续性"""
+    if wave_number != session.wave_count + 1:
+        return False, f"波次不连续: 期望 {session.wave_count + 1}, 收到 {wave_number}"
+    return True, ""
+```
+
+> **说明**：`WaveRecord` 的 `unique_together = [["session", "wave_number"]]` 在数据库层面防止重复提交。
+
 ### Level 1：基础验证
 
 ```python
@@ -722,29 +739,66 @@ def validate_damage(
 
 ### Level 4：统计分析
 
+基于 `WaveRecord` 历史数据检测异常行为。
+
 ```python
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-def analyze_statistics(result: dict, total_building_cost: int, historical_average: float) -> None:
-    """统计分析：检测异常行为"""
+def analyze_statistics(session: GameSession, result: dict, money_spent: int) -> None:
+    """统计分析：基于历史数据检测异常"""
+    wave_records = list(session.waves.all())
+    if len(wave_records) < 3:
+        return  # 数据不足
 
-    total = result["killed"] + result["passed"]
-    if total == 0:
-        return
+    # 历史平均击杀率
+    hist_killed = sum(r.killed for r in wave_records)
+    hist_total = sum(r.killed + r.passed for r in wave_records)
+    hist_kill_rate = hist_killed / max(hist_total, 1)
 
-    # 击杀率异常检测
-    kill_rate = result["killed"] / total
-    if kill_rate > 0.99 and result["wave_duration_frames"] < 1000:
-        logger.warning("击杀率异常高且时间过短", extra={"result": result})
+    # 当前击杀率
+    curr_total = result["killed"] + result["passed"]
+    curr_kill_rate = result["killed"] / max(curr_total, 1)
 
-    # 资源效率异常检测
-    if total_building_cost > 0:
-        efficiency = result["score_gained"] / total_building_cost
-        if efficiency > historical_average * 2:
-            logger.warning("资源效率异常高", extra={"result": result})
+    # 击杀率突增检测
+    if hist_kill_rate < 0.5 and curr_kill_rate > 0.95:
+        logger.warning("击杀率异常突增", extra={"wave": session.wave_count + 1})
+
+    # 历史平均效率
+    hist_score = sum(r.score_gained for r in wave_records)
+    hist_cost = sum(r.money_spent for r in wave_records)
+    hist_efficiency = hist_score / max(hist_cost, 1)
+
+    # 当前效率
+    curr_efficiency = result["score_gained"] / max(money_spent, 1)
+
+    # 效率突增检测
+    if curr_efficiency > hist_efficiency * 3:
+        logger.warning("资源效率异常突增", extra={"wave": session.wave_count + 1})
+```
+
+### 游戏结束验证
+
+游戏结束时验证累计状态一致性。
+
+```python
+def validate_game_end(session: GameSession) -> tuple[bool, str]:
+    """验证累计状态一致性"""
+    wave_records = list(session.waves.order_by("wave_number"))
+
+    # 验证波次连续性
+    for i, record in enumerate(wave_records):
+        if record.wave_number != i + 1:
+            return False, f"波次记录不连续: 缺少波次 {i + 1}"
+
+    # 验证分数累计
+    expected_score = sum(r.score_gained for r in wave_records)
+    if session.score != expected_score:
+        return False, f"分数累计不一致: 期望 {expected_score}, 实际 {session.score}"
+
+    return True, ""
 ```
 
 ---
@@ -858,6 +912,49 @@ class GameSession(models.Model):
         ]
 
 
+class WaveRecord(models.Model):
+    """波次记录，用于统计分析和一致性验证"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    session = models.ForeignKey(GameSession, on_delete=models.CASCADE, related_name="waves")
+    wave_number = models.IntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    # 战斗结果（客户端提供，验证后写入）
+    killed = models.IntegerField()
+    passed = models.IntegerField()
+    score_gained = models.IntegerField()
+    money_gained = models.IntegerField()
+    life_lost = models.IntegerField()
+    total_damage_dealt = models.IntegerField()
+    wave_duration_frames = models.IntegerField()
+
+    # 经济数据（服务端计算）
+    money_spent = models.IntegerField()
+    money_income = models.IntegerField()
+    building_count = models.IntegerField()
+
+    # 状态快照（波次结束时）
+    end_money = models.IntegerField()
+    end_score = models.IntegerField()
+    end_life = models.IntegerField()
+    end_difficulty = models.FloatField()
+
+    class Meta:
+        db_table = "wave_record"
+        ordering = ["wave_number"]
+        unique_together = [["session", "wave_number"]]
+```
+
+**WaveRecord 创建时机**：
+
+| API | 创建的 WaveRecord | 说明 |
+|-----|-------------------|------|
+| `POST /wave` | 第 1 ~ N-1 波 | 普通波次，验证通过后创建 |
+| `POST /end` | 第 N 波 | 最后一波，从 lastWave 创建 |
+
+> **原则**：WaveRecord 只创建不更新，是不可变的历史记录。
+
+```python
 class LeaderboardEntry(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     nickname = models.CharField(max_length=32)
@@ -906,8 +1003,14 @@ class Command(BaseCommand):
 ### 服务端实现要点
 
 1. **创建会话**（POST /api/game/sessions）：生成 sessionId，存储配置和初始状态
-2. **波次提交**（POST /api/game/sessions/wave）：验证数据，更新 state，保存 buildings
-3. **游戏结束**（POST /api/game/sessions/end）：验证 lastWave，计算最终分数，记录排行榜，删除会话
+2. **波次提交**（POST /api/game/sessions/wave）：
+   - 验证波次连续性
+   - Level 1/2 验证
+   - 计算经济数据（spent, income）
+   - 创建 WaveRecord
+   - 更新 GameSession 状态
+   - Level 4 统计分析
+3. **游戏结束**（POST /api/game/sessions/end）：验证 lastWave，累计验证，记录排行榜，删除会话
 4. **排行榜查询**（GET /api/game/leaderboard）：按 score 降序、waves_completed 降序返回
 5. **会话不存在**：返回 `SESSION_NOT_FOUND`，客户端提示用户重新开始
 
