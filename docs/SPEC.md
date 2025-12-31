@@ -6,13 +6,40 @@
 
 ## 目录
 
-1. [整体架构](#整体架构)
-2. [游戏生命周期](#游戏生命周期)
-3. [API 定义](#api-定义)
-4. [客户端数据记录](#客户端数据记录)
-5. [服务端验证逻辑](#服务端验证逻辑)
-6. [错误处理](#错误处理)
-7. [会话管理](#会话管理)
+1. [技术栈](#技术栈)
+2. [整体架构](#整体架构)
+3. [游戏生命周期](#游戏生命周期)
+4. [API 定义](#api-定义)
+5. [客户端数据记录](#客户端数据记录)
+6. [服务端验证逻辑](#服务端验证逻辑)
+7. [错误处理](#错误处理)
+8. [会话管理](#会话管理)
+
+---
+
+## 技术栈
+
+### 前端
+
+| 技术 | 版本 | 用途 |
+|------|------|------|
+| Vue | 3.5 | UI 框架 |
+| Phaser | 3.90 | 游戏引擎 |
+| Vite | 7.2 | 构建工具 |
+| TypeScript | 5 | 开发语言 |
+| Pinia | 3.0 | 状态管理 |
+| Axios | 1.13 | HTTP 客户端 |
+
+### 后端
+
+| 技术 | 版本 | 用途 |
+|------|------|------|
+| Python | 3.13 | 开发语言 |
+| Django | 5.2 | Web 框架 |
+| Django REST Framework | 3.16 | API 框架 |
+| PostgreSQL | 15 | 数据库 |
+| pytest + pytest-django | - | 测试框架 |
+| Docker + Gunicorn | - | 部署 |
 
 ---
 
@@ -399,69 +426,99 @@ interface WaveRecord {
 
 ### Level 1：基础验证
 
-```typescript
-// 金钱收益验证
-const maxMoney = killed.reduce((sum, k) =>
-  sum + k.count * monsterConfig[k.type].money, 0);
-if (result.moneyGained > maxMoney) {
-  return { valid: false, message: '金钱收益超出上限' };
-}
+```python
+# game/validators.py
 
-// 分数收益验证
-const maxScore = killed.reduce((sum, k) =>
-  sum + k.count * monsterConfig[k.type].score, 0);
-if (result.scoreGained > maxScore) {
-  return { valid: false, message: '分数收益超出上限' };
-}
+def validate_basic(result: dict, wave_config: dict, monster_config: dict) -> tuple[bool, str]:
+    """基础验证：收益上限、数量一致性"""
 
-// 数量一致性验证
-const totalMonsters = waveConfig.monsters.reduce((sum, m) => sum + m.count, 0);
-if (result.killed + result.passed !== totalMonsters) {
-  return { valid: false, message: '怪物数量不一致' };
-}
+    # 金钱收益验证
+    max_money = sum(
+        k["count"] * monster_config[k["type"]]["money"]
+        for k in wave_config["monsters"]
+        if k["type"] in monster_config
+    )
+    if result["money_gained"] > max_money:
+        return False, "金钱收益超出上限"
+
+    # 分数收益验证
+    max_score = sum(
+        k["count"] * monster_config[k["type"]]["score"]
+        for k in wave_config["monsters"]
+    )
+    if result["score_gained"] > max_score:
+        return False, "分数收益超出上限"
+
+    # 数量一致性验证
+    total_monsters = sum(m["count"] for m in wave_config["monsters"])
+    if result["killed"] + result["passed"] != total_monsters:
+        return False, "怪物数量不一致"
+
+    return True, ""
 ```
 
 ### Level 2：伤害验证
 
-```typescript
-// 生命池验证
-const expectedLife = killed.reduce((sum, k) =>
-  sum + k.count * monsterConfig[k.type].life, 0);
-if (result.totalLifeDestroyed !== expectedLife) {
-  return { valid: false, message: '生命池验证失败' };
-}
+```python
+def validate_damage(
+    result: dict,
+    buildings: list[dict],
+    wave_config: dict,
+    monster_config: dict,
+    building_config: dict,
+) -> tuple[bool, str]:
+    """伤害验证：生命池、DPS 容量"""
 
-// 伤害下限验证
-if (result.totalDamageDealt < result.totalLifeDestroyed) {
-  return { valid: false, message: '伤害值不足以击杀' };
-}
+    # 生命池验证
+    expected_life = sum(
+        m["count"] * monster_config[m["type"]]["life"]
+        for m in wave_config["monsters"]
+        if m["count"] <= result["killed"]
+    )
+    if result["total_life_destroyed"] != expected_life:
+        return False, "生命池验证失败"
 
-// DPS 容量验证
-const maxDPS = buildings.reduce((sum, b) => {
-  const config = buildingConfig[b.type];
-  const dps = config.damage * b.level / config.speed;
-  return sum + dps;
-}, 0);
-const maxDamage = maxDPS * result.waveDurationFrames;
-if (result.totalDamageDealt > maxDamage * 1.1) {  // 10% 容差
-  return { valid: false, message: 'DPS 容量超限' };
-}
+    # 伤害下限验证
+    if result["total_damage_dealt"] < result["total_life_destroyed"]:
+        return False, "伤害值不足以击杀"
+
+    # DPS 容量验证
+    max_dps = sum(
+        building_config[b["type"]]["damage"] * b["level"] / building_config[b["type"]]["speed"]
+        for b in buildings
+    )
+    max_damage = max_dps * result["wave_duration_frames"]
+    if result["total_damage_dealt"] > max_damage * 1.1:  # 10% 容差
+        return False, "DPS 容量超限"
+
+    return True, ""
 ```
 
 ### Level 4：统计分析
 
-```typescript
-// 击杀率异常检测
-const killRate = result.killed / (result.killed + result.passed);
-if (killRate > 0.99 && result.waveDurationFrames < expectedMinFrames) {
-  flagForReview('击杀率异常高且时间过短');
-}
+```python
+import logging
 
-// 资源效率异常检测
-const efficiency = result.scoreGained / totalBuildingCost;
-if (efficiency > historicalAverage * 2) {
-  flagForReview('资源效率异常高');
-}
+logger = logging.getLogger(__name__)
+
+
+def analyze_statistics(result: dict, total_building_cost: int, historical_average: float) -> None:
+    """统计分析：检测异常行为"""
+
+    total = result["killed"] + result["passed"]
+    if total == 0:
+        return
+
+    # 击杀率异常检测
+    kill_rate = result["killed"] / total
+    if kill_rate > 0.99 and result["wave_duration_frames"] < 1000:
+        logger.warning("击杀率异常高且时间过短", extra={"result": result})
+
+    # 资源效率异常检测
+    if total_building_cost > 0:
+        efficiency = result["score_gained"] / total_building_cost
+        if efficiency > historical_average * 2:
+            logger.warning("资源效率异常高", extra={"result": result})
 ```
 
 ---
@@ -479,20 +536,42 @@ if (efficiency > historicalAverage * 2) {
 ### 客户端处理示例
 
 ```typescript
-async function handleApiError(error: { code: string; message: string }) {
-  switch (error.code) {
-    case 'SESSION_NOT_FOUND':
-      showToast('游戏会话不存在，正在重新开始');
-      gameStore.$reset();
-      window.location.reload();
-      break;
+// src/composables/useGameApi.ts
+import axios from 'axios'
+import { useGameStore } from '@/stores/game'
+import { useRouter } from 'vue-router'
 
-    case 'VALIDATION_FAILED':
-      showToast(`数据验证失败: ${error.message}`);
-      break;
+const api = axios.create({ baseURL: '/api/game' })
 
-    default:
-      showToast(`发生错误: ${error.message}`);
+export function useGameApi() {
+  const gameStore = useGameStore()
+  const router = useRouter()
+
+  function handleError(error: { code: string; message: string }) {
+    switch (error.code) {
+      case 'SESSION_NOT_FOUND':
+        gameStore.$reset()
+        router.replace({ name: 'game' })
+        break
+    }
+  }
+
+  async function request<T>(method: 'get' | 'post', url: string, data?: unknown): Promise<T> {
+    try {
+      const res = await api[method](url, data)
+      return res.data
+    } catch (e: any) {
+      if (e.response?.data?.error) {
+        handleError(e.response.data.error)
+      }
+      throw e
+    }
+  }
+
+  return {
+    startGame: () => request<GameStartResponse>('get', '/start'),
+    submitWave: (data: WaveRequest) => request<WaveResponse>('post', '/wave', data),
+    endGame: (data: GameEndRequest) => request<GameEndResponse>('post', '/end', data),
   }
 }
 ```
@@ -520,30 +599,62 @@ async function handleApiError(error: { code: string; message: string }) {
 
 ### 会话数据结构
 
-```typescript
-interface GameSession {
-  id: string;
-  createdAt: Date;
-  state: { money: number; score: number; life: number };
-  waveCount: number;
-  config: GameConfig;       // 本局游戏配置
-  nextWave: WaveConfig;     // 下一波怪物配置
-}
+```python
+# game/models.py
+
+import uuid
+from django.db import models
+
+
+class GameSession(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    # 游戏状态
+    money = models.IntegerField(default=500)
+    score = models.IntegerField(default=0)
+    life = models.IntegerField(default=100)
+    wave_count = models.IntegerField(default=0)
+
+    # 配置（JSON 存储）
+    config = models.JSONField()
+    next_wave = models.JSONField()
+
+    class Meta:
+        db_table = "game_session"
+        indexes = [
+            models.Index(fields=["created_at"]),
+        ]
 ```
 
 ### 定时清理策略
 
 每局游戏上限 24 小时，超时自动清理：
 
-```typescript
-// 每小时执行一次清理
-async function cleanupExpiredSessions() {
-  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+```python
+# game/management/commands/cleanup_sessions.py
 
-  await db.session.deleteMany({
-    where: { createdAt: { lt: oneDayAgo } },
-  });
-}
+from datetime import timedelta
+
+from django.core.management.base import BaseCommand
+from django.utils import timezone
+
+from game.models import GameSession
+
+
+class Command(BaseCommand):
+    help = "清理过期的游戏会话"
+
+    def handle(self, *args, **options):
+        threshold = timezone.now() - timedelta(hours=24)
+        deleted, _ = GameSession.objects.filter(created_at__lt=threshold).delete()
+        self.stdout.write(f"已清理 {deleted} 个过期会话")
+```
+
+定时执行：
+
+```cron
+0 * * * * /app/.venv/bin/python manage.py cleanup_sessions
 ```
 
 ### 服务端实现要点
