@@ -116,7 +116,7 @@ POST /sessions    无请求     POST /sessions/wave  POST /sessions/end
     │                                             │
     │  POST /api/game/sessions/wave               │
     │  {sessionId, waveNumber, actions,           │
-    │   result, endState, buildings}              │
+    │   result, buildings}                        │
     │────────────────────────────────────────────▶│
     │                                             │ 验证数据
     │  {valid, serverState, nextWave}             │
@@ -262,13 +262,6 @@ interface WaveRequest {
     totalDamageDealt: number;      // 总伤害输出
     totalLifeDestroyed: number;    // 击杀怪物的总生命值
     waveDurationFrames: number;    // 波次持续帧数
-  };
-
-  // 波次结束时的状态
-  endState: {
-    money: number;
-    score: number;
-    life: number;
   };
 
   // 当前建筑列表
