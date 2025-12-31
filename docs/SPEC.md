@@ -240,15 +240,13 @@ interface WaveRequest {
   sessionId: string;
   waveNumber: number;
 
-  // 本波所有建筑操作
+  // 本波所有建筑操作（cost/income 由服务端计算）
   actions: Array<{
     type: 'BUILD' | 'UPGRADE' | 'SELL';
     frame: number;                 // 操作发生的帧号
     buildingType?: string;         // BUILD 时的建筑类型
     buildingId: string;            // 建筑唯一 ID
     position?: [number, number];   // BUILD 时的位置
-    cost?: number;                 // BUILD/UPGRADE 的花费
-    income?: number;               // SELL 的收入
     level?: number;                // UPGRADE 后的等级
   }>;
 
@@ -387,9 +385,9 @@ interface GameEndResponse {
 
 | 事件 | 记录内容 | 时机 |
 |------|----------|------|
-| 建造建筑 | type, frame, buildingType, position, cost | 立即记录 |
-| 升级建筑 | type, frame, buildingId, cost, level | 立即记录 |
-| 出售建筑 | type, frame, buildingId, income | 立即记录 |
+| 建造建筑 | type, frame, buildingType, buildingId, position | 立即记录 |
+| 升级建筑 | type, frame, buildingId, level | 立即记录 |
+| 出售建筑 | type, frame, buildingId | 立即记录 |
 | 造成伤害 | 累加到 totalDamageDealt | 每次攻击 |
 | 击杀怪物 | killedByType[type]++, totalLifeDestroyed += life | 击杀时 |
 | 怪物穿过 | 累加 passed, lifeLost | 到达终点时 |
@@ -422,6 +420,62 @@ interface WaveRecord {
 ---
 
 ## 服务端验证逻辑
+
+### 建筑成本计算
+
+服务端根据 `session.buildings` 和 `actions` 计算每个操作的 cost/income。
+
+**成本公式**：
+
+| 操作 | 公式 |
+|------|------|
+| BUILD | `config.buildings[type].cost` |
+| UPGRADE | `total_cost × upgradeCostRatio` |
+| SELL | `total_cost × sellRatio` |
+
+其中 `total_cost` = 建造成本 + 历次升级成本。
+
+```python
+# game/calculators.py
+
+def calc_total_cost(building_type: str, level: int, config: dict) -> int:
+    """计算建筑累计花费"""
+    base = config["buildings"][building_type]["cost"]
+    ratio = config["buildings"][building_type].get("upgradeCostRatio", 0.75)
+    total = base
+    for _ in range(2, level + 1):
+        total += int(total * ratio)
+    return total
+
+
+def process_actions(actions: list, session_buildings: list, config: dict) -> tuple:
+    """遍历操作计算金钱变化，返回 (spent, income, updated_buildings)"""
+    buildings = {b["id"]: b.copy() for b in session_buildings}
+    spent, income = 0, 0
+
+    for action in sorted(actions, key=lambda a: a["frame"]):
+        bid, atype = action["buildingId"], action["type"]
+        if atype == "BUILD":
+            spent += config["buildings"][action["buildingType"]]["cost"]
+            buildings[bid] = {"type": action["buildingType"], "level": 1}
+        elif atype == "UPGRADE":
+            b = buildings[bid]
+            spent += int(calc_total_cost(b["type"], b["level"], config) * 0.75)
+            b["level"] += 1
+        elif atype == "SELL":
+            b = buildings.pop(bid)
+            income += int(calc_total_cost(b["type"], b["level"], config) * 0.5) or 1
+
+    return spent, income, list(buildings.values())
+```
+
+**新状态计算**：
+
+```
+new_money = old_money - spent + income + moneyGained
+new_score = old_score + scoreGained
+new_life  = min(old_life - lifeLost + lifeReward, 100)
+```
 
 ### Level 1：基础验证
 
@@ -466,6 +520,26 @@ def validate_basic(result: dict, wave_config: dict) -> tuple[bool, str]:
     if result["score_gained"] != expected_score:
         return False, "分数收益不匹配"
 
+    return True, ""
+
+
+def validate_money_balance(new_state: dict) -> tuple[bool, str]:
+    """验证金钱余额不为负"""
+    if new_state["money"] < 0:
+        return False, "金钱余额不足，无法完成所有操作"
+    return True, ""
+
+
+def validate_buildings_consistency(
+    calculated_buildings: list[dict],
+    submitted_buildings: list[dict],
+) -> tuple[bool, str]:
+    """验证服务端计算的建筑列表与客户端提交的一致"""
+    calc_map = {b["id"]: (b["type"], b["level"]) for b in calculated_buildings}
+    submit_map = {b["id"]: (b["type"], b["level"]) for b in submitted_buildings}
+
+    if calc_map != submit_map:
+        return False, "建筑列表不一致"
     return True, ""
 ```
 
@@ -629,6 +703,10 @@ class GameSession(models.Model):
     score = models.IntegerField(default=0)
     life = models.IntegerField()
     wave_count = models.IntegerField(default=0)
+
+    # 建筑状态（用于跨波次验证）
+    # 格式: [{"id": "b-001", "type": "cannon", "level": 2}, ...]
+    buildings = models.JSONField(default=list)
 
     # 配置（JSON 存储）
     config = models.JSONField()
