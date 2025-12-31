@@ -254,7 +254,8 @@ interface WaveRequest {
 
   // 战斗结果
   result: {
-    killed: number;                // 击杀怪物数
+    killed: number;                // 击杀怪物总数
+    killedByType: Record<number, number>;  // 每种怪物的击杀数 {typeId: count}
     passed: number;                // 穿过终点的怪物数
     scoreGained: number;           // 获得分数
     moneyGained: number;           // 获得金钱
@@ -390,7 +391,7 @@ interface GameEndResponse {
 | 升级建筑 | type, frame, buildingId, cost, level | 立即记录 |
 | 出售建筑 | type, frame, buildingId, income | 立即记录 |
 | 造成伤害 | 累加到 totalDamageDealt | 每次攻击 |
-| 击杀怪物 | 累加 kills, totalLifeDestroyed | 击杀时 |
+| 击杀怪物 | killedByType[type]++, totalLifeDestroyed += life | 击杀时 |
 | 怪物穿过 | 累加 passed, lifeLost | 到达终点时 |
 
 ### 波次记录结构
@@ -404,6 +405,7 @@ interface WaveRecord {
 
   result: {
     killed: number;
+    killedByType: Record<number, number>;  // {typeId: count}
     passed: number;
     scoreGained: number;
     moneyGained: number;
@@ -426,30 +428,43 @@ interface WaveRecord {
 ```python
 # game/validators.py
 
-def validate_basic(result: dict, wave_config: dict, monster_config: dict) -> tuple[bool, str]:
+def validate_basic(result: dict, wave_config: dict) -> tuple[bool, str]:
     """基础验证：收益上限、数量一致性"""
 
-    # 金钱收益验证
-    max_money = sum(
-        k["count"] * monster_config[k["type"]]["money"]
-        for k in wave_config["monsters"]
-        if k["type"] in monster_config
-    )
-    if result["money_gained"] > max_money:
-        return False, "金钱收益超出上限"
+    killed_by_type = result["killed_by_type"]
+    wave_monsters = {m["type"]: m for m in wave_config["monsters"]}
 
-    # 分数收益验证
-    max_score = sum(
-        k["count"] * monster_config[k["type"]]["score"]
-        for k in wave_config["monsters"]
-    )
-    if result["score_gained"] > max_score:
-        return False, "分数收益超出上限"
+    # killedByType 一致性验证
+    if sum(killed_by_type.values()) != result["killed"]:
+        return False, "击杀数量不一致"
 
-    # 数量一致性验证
+    # 每种怪物击杀数不能超过波次配置
+    for monster_type, killed_count in killed_by_type.items():
+        if monster_type not in wave_monsters:
+            return False, f"未知的怪物类型: {monster_type}"
+        if killed_count > wave_monsters[monster_type]["count"]:
+            return False, f"怪物 {monster_type} 击杀数超出配置"
+
+    # 总数量一致性验证
     total_monsters = sum(m["count"] for m in wave_config["monsters"])
     if result["killed"] + result["passed"] != total_monsters:
         return False, "怪物数量不一致"
+
+    # 金钱收益验证（基于 killedByType 精确计算）
+    expected_money = sum(
+        killed_by_type.get(m["type"], 0) * m["money"]
+        for m in wave_config["monsters"]
+    )
+    if result["money_gained"] != expected_money:
+        return False, "金钱收益不匹配"
+
+    # 分数收益验证（基于 killedByType 精确计算）
+    expected_score = sum(
+        killed_by_type.get(m["type"], 0) * m["score"]
+        for m in wave_config["monsters"]
+    )
+    if result["score_gained"] != expected_score:
+        return False, "分数收益不匹配"
 
     return True, ""
 ```
@@ -461,19 +476,20 @@ def validate_damage(
     result: dict,
     buildings: list[dict],
     wave_config: dict,
-    monster_config: dict,
     building_config: dict,
 ) -> tuple[bool, str]:
     """伤害验证：生命池、DPS 容量"""
 
-    # 生命池验证
+    killed_by_type = result["killed_by_type"]
+    wave_monsters = {m["type"]: m for m in wave_config["monsters"]}
+
+    # 生命池验证（基于 killedByType 精确计算）
     expected_life = sum(
-        m["count"] * monster_config[m["type"]]["life"]
+        killed_by_type.get(m["type"], 0) * m["life"]
         for m in wave_config["monsters"]
-        if m["count"] <= result["killed"]
     )
     if result["total_life_destroyed"] != expected_life:
-        return False, "生命池验证失败"
+        return False, f"生命池验证失败: 期望 {expected_life}, 实际 {result['total_life_destroyed']}"
 
     # 伤害下限验证
     if result["total_damage_dealt"] < result["total_life_destroyed"]:
@@ -483,6 +499,7 @@ def validate_damage(
     max_dps = sum(
         building_config[b["type"]]["damage"] * b["level"] / building_config[b["type"]]["speed"]
         for b in buildings
+        if building_config[b["type"]]["speed"] > 0
     )
     max_damage = max_dps * result["wave_duration_frames"]
     if result["total_damage_dealt"] > max_damage * 1.1:  # 10% 容差
