@@ -63,7 +63,6 @@
     │  GET /api/game/start                        │
     │────────────────────────────────────────────▶│
     │                                             │ 创建会话
-    │                                             │ TTL = 5 分钟
     │  {sessionId, config, firstWave}             │
     │◀────────────────────────────────────────────│
     │                                             │
@@ -89,7 +88,6 @@
     │   result, endState, buildings}              │
     │────────────────────────────────────────────▶│
     │                                             │ 验证数据
-    │                                             │ TTL = 30 分钟
     │  {valid, serverState, nextWave}             │
     │◀────────────────────────────────────────────│
     │                                             │
@@ -474,8 +472,7 @@ if (efficiency > historicalAverage * 2) {
 
 | 错误码 | 说明 | 客户端处理 |
 |--------|------|-----------|
-| `SESSION_EXPIRED` | 会话已过期 | 提示并重新加载页面 |
-| `SESSION_NOT_FOUND` | 会话不存在 | 提示并重新加载页面 |
+| `SESSION_NOT_FOUND` | 会话不存在或已被清理 | 提示并重新加载页面 |
 | `VALIDATION_FAILED` | 数据验证失败 | 显示错误信息 |
 | `INVALID_REQUEST` | 请求格式错误 | 显示错误信息 |
 
@@ -484,9 +481,8 @@ if (efficiency > historicalAverage * 2) {
 ```typescript
 async function handleApiError(error: { code: string; message: string }) {
   switch (error.code) {
-    case 'SESSION_EXPIRED':
     case 'SESSION_NOT_FOUND':
-      showToast('游戏会话已过期，正在重新开始...');
+      showToast('游戏会话不存在，正在重新开始');
       gameStore.$reset();
       window.location.reload();
       break;
@@ -505,40 +501,64 @@ async function handleApiError(error: { code: string; message: string }) {
 
 ## 会话管理
 
-### 会话状态
+### 设计原则
+
+- 塔防游戏是策略游戏，允许玩家暂停思考
+- 不对暂停时间和每波耗时做限制
+- 客户端的开始/暂停是 UI 状态，服务端不感知
+- Session 存在即有效，不存在即失效
+
+### 会话生命周期
 
 ```
-pending  ──(第1波完成)──▶  active  ──(游戏结束)──▶  completed
-   │                         │
-   │ (5分钟无操作)            │ (30分钟无操作)
-   ▼                         ▼
-expired                   expired
+创建 ──(波次提交)──▶ 更新 ──(游戏结束)──▶ 删除
+                      │
+            （定时任务清理过期会话）
 ```
 
-### TTL 策略
+服务端只关心：Session 是否存在、提交数据是否合法。
 
-| 状态 | TTL | 说明 |
-|------|-----|------|
-| pending | 5 分钟 | 用户可能只是浏览，未真正开始游戏 |
-| active | 30 分钟 | 用户正在游戏中，每次提交波次时刷新 |
-| completed | 永久 | 游戏已结束，成绩已记录 |
+### 会话数据结构
+
+```typescript
+interface GameSession {
+  id: string;
+  createdAt: Date;
+  state: { money: number; score: number; life: number };
+  waveCount: number;
+  config: GameConfig;       // 本局游戏配置
+  nextWave: WaveConfig;     // 下一波怪物配置
+}
+```
+
+### 定时清理策略
+
+每局游戏上限 24 小时，超时自动清理：
+
+```typescript
+// 每小时执行一次清理
+async function cleanupExpiredSessions() {
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+  await db.session.deleteMany({
+    where: { createdAt: { lt: oneDayAgo } },
+  });
+}
+```
 
 ### 服务端实现要点
 
-1. **创建会话**：生成 sessionId，存储配置和初始状态，设置 5 分钟 TTL
-2. **波次提交**：验证数据，更新状态，刷新 TTL 为 30 分钟
-3. **游戏结束**：最终验证，记录排行榜，标记会话为 completed
-4. **过期处理**：客户端不感知 TTL，过期时返回 `SESSION_EXPIRED` 错误
+1. **创建会话**（GET /api/game/start）：生成 sessionId，存储配置和初始状态
+2. **波次提交**（POST /api/game/wave）：验证数据，更新 state
+3. **游戏结束**（POST /api/game/end）：最终验证，记录排行榜，删除会话
+4. **会话不存在**：返回 `SESSION_NOT_FOUND`，客户端提示用户重新开始
 
----
+### 过期处理流程
 
-## 附录：移除的字段
-
-以下字段经分析后确认不需要：
-
-| 字段 | 原设计用途 | 移除理由 |
-|------|-----------|---------|
-| `playerId` | 关联历史记录 | 匿名游戏不需要 |
-| `clientVersion` | 版本兼容性 | 配置由服务端下发 |
-| `seed` | 确定性重放 | 怪物配置由服务端直接下发 |
-| `expiresAt` | 客户端显示过期时间 | 隐藏实现细节，过期时统一处理 |
+```
+创建会话 → 24 小时后 → 定时任务删除
+                            ↓
+            下次请求返回 SESSION_NOT_FOUND
+                            ↓
+              客户端提示"会话已失效，请重新开始"
+```
