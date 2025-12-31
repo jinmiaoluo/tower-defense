@@ -210,6 +210,7 @@ interface GameStartResponse {
     initial: {
       money: number;               // 初始金钱（服务端配置）
       life: number;                // 初始生命（服务端配置，上限 100）
+      difficulty: number;          // 初始难度系数（默认 1.0）
     };
   };
 
@@ -287,6 +288,7 @@ interface WaveResponse {
     money: number;
     score: number;
     life: number;
+    difficulty: number;              // 当前难度系数（影响下一波怪物属性）
   };
 
   // 下一波配置（游戏继续时返回）
@@ -499,9 +501,10 @@ def process_actions(actions: list, session_buildings: list, config: dict) -> tup
 
 ```
 // 波次结束时（serverState 返回的值）
-new_money = old_money - spent + income + moneyGained
-new_score = old_score + scoreGained
-new_life  = old_life - lifeLost
+new_money      = old_money - spent + income + moneyGained
+new_score      = old_score + scoreGained
+new_life       = old_life - lifeLost
+new_difficulty = calc_new_difficulty(old_difficulty, lifeLost, wave)
 
 // 下一波开始前（客户端根据 nextWave.lifeReward 应用）
 if lifeReward > 0:
@@ -527,6 +530,90 @@ if lifeReward > 0:
 ```
 
 > **说明**：`serverState.life` 反映波次结束时的精确状态，`lifeReward` 作为下一波的奖励单独返回，由客户端在下一波开始前应用。
+
+### 动态难度计算
+
+根据玩家上一波的表现（受到的伤害）动态调整难度系数。
+
+```python
+# game/calculators.py
+
+def calc_new_difficulty(current: float, life_lost: int, wave: int) -> float:
+    """根据上一波受伤情况调整难度"""
+    if life_lost == 0:
+        # 没有受伤，增加难度
+        factor = 1.2 if wave >= 5 else 1.05
+    elif life_lost >= 50:
+        factor = 0.6
+    elif life_lost >= 30:
+        factor = 0.7
+    elif life_lost >= 20:
+        factor = 0.8
+    elif life_lost >= 10:
+        factor = 0.9
+    else:
+        # 受伤较少（< 10），波次 >= 10 时略微增加难度
+        factor = 1.05 if wave >= 10 else 1.0
+    return max(current * factor, 1.0)
+```
+
+**难度调整规则**：
+
+| 上一波受伤 | 难度变化 | 说明 |
+|------------|----------|------|
+| 0 | ×1.05 ~ ×1.2 | 玩家太强，增加挑战 |
+| 1 ~ 9 | ×1.0 ~ ×1.05 | 表现良好，维持或略增 |
+| 10 ~ 19 | ×0.9 | 略微降低 |
+| 20 ~ 29 | ×0.8 | 中等降低 |
+| 30 ~ 49 | ×0.7 | 较多降低 |
+| ≥ 50 | ×0.6 | 大幅降低 |
+
+### 怪物属性计算
+
+怪物的实际属性基于基础属性和当前难度系数计算。
+
+```python
+def calc_monster_attrs(base: dict, difficulty: float) -> dict:
+    """基于 difficulty 计算怪物实际属性"""
+    return {
+        **base,
+        "speed": base["speed"] + difficulty / 2,
+        "life": int(base["life"] * (difficulty + 1) * 0.5),
+        "shield": int(base["shield"] + difficulty / 2),
+        # money 和 score 不受 difficulty 影响
+    }
+```
+
+**属性计算公式**：
+
+| 属性 | 公式 | difficulty=1.0 时 | difficulty=2.0 时 |
+|------|------|-------------------|-------------------|
+| speed | `base + difficulty/2` | base + 0.5 | base + 1.0 |
+| life | `base × (difficulty+1) × 0.5` | base × 1.0 | base × 1.5 |
+| shield | `base + difficulty/2` | base + 0.5 | base + 1.0 |
+
+**波次生成流程**：
+
+```
+第 N 波结束
+    │
+    ├─ 服务端验证（使用 session.next_wave 中的怪物属性）
+    │
+    ├─ 计算新难度
+    │      └─ new_difficulty = calc_new_difficulty(session.difficulty, lifeLost, N)
+    │
+    ├─ 生成第 N+1 波配置
+    │      └─ for base in base_monsters:
+    │             monster = calc_monster_attrs(base, new_difficulty)
+    │
+    ├─ 保存到 session
+    │      ├─ session.difficulty = new_difficulty
+    │      └─ session.next_wave = { monsters: [...] }
+    │
+    └─ 返回 { serverState: { difficulty: new_difficulty }, nextWave }
+```
+
+> **验证兼容性**：现有的 Level 1、Level 2 验证逻辑无需修改，因为验证时使用的 `wave_config`（即 `session.next_wave`）已包含基于当前 difficulty 计算的怪物属性。
 
 ### Level 1：基础验证
 
@@ -754,6 +841,7 @@ class GameSession(models.Model):
     score = models.IntegerField(default=0)
     life = models.IntegerField()
     wave_count = models.IntegerField(default=0)
+    difficulty = models.FloatField(default=1.0)
 
     # 建筑状态（用于跨波次验证）
     # 格式: [{"id": "b-001", "type": "cannon", "level": 2}, ...]
