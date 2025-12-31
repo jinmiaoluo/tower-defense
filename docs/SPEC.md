@@ -204,7 +204,7 @@ interface GameStartResponse {
 
     initial: {
       money: number;               // 初始金钱，默认 500
-      life: number;                // 初始生命，默认 100
+      life: number;                // 初始生命，默认 100，上限 100
     };
   };
 
@@ -304,7 +304,7 @@ interface WaveResponse {
       money: number;
       score: number;
     }>;
-    lifeReward?: number;           // 生命恢复奖励（每 5 波 +5，每 10 波 +10）
+    lifeReward?: number;           // 生命恢复奖励（每 5 波 +5，每 10 波 +10，不超过上限 100）
   };
 
   // 验证失败时返回
