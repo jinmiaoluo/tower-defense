@@ -420,9 +420,26 @@ def test_validate_damage_dps_exceeded():
 
 ```python
 def test_validate_attacks_success():
+    # 攻击事件包含原始目标和实际命中信息（支持"误伤"机制）
     attacks = [
-        {"frame": 100, "buildingId": "b-001", "monsterId": "uuid-1", "damage": 10, "monsterPosition": [5, 5]},
-        {"frame": 120, "buildingId": "b-001", "monsterId": "uuid-1", "damage": 10, "monsterPosition": [6, 5]},
+        {
+            "frame": 100,
+            "buildingId": "b-001",
+            "originalTargetId": "uuid-1",           # 发射时瞄准的目标
+            "originalTargetPosition": [5, 5],       # 发射时目标位置（用于射程验证）
+            "monsterId": "uuid-1",                  # 实际命中的怪物
+            "monsterPosition": [5, 5],              # 命中时怪物位置
+            "damage": 10,
+        },
+        {
+            "frame": 120,
+            "buildingId": "b-001",
+            "originalTargetId": "uuid-1",
+            "originalTargetPosition": [6, 5],
+            "monsterId": "uuid-1",
+            "monsterPosition": [6, 5],
+            "damage": 10,
+        },
     ]
     buildings = [{"id": "b-001", "type": "cannon", "level": 1, "position": [5, 4]}]
     result = {"totalDamageDealt": 20, "killedByType": {}}
@@ -430,9 +447,37 @@ def test_validate_attacks_success():
     ok, err = validate_attacks(attacks, buildings, result, GAME_CONFIG["buildings"], GAME_CONFIG["map"], monsters_config)
     assert ok is True
 
+def test_validate_attacks_friendly_fire():
+    # 测试"误伤"场景：瞄准 uuid-1，但命中了 uuid-2
+    attacks = [
+        {
+            "frame": 100,
+            "buildingId": "b-001",
+            "originalTargetId": "uuid-1",           # 原始目标在射程内
+            "originalTargetPosition": [5, 5],
+            "monsterId": "uuid-2",                  # 实际命中了其他怪物
+            "monsterPosition": [7, 7],              # 可能在射程外（允许）
+            "damage": 10,
+        },
+    ]
+    buildings = [{"id": "b-001", "type": "cannon", "level": 1, "position": [5, 4]}]
+    result = {"totalDamageDealt": 10, "killedByType": {}}
+    monsters_config = {"uuid-1": {"type": 0, "life": 50}, "uuid-2": {"type": 0, "life": 50}}
+    # 只验证 originalTargetPosition 在射程内，不验证 monsterPosition
+    ok, err = validate_attacks(attacks, buildings, result, GAME_CONFIG["buildings"], GAME_CONFIG["map"], monsters_config)
+    assert ok is True
+
 def test_validate_attacks_invalid_monster_id():
     attacks = [
-        {"frame": 100, "buildingId": "b-001", "monsterId": "fake-id", "damage": 10, "monsterPosition": [5, 5]},
+        {
+            "frame": 100,
+            "buildingId": "b-001",
+            "originalTargetId": "fake-id",
+            "originalTargetPosition": [5, 5],
+            "monsterId": "fake-id",
+            "monsterPosition": [5, 5],
+            "damage": 10,
+        },
     ]
     monsters_config = {"uuid-1": {"type": 0, "life": 50}}
     ok, err = validate_monster_ids(attacks, monsters_config)
@@ -441,8 +486,8 @@ def test_validate_attacks_invalid_monster_id():
 
 def test_validate_cumulative_damage():
     attacks = [
-        {"monsterId": "uuid-1", "damage": 30},
-        {"monsterId": "uuid-1", "damage": 25},  # 累计 55 >= 50，应击杀
+        {"monsterId": "uuid-1", "damage": 30, "originalTargetId": "uuid-1", "originalTargetPosition": [3, 3], "monsterPosition": [3, 3]},
+        {"monsterId": "uuid-1", "damage": 25, "originalTargetId": "uuid-1", "originalTargetPosition": [4, 4], "monsterPosition": [4, 4]},  # 累计 55 >= 50，应击杀
     ]
     result = {"killedByType": {0: 1}}
     monsters_config = {"uuid-1": {"type": 0, "life": 50}}

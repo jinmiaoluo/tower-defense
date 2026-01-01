@@ -345,8 +345,12 @@ interface GameStartResponse {
         name: string;              // 显示名称
         cost: number;              // 建造成本
         damage: number;            // 基础伤害
-        range: number;             // 攻击范围（格子数）
-        speed: number;             // 攻击间隔（帧）
+        range: number;             // 最小攻击范围（格子数）
+        max_range: number;         // 最大攻击范围（升级可扩展）
+        speed: number;             // 攻击速度
+        bullet_speed: number;      // 子弹速度（laser_gun 为 0）
+        life: number;              // 建筑生命值
+        shield: number;            // 建筑护盾值
         upgradeCostRatio: number;  // 升级成本比例
         sellRatio: number;         // 出售回收比例
       }
@@ -412,13 +416,15 @@ interface WaveRequest {
     level?: number;                // UPGRADE 后的等级
   }>;
 
-  // 本波所有攻击事件
+  // 本波所有攻击事件（支持子弹"误伤"机制）
   attacks: Array<{
-    frame: number;                 // 攻击帧号
-    buildingId: string;            // 建筑 ID
-    monsterId: string;             // 怪物 ID（使用服务端下发的 UUID）
-    damage: number;                // 实际伤害
-    monsterPosition: [number, number];  // 怪物所在格子 [x, y]
+    frame: number;                           // 命中帧号
+    buildingId: string;                      // 建筑 ID
+    originalTargetId: string;                // 发射时瞄准的怪物 ID
+    originalTargetPosition: [number, number]; // 发射时目标位置（用于射程验证）
+    monsterId: string;                       // 实际命中的怪物 ID（可能不同）
+    monsterPosition: [number, number];       // 命中时怪物位置（用于路径验证）
+    damage: number;                          // 实际伤害
   }>;
 
   // 战斗结果
@@ -1139,6 +1145,11 @@ def validate_attack_range(
     """
     验证发射时的原始目标是否在建筑射程内。
 
+    射程规则：
+    - range: 最小射程（太近的目标无法攻击）
+    - max_range: 最大射程（太远的目标无法攻击）
+    - 升级后射程略微增加（level ** 0.1）
+
     注意：由于子弹存在"误伤"机制，实际命中的怪物 (monsterPosition) 可能在射程外，
     但发射时的原始目标 (originalTargetPosition) 必须在射程内。
     """
@@ -1147,10 +1158,15 @@ def validate_attack_range(
     tx, ty = attack["originalTargetPosition"]
 
     distance = math.sqrt((bx - tx) ** 2 + (by - ty) ** 2)
-    building_range = building_config[building["type"]]["range"] * building["level"] ** 0.1
+    level_factor = building["level"] ** 0.1
+    min_range = building_config[building["type"]]["range"] * level_factor
+    max_range = building_config[building["type"]]["max_range"] * level_factor
 
-    if distance > building_range + 1:  # 1 格容差（怪物可能在格子边缘）
-        return False, f"发射时目标超出射程: 建筑 {building['id']} 在 ({bx},{by}), 原始目标在 ({tx},{ty}), 距离 {distance:.1f}, 射程 {building_range:.1f}"
+    if distance < min_range - 1:  # 1 格容差
+        return False, f"目标太近: 建筑 {building['id']} 最小射程 {min_range:.1f}, 目标距离 {distance:.1f}"
+
+    if distance > max_range + 1:  # 1 格容差（怪物可能在格子边缘）
+        return False, f"目标太远: 建筑 {building['id']} 最大射程 {max_range:.1f}, 目标距离 {distance:.1f}"
 
     return True, ""
 
@@ -1519,5 +1535,3 @@ class Command(BaseCommand):
                             ↓
               客户端提示"会话已失效，请重新开始"
 ```
-
-
