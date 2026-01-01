@@ -15,5 +15,13 @@
   ],
   "settings": {
     "terminal.integrated.cwd": "${workspaceFolder}/../"
+  },
+  "extensions": {
+    "recommendations": [
+      "Vue.volar",
+      "dbaeumer.vscode-eslint",
+      "esbenp.prettier-vscode",
+      "EditorConfig.EditorConfig"
+    ]
   }
 }
