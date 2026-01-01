@@ -1656,7 +1656,7 @@ class WaveRecord(models.Model):
     # 战斗结果（客户端提供，验证后写入）
     killed = models.IntegerField()
     passed = models.IntegerField()
-    remaining = models.IntegerField(default=0)  # 提前结束时场上剩余的怪物数
+    remaining = models.IntegerField(default=0)  # 提前结束时场上剩余的怪物数（只存储数量，不存储 ID 列表）
     score_gained = models.IntegerField()
     money_gained = models.IntegerField()
     life_lost = models.IntegerField()
@@ -1686,6 +1686,15 @@ class WaveRecord(models.Model):
 - `POST /end`: 创建第 N 波的记录，最后一波从 lastWave 创建
 
 > **原则**：WaveRecord 只创建不更新，是不可变的历史记录。
+
+**remaining_monster_ids 存储策略**：
+
+API 请求中的 `remainingMonsterIds` 字段只用于验证，验证通过后不持久化存储。原因如下：
+
+- **验证时使用**：服务端使用 `remainingMonsterIds` 验证客户端没有作弊（如把 passed 的怪物伪装成 remaining 来避免生命损失）
+- **验证后丢弃**：验证通过后，只存储 `remaining` 数量到 `WaveRecord`，ID 列表不再有用途
+- **可反推性**：如需回溯，可从攻击记录反推（累计伤害 < 生命值且不在 killed/passed 中的怪物）
+- **存储效率**：存储一个整数比存储 UUID 列表更高效
 
 ```python
 class LeaderboardEntry(models.Model):

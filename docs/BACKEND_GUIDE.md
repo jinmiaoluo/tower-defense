@@ -737,6 +737,8 @@ def test_validate_remaining_monsters_zero_remaining():
     assert ok is True
 ```
 
+> **存储策略**：`remaining_monster_ids` 只用于验证，验证通过后只存储 `remaining` 数量到 `WaveRecord`，ID 列表不持久化。详见 SPEC.md 的"remaining_monster_ids 存储策略"章节。
+
 ## API 视图
 
 ### POST /api/game/sessions
