@@ -50,13 +50,42 @@ frontend/
 
 ### PathSystem
 
-负责怪物路径计算。
+负责怪物路径计算。使用动态寻路算法（Dijkstra/BFS），与旧实现保持一致。
+
+**核心特性**：
+
+- 每个怪物独立计算路径，不共享
+- 怪物每帧有 10% 概率自动重新寻路
+- 寻路回溯时若有多条等距路径，随机选择一条
+- 建筑放置后该格子变为不可通行，影响后续怪物的路径计算
 
 ```typescript
 // src/game/systems/PathSystem.ts
 interface PathSystem {
-  generatePath(mapConfig: MapConfig): [number, number][]
-  getPositionAtProgress(path: Path, progress: number): { x: number; y: number }
+  // 为指定怪物计算从当前位置到出口的路径
+  findPath(
+    startPos: [number, number],
+    mapConfig: MapConfig,
+    buildings: Building[]
+  ): [number, number][]
+
+  // 检查格子是否可通行（考虑障碍物和建筑）
+  isPassable(
+    pos: [number, number],
+    mapConfig: MapConfig,
+    buildings: Building[]
+  ): boolean
+
+  // 检查在指定位置放置建筑是否会阻塞通路或现有怪物
+  wouldBlock(
+    buildPos: [number, number],
+    mapConfig: MapConfig,
+    buildings: Building[],
+    monsters: Monster[]
+  ): boolean
+
+  // 获取路径上指定进度的位置（用于平滑移动）
+  getPositionAtProgress(path: [number, number][], progress: number): { x: number; y: number }
 }
 ```
 

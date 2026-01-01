@@ -167,7 +167,7 @@ GAME_CONFIG = {
         "height": 16,
         "entrance": [0, 0],
         "exit": [15, 15],
-        "obstacles": [],
+        "obstacles": [],  # 预设障碍物坐标列表，如 [[3, 3], [7, 15]]
     },
     "initial": {
         "money": 500,
