@@ -340,6 +340,7 @@ class Monster extends Phaser.GameObjects.Sprite {
   shield: number
   money: number
   damage: number       // 到达终点造成的伤害（从 config.monsters[type].damage 获取）
+  color: string        // 颜色（从 config.monsters[type].color 获取或随机生成）
   progress: number     // 路径进度 0-1
 
   takeDamage(rawDamage: number): number  // 返回实际伤害
@@ -348,11 +349,13 @@ class Monster extends Phaser.GameObjects.Sprite {
   getGridPosition(): [number, number]
 }
 
-// 创建怪物时，damage 从 config 中获取
+// 创建怪物时，damage 和 color 从 config 中获取
 function createMonster(monsterData: WaveMonster, config: GameConfig): Monster {
+  const displayConfig = config.monsters[monsterData.type]
   return new Monster({
     ...monsterData,
-    damage: config.monsters[monsterData.type].damage,  // 从静态配置获取
+    damage: displayConfig.damage,  // 从静态配置获取
+    color: displayConfig.color,    // 从静态配置获取
   })
 }
 ```
