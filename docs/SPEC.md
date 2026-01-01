@@ -73,7 +73,7 @@
 - 同一类型怪物单波最多出现 3 个
 - 波次 1-10 使用预定义配置
 - 波次 11+ 自动生成，怪物数量 = min(wave^1.1, 100)
-- 波次间隔：24 FPS × 3 = 72 帧（约 3 秒）
+- 波次间隔：60 FPS × 3 = 180 帧
 
 #### 难度动态调整
 
@@ -396,6 +396,15 @@ interface WaveRequest {
     level?: number;                // UPGRADE 后的等级
   }>;
 
+  // 本波所有攻击事件
+  attacks: Array<{
+    frame: number;                 // 攻击帧号
+    buildingId: string;            // 建筑 ID
+    monsterId: string;             // 怪物 ID
+    damage: number;                // 实际伤害
+    monsterPosition: [number, number];  // 怪物所在格子 [x, y]
+  }>;
+
   // 战斗结果
   result: {
     killed: number;                // 击杀怪物总数
@@ -482,6 +491,13 @@ interface GameEndRequest {
       position?: [number, number];
       level?: number;
     }>;
+    attacks: Array<{
+      frame: number;
+      buildingId: string;
+      monsterId: string;
+      damage: number;
+      monsterPosition: [number, number];
+    }>;
     result: {
       killed: number;
       killedByType: Record<number, number>;
@@ -563,9 +579,62 @@ interface LeaderboardResponse {
 | 建造建筑 | type, frame, buildingType, buildingId, position | 立即记录 |
 | 升级建筑 | type, frame, buildingId, level | 立即记录 |
 | 出售建筑 | type, frame, buildingId | 立即记录 |
-| 造成伤害 | 累加到 totalDamageDealt | 每次攻击 |
+| 攻击命中 | frame, buildingId, monsterId, damage, monsterGrid | 每次攻击 |
 | 击杀怪物 | killedByType[type]++, totalLifeDestroyed += life | 击杀时 |
 | 怪物穿过 | 累加 passed, lifeLost | 到达终点时 |
+
+### 攻击事件记录
+
+每次建筑攻击命中怪物时记录，用于路径验证和精确伤害验证。
+
+```typescript
+interface AttackEvent {
+  frame: number;                      // 攻击发生的帧号
+  buildingId: string;                 // 发起攻击的建筑 ID
+  monsterId: string;                  // 被攻击的怪物 ID
+  damage: number;                     // 实际造成的伤害（扣除护盾后）
+  monsterPosition: [number, number];  // 怪物所在格子 [x, y]
+}
+```
+
+**字段说明**：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| frame | number | 攻击发生的帧号，用于验证攻击时序和 DPS |
+| buildingId | string | 发起攻击的建筑 ID，如 "b-001" |
+| monsterId | string | 被攻击的怪物 ID，如 "m-042" |
+| damage | number | 实际伤害 = max(建筑伤害 - 怪物护盾, 1) |
+| monsterPosition | [number, number] | 怪物所在格子坐标 [x, y]，用于路径验证 |
+
+**monsterPosition 示例**：
+
+```
+入口位置 → monsterPosition: [0, 0]
+中间位置 → monsterPosition: [5, 3]
+出口位置 → monsterPosition: [15, 15]
+```
+
+**记录时机**：
+
+```typescript
+// 在建筑攻击命中时记录
+function onBuildingHit(building: Building, monster: Monster, rawDamage: number) {
+  const actualDamage = Math.max(rawDamage - monster.shield, 1)
+
+  attacks.push({
+    frame: currentFrame,
+    buildingId: building.id,
+    monsterId: monster.id,
+    damage: actualDamage,
+    monsterPosition: [monster.gridX, monster.gridY],
+  })
+
+  // 同时更新统计
+  result.totalDamageDealt += actualDamage
+  building.damageDealt += actualDamage
+}
+```
 
 ### 波次记录结构
 
@@ -575,6 +644,7 @@ interface WaveRecord {
   startFrame: number;
 
   actions: Action[];
+  attacks: AttackEvent[];
 
   result: {
     killed: number;
@@ -591,6 +661,18 @@ interface WaveRecord {
   buildings: Building[];
 }
 ```
+
+### 数据量估算
+
+| 数据类型 | 每条大小 | 典型数量/波 | 小计 |
+|---------|---------|------------|------|
+| 建筑操作 | ~80 bytes | 5 | ~400 bytes |
+| 攻击事件 | ~50 bytes | 500 | ~25 KB |
+| 战斗结果 | ~200 bytes | 1 | ~200 bytes |
+| 建筑列表 | ~60 bytes | 10 | ~600 bytes |
+| **合计** | - | - | **~26 KB/波** |
+
+**整局游戏（42 波）**：约 1.1 MB（压缩后约 150 KB）
 
 ---
 
@@ -880,6 +962,152 @@ def validate_damage(
 
     return True, ""
 ```
+
+### Level 2+：攻击事件验证
+
+基于攻击事件记录进行更精确的验证。
+
+```python
+import math
+
+
+def validate_attacks(
+    attacks: list[dict],
+    buildings: list[dict],
+    result: dict,
+    building_config: dict,
+    map_config: dict,
+) -> tuple[bool, str]:
+    """攻击事件验证：伤害一致性、射程验证、路径合理性"""
+
+    building_map = {b["id"]: b for b in buildings}
+
+    # 1. 伤害总和一致性
+    total_damage = sum(a["damage"] for a in attacks)
+    if total_damage != result["total_damage_dealt"]:
+        return False, f"伤害总和不一致: 攻击记录 {total_damage}, 结果 {result['total_damage_dealt']}"
+
+    # 2. 攻击帧号时序验证
+    for i in range(1, len(attacks)):
+        if attacks[i]["frame"] < attacks[i - 1]["frame"]:
+            return False, "攻击帧号时序错误"
+
+    # 3. 逐条验证
+    for attack in attacks:
+        building = building_map.get(attack["buildingId"])
+        if not building:
+            return False, f"未知建筑: {attack['buildingId']}"
+
+        # 射程验证
+        ok, err = validate_attack_range(attack, building, building_config)
+        if not ok:
+            return False, err
+
+        # 伤害值合法性验证
+        ok, err = validate_damage_value(attack, building, building_config)
+        if not ok:
+            return False, err
+
+    # 4. 路径合理性验证
+    ok, err = validate_monster_paths(attacks, map_config)
+    if not ok:
+        return False, err
+
+    return True, ""
+
+
+def validate_attack_range(
+    attack: dict,
+    building: dict,
+    building_config: dict,
+) -> tuple[bool, str]:
+    """验证攻击是否在建筑射程内"""
+    bx, by = building["position"]
+    mx, my = attack["monsterPosition"]
+
+    distance = math.sqrt((bx - mx) ** 2 + (by - my) ** 2)
+    building_range = building_config[building["type"]]["range"] * building["level"] ** 0.1
+
+    if distance > building_range + 1:  # 1 格容差（怪物可能在格子边缘）
+        return False, f"攻击超出射程: 建筑 {building['id']} 在 ({bx},{by}), 怪物在 ({mx},{my}), 距离 {distance:.1f}, 射程 {building_range:.1f}"
+
+    return True, ""
+
+
+def validate_damage_value(
+    attack: dict,
+    building: dict,
+    building_config: dict,
+) -> tuple[bool, str]:
+    """验证伤害值是否合法"""
+    base_damage = building_config[building["type"]]["damage"]
+    level = building["level"]
+
+    # 计算建筑在当前等级的伤害（升级规则：每级 ×1.2）
+    expected_damage = base_damage
+    for _ in range(1, level):
+        expected_damage = int(expected_damage * 1.2)
+
+    # 实际伤害 = 建筑伤害 - 怪物护盾，最低为 1
+    # 由于不知道具体打的是哪个怪物，只验证伤害不超过建筑伤害
+    if attack["damage"] > expected_damage:
+        return False, f"伤害值超过建筑上限: {attack['damage']} > {expected_damage}"
+    if attack["damage"] < 1:
+        return False, f"伤害值不能小于 1"
+
+    return True, ""
+
+
+def validate_monster_paths(
+    attacks: list[dict],
+    map_config: dict,
+) -> tuple[bool, str]:
+    """验证怪物路径合理性"""
+    entrance = map_config["entrance"]
+    exit_pos = map_config["exit"]
+
+    # 按怪物分组
+    monster_attacks: dict[str, list[dict]] = {}
+    for attack in attacks:
+        mid = attack["monsterId"]
+        if mid not in monster_attacks:
+            monster_attacks[mid] = []
+        monster_attacks[mid].append(attack)
+
+    for mid, atks in monster_attacks.items():
+        atks.sort(key=lambda a: a["frame"])
+
+        if len(atks) < 2:
+            continue
+
+        first_pos = atks[0]["monsterPosition"]
+        last_pos = atks[-1]["monsterPosition"]
+
+        # 计算到出口的距离
+        first_to_exit = position_distance(first_pos, exit_pos)
+        last_to_exit = position_distance(last_pos, exit_pos)
+
+        # 怪物应该从入口向出口移动
+        if last_to_exit > first_to_exit + 3:  # 允许 3 格容差（绕路）
+            return False, f"怪物 {mid} 路径异常: 远离出口方向移动"
+
+    return True, ""
+
+
+def position_distance(pos1: list, pos2: list) -> int:
+    """计算两个位置之间的曼哈顿距离"""
+    return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
+```
+
+**验证能力总结**：
+
+| 验证项 | 说明 | 作弊类型 |
+|--------|------|---------|
+| 伤害总和一致性 | attacks 伤害总和 = result.totalDamageDealt | 伪造总伤害 |
+| 攻击帧号时序 | 帧号递增 | 伪造攻击时序 |
+| 射程验证 | 攻击时怪物在建筑射程内 | 增加射程 |
+| 伤害值合法性 | 伤害 ≤ 建筑伤害，伤害 ≥ 1 | 增加伤害 |
+| 路径合理性 | 怪物从入口向出口移动 | 绕圈刷分 |
 
 ### Level 4：统计分析
 
