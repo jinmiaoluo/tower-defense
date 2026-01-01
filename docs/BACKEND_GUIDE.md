@@ -854,6 +854,50 @@ def leaderboard_entries(db):
     return entries
 ```
 
+## CORS 跨域配置
+
+前后端分离架构需要配置 CORS（跨域资源共享）以允许浏览器发起跨域请求。
+
+### 默认配置
+
+开发环境默认允许以下源:
+- `http://localhost:8080`
+- `http://127.0.0.1:8080`
+
+### 环境变量配置
+
+```bash
+# .env 或环境变量
+CORS_ALLOWED_ORIGINS=http://localhost:8080,http://127.0.0.1:8080
+CSRF_TRUSTED_ORIGINS=http://localhost:8080,http://127.0.0.1:8080
+```
+
+### 生产环境
+
+生产环境需要配置实际的前端域名:
+
+```bash
+CORS_ALLOWED_ORIGINS=https://game.example.com
+CSRF_TRUSTED_ORIGINS=https://game.example.com
+```
+
+## 认证配置
+
+游戏 API 不使用用户认证，因此禁用了 DRF 的默认认证类:
+
+```python
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [],
+    "DEFAULT_PERMISSION_CLASSES": [],
+    # ...
+}
+```
+
+这意味着:
+- API 请求无需携带 CSRF token
+- 游戏会话通过 `sessionId`（UUID）标识，而非用户会话
+- 防作弊依赖服务端验证逻辑，而非认证机制
+
 ## 注意事项
 
 1. **服务端权威**：所有游戏配置和怪物属性由服务端定义，客户端不内置任何数值
@@ -862,3 +906,4 @@ def leaderboard_entries(db):
 4. **事务处理**：波次提交应在数据库事务中完成，验证失败时回滚
 5. **状态一致性**：GameSession 的状态必须与所有 WaveRecord 的累计结果一致
 6. **会话清理**：定时任务每小时清理超过 24 小时的过期会话
+7. **跨域配置**：开发环境默认允许 localhost:8080，生产环境需要配置实际域名
