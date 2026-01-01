@@ -345,6 +345,7 @@ interface GameStartResponse {
       [typeId: number]: {
         name: string;
         color: string;
+        damage: number;            // 到达终点造成的伤害（1-10）
       }
     };
 

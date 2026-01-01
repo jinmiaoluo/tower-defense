@@ -66,6 +66,21 @@ backend/
 
 ## 游戏配置
 
+服务端内部使用完整的怪物配置（包含所有属性），API 响应时只返回部分属性：
+
+| 属性 | 服务端配置 | API config.monsters | API wave.monsters |
+|------|-----------|---------------------|-------------------|
+| name | ✅ | ✅ | - |
+| color | ✅ | ✅ | - |
+| damage | ✅ | ✅ | - |
+| life | ✅ 基础值 | - | ✅ 计算后 |
+| speed | ✅ 基础值 | - | ✅ 计算后 |
+| shield | ✅ 基础值 | - | ✅ 计算后 |
+| money | ✅ | - | ✅ |
+| score | ✅ | - | ✅ |
+
+> **说明**：`life/speed/shield` 会根据难度系数动态计算，因此在每波怪物配置中返回计算后的值。`damage` 是静态属性，不受难度影响，放在 `config.monsters` 中。
+
 ```python
 # game/config.py
 

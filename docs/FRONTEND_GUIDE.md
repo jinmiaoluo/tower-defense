@@ -153,13 +153,21 @@ class Monster extends Phaser.GameObjects.Sprite {
   shield: number
   money: number
   score: number
-  damage: number       // 到达终点造成的伤害
+  damage: number       // 到达终点造成的伤害（从 config.monsters[type].damage 获取）
   progress: number     // 路径进度 0-1
 
   takeDamage(rawDamage: number): number  // 返回实际伤害
   isDead(): boolean
   reachedExit(): boolean
   getGridPosition(): [number, number]
+}
+
+// 创建怪物时，damage 从 config 中获取
+function createMonster(monsterData: WaveMonster, config: GameConfig): Monster {
+  return new Monster({
+    ...monsterData,
+    damage: config.monsters[monsterData.type].damage,  // 从静态配置获取
+  })
 }
 ```
 
