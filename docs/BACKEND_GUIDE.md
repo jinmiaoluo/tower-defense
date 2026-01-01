@@ -259,6 +259,10 @@ def test_calc_new_difficulty_no_damage_early():
 def test_calc_new_difficulty_no_damage_late():
     assert calc_new_difficulty(1.0, 0, 10) == 1.2
 
+def test_calc_new_difficulty_no_damage_high_difficulty():
+    # 高难度（> 30）时减缓增长
+    assert calc_new_difficulty(31.0, 0, 5) == 34.1  # 31 * 1.1
+
 def test_calc_new_difficulty_heavy_damage():
     assert calc_new_difficulty(2.0, 50, 5) == 1.2  # 2.0 * 0.6
 

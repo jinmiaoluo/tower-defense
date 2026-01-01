@@ -838,7 +838,12 @@ def calc_new_difficulty(current: float, life_lost: int, wave: int) -> float:
 
     if life_lost == 0:
         # 没有受伤，增加难度
-        factor = 1.2 if wave >= 5 else 1.05
+        if wave < 5:
+            factor = 1.05
+        elif current > 30:
+            factor = 1.1  # 高难度时减缓增长
+        else:
+            factor = 1.2
     elif life_lost >= 50:
         factor = 0.6
     elif life_lost >= 30:
@@ -860,7 +865,9 @@ def calc_new_difficulty(current: float, life_lost: int, wave: int) -> float:
 | 上一波受伤 | 难度变化 | 说明 |
 |------------|----------|------|
 | Wave 1 | ×1.0 | 教学波，不调整 |
-| 0 | ×1.05 ~ ×1.2 | 玩家太强，增加挑战 |
+| 0 (wave < 5) | ×1.05 | 早期无伤，小幅增加 |
+| 0 (difficulty > 30) | ×1.1 | 高难度无伤，减缓增长 |
+| 0 (其他) | ×1.2 | 正常无伤，较大增加 |
 | 1 ~ 9 | ×1.0 ~ ×1.05 | 表现良好，维持或略增 |
 | 10 ~ 19 | ×0.9 | 略微降低 |
 | 20 ~ 29 | ×0.8 | 中等降低 |
