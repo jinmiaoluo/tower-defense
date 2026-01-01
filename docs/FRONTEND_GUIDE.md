@@ -125,29 +125,38 @@ const damageSystem: DamageSystem = {
 
 ### BuildingSystem
 
-负责建筑相关计算。
+负责建筑相关计算，包括成本、伤害、射程和金钱检查。
 
 ```typescript
 // src/game/systems/BuildingSystem.ts
 interface BuildingSystem {
-  getUpgradeCost(type: string, level: number, config: GameConfig): number
-  getSellIncome(type: string, level: number, config: GameConfig): number
-  getDamageAtLevel(type: string, level: number, config: GameConfig): number
-  isInRange(building: Building, targetPos: [number, number], config: GameConfig): boolean
+  getTotalCost(type: string, level: number): number      // 累计花费（建造 + 升级）
+  getUpgradeCost(type: string, level: number): number    // 升级成本
+  getSellIncome(type: string, level: number): number     // 出售回收
+  getDamageAtLevel(type: string, level: number): number  // 等级伤害
+  getRangeAtLevel(type: string, level: number): number   // 等级射程
+  isInRange(building: Building, targetPos: [number, number]): boolean
+  getAttackSpeedFrames(type: string): number             // 攻击间隔帧数
+  canAfford(money: number, type: string): boolean        // 检查建造金钱
+  canAffordUpgrade(money: number, type: string, level: number): boolean  // 检查升级金钱
+  isWeapon(type: string): boolean                        // 是否为武器建筑
+  getBuildingConfig(type: string): BuildingConfig        // 获取配置
 }
 ```
 
 ### EconomySystem
 
-负责经济相关计算。
+负责波次生命奖励计算。
 
 ```typescript
 // src/game/systems/EconomySystem.ts
 interface EconomySystem {
-  canAfford(money: number, buildingType: string, config: GameConfig): boolean
   getLifeReward(waveNumber: number): number  // 每 5 波 +5，每 10 波 +10
+  applyLifeReward(currentLife: number, reward: number): number  // 应用奖励，不超过 100
 }
 ```
+
+> **注意**: `canAfford` 方法已移至 BuildingSystem，与 `canAffordUpgrade` 统一管理建筑成本检查。
 
 ### BulletSystem
 
