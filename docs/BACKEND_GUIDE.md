@@ -57,7 +57,7 @@ backend/
 | P0 | 项目初始化 | Django + DRF + PostgreSQL + pytest |
 | P0 | 数据模型 | GameSession, WaveRecord, LeaderboardEntry |
 | P0 | 游戏配置 | 建筑配置、怪物基础属性、地图配置 |
-| P1 | 计算器 (TDD) | calc_total_cost, process_actions, calc_new_difficulty, calc_monster_attrs |
+| P1 | 计算器 (TDD) | calc_total_cost, process_actions, calc_new_difficulty, calc_monster_attrs, calc_actual_damage, calc_hit_score, calc_life_reward |
 | P1 | 波次生成器 (TDD) | generate_wave, generate_first_wave |
 | P2 | 验证器 (TDD) | Level 1, Level 2, Level 2+, Level 4 |
 | P2 | API 视图 (TDD) | 创建会话, 提交波次, 游戏结束, 排行榜 |
@@ -280,6 +280,139 @@ def test_calc_monster_attrs_high_difficulty():
     assert result["speed"] == 4.5  # 3 + 3.0/2
 ```
 
+### calc_actual_damage
+
+计算实际伤害（考虑护盾减伤和最低伤害）。
+
+```python
+# game/calculators.py
+def calc_actual_damage(raw_damage: int, shield: int) -> int:
+    """计算实际伤害 = max(原始伤害 - 护盾, 原始伤害 × 0.1)"""
+    min_damage = math.ceil(raw_damage * 0.1)
+    return max(raw_damage - shield, min_damage)
+```
+
+```python
+# tests/test_calculators.py
+def test_calc_actual_damage_no_shield():
+    assert calc_actual_damage(12, 0) == 12
+
+def test_calc_actual_damage_with_shield():
+    assert calc_actual_damage(12, 5) == 7  # 12 - 5 = 7
+
+def test_calc_actual_damage_high_shield():
+    # 护盾高于伤害时，使用最低伤害（10%）
+    assert calc_actual_damage(12, 20) == 2  # ceil(12 * 0.1) = 2
+
+def test_calc_actual_damage_min_damage():
+    # 最低伤害保证高攻武器对高护盾怪有效
+    assert calc_actual_damage(30, 100) == 3  # ceil(30 * 0.1) = 3
+```
+
+### calc_hit_score
+
+计算命中得分（每次攻击命中时累加）。
+
+```python
+# game/calculators.py
+def calc_hit_score(actual_damage: int) -> int:
+    """计算命中得分 = floor(√实际伤害)"""
+    return int(math.sqrt(actual_damage))
+```
+
+```python
+# tests/test_calculators.py
+def test_calc_hit_score_basic():
+    assert calc_hit_score(1) == 1   # √1 = 1
+    assert calc_hit_score(4) == 2   # √4 = 2
+    assert calc_hit_score(9) == 3   # √9 = 3
+
+def test_calc_hit_score_floor():
+    assert calc_hit_score(10) == 3  # √10 ≈ 3.16 -> 3
+    assert calc_hit_score(15) == 3  # √15 ≈ 3.87 -> 3
+
+def test_calc_hit_score_high_damage():
+    assert calc_hit_score(100) == 10  # √100 = 10
+```
+
+> **设计说明**：得分在每次攻击命中时累加（`√伤害`），而非击杀时加分。这使高攻速武器（如激光枪）在得分上更有价值。
+
+### calc_life_reward
+
+计算波次生命奖励。
+
+```python
+# game/calculators.py
+def calc_life_reward(wave: int) -> int:
+    """计算波次生命奖励
+
+    - 每 10 波: +10 生命
+    - 每 5 波（非 10 的倍数）: +5 生命
+    - 其他: 0
+    """
+    if wave % 10 == 0:
+        return 10
+    elif wave % 5 == 0:
+        return 5
+    return 0
+```
+
+```python
+# tests/test_calculators.py
+def test_calc_life_reward_normal_wave():
+    assert calc_life_reward(1) == 0
+    assert calc_life_reward(3) == 0
+    assert calc_life_reward(7) == 0
+
+def test_calc_life_reward_every_5_waves():
+    assert calc_life_reward(5) == 5
+    assert calc_life_reward(15) == 5
+    assert calc_life_reward(25) == 5
+
+def test_calc_life_reward_every_10_waves():
+    # 10 的倍数返回 10（覆盖 5 的规则）
+    assert calc_life_reward(10) == 10
+    assert calc_life_reward(20) == 10
+    assert calc_life_reward(30) == 10
+```
+
+### calc_final_score
+
+计算游戏结束时的最终得分（P2 阶段实现）。
+
+```python
+# game/calculators.py
+def calc_final_score(
+    accumulated_score: int,
+    waves_completed: int,
+    remaining_life: int,
+    remaining_money: int,
+    score_config: dict,
+) -> int:
+    """计算最终得分
+
+    最终得分 = 累计命中得分 + 波次奖励 + 剩余生命奖励 + 剩余金币奖励
+    """
+    wave_bonus = waves_completed * score_config["wave_coefficient"]
+    life_bonus = remaining_life * score_config["life_coefficient"]
+    money_bonus = int(remaining_money * score_config["money_coefficient"])
+    return accumulated_score + wave_bonus + life_bonus + money_bonus
+```
+
+```python
+# tests/test_calculators.py
+def test_calc_final_score():
+    score_config = {
+        "wave_coefficient": 10,
+        "life_coefficient": 5,
+        "money_coefficient": 0.1,
+    }
+    # 累计 1000 分 + 10 波 × 10 + 50 生命 × 5 + 200 金币 × 0.1
+    # = 1000 + 100 + 250 + 20 = 1370
+    result = calc_final_score(1000, 10, 50, 200, score_config)
+    assert result == 1370
+```
+
 ## 波次生成器
 
 ### generate_wave
@@ -291,7 +424,7 @@ def test_calc_monster_attrs_high_difficulty():
 def test_generate_wave_predefined():
     wave = generate_wave(1, 1.0)
     assert wave["waveNumber"] == 1
-    assert len(wave["monsters"]) == 3
+    assert len(wave["monsters"]) == 1  # 第一波只有 1 个怪物
     assert all(m["type"] == 0 for m in wave["monsters"])
 
 def test_generate_wave_auto():
@@ -315,23 +448,7 @@ def test_generate_wave_monster_ids():
 
 ## 验证器
 
-### 伤害和得分计算规则
-
-```python
-# game/calculators.py
-
-def calc_actual_damage(raw_damage: int, shield: int) -> int:
-    """计算实际伤害 = max(原始伤害 - 护盾, 原始伤害 × 0.1)"""
-    min_damage = math.ceil(raw_damage * 0.1)
-    return max(raw_damage - shield, min_damage)
-
-
-def calc_hit_score(actual_damage: int) -> int:
-    """计算命中得分 = floor(√实际伤害)"""
-    return int(math.sqrt(actual_damage))
-```
-
-> **说明**：得分在每次攻击命中时累加（`√伤害`），而非击杀时加分。这使高攻速武器在得分上更有价值。
+> 伤害和得分计算规则见上方 `calc_actual_damage` 和 `calc_hit_score` 计算器。
 
 ### Level 1：基础验证
 
