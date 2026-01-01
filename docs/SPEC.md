@@ -71,10 +71,20 @@
 
 #### 波次生成规则
 
-- 同一类型怪物单波最多出现 3 个
 - 波次 1-10 使用预定义配置
-- 波次 11+ 自动生成，怪物数量 = min(wave^1.1, 100)
+- 波次 11+ 自动生成：
+  - 怪物总数 = min(wave^1.1, 100)
+  - 使用确定性轮询算法分配怪物：
+    - 组大小按 1→2→3→1→2→3... 循环
+    - 怪物类型按 0→1→2→...→8→0→1... 轮询
+    - 确保服务端可根据 (wave_number, difficulty) 精确重建配置用于验证
+  - 一波可以有多组同类型怪物，总数可超过 3 个
 - 波次间隔：60 FPS × 3 = 180 帧
+
+> **与旧实现的区别**：旧实现使用随机算法生成波次配置（每组随机 1-3 个怪物，随机怪物类型）。新实现改为确定性轮询算法，原因是：
+> - 服务端验证需要精确重建波次配置
+> - 随机算法无法仅凭 (wave_number, difficulty) 重建相同配置
+> - 确定性算法保证相同输入产生相同输出，支持服务端独立验证
 
 #### 难度动态调整
 
@@ -181,6 +191,7 @@ difficulty 最小值为 1
 ### 后端
 
 - Python 3.13: 开发语言
+- uv: 0.9.15 包管理器
 - Django 5.2: Web 框架
 - Django REST Framework 3.16: API 框架
 - PostgreSQL 15: 数据库
@@ -198,6 +209,7 @@ difficulty 最小值为 1
 - **客户端执行**：游戏逻辑在客户端执行，服务端验证结果
 - **批量提交**：每波结束时批量提交，而非实时上传
 - **渐进验证**：每波验证一次，而非游戏结束时一次性验证
+- **确定性生成**：波次配置使用确定性算法生成，服务端可精确重建用于验证
 
 ### 验证方案
 
@@ -481,7 +493,7 @@ interface WaveResponse {
 ```typescript
 interface GameEndRequest {
   sessionId: string;
-  nickname: string;
+  nickname: string;              // 玩家昵称（1-32 字符，不能为纯空白）
 
   // 最后一波数据（与 WaveRequest 结构相同）
   lastWave: {
@@ -1096,11 +1108,26 @@ def validate_monster_ids(
     attacks: list[dict],
     monsters_config: dict,
 ) -> tuple[bool, str]:
-    """验证攻击事件中的 monsterId 是否是服务端下发的有效 UUID"""
+    """验证攻击事件中的怪物 ID 是否是服务端下发的有效 UUID
+
+    验证项目：
+    1. monsterId: 实际命中的怪物 ID
+    2. originalTargetId: 发射时瞄准的怪物 ID（用于验证建筑有合法目标）
+
+    两者都必须是服务端下发的有效 UUID。由于存在"误伤"机制，
+    monsterId 可能与 originalTargetId 不同，但两者都必须有效。
+    """
     for attack in attacks:
+        # 验证实际命中的怪物 ID
         mid = attack["monsterId"]
         if mid not in monsters_config:
             return False, f"未知的 monsterId: {mid}（不是服务端下发的 UUID）"
+
+        # 验证原始目标怪物 ID
+        original_tid = attack.get("originalTargetId")
+        if original_tid is not None and original_tid not in monsters_config:
+            return False, f"未知的 originalTargetId: {original_tid}（不是服务端下发的 UUID）"
+
     return True, ""
 
 
@@ -1149,7 +1176,7 @@ def validate_attack_range(
     射程规则：
     - range: 最小射程（太近的目标无法攻击）
     - max_range: 最大射程（太远的目标无法攻击）
-    - 升级后射程略微增加（level ** 0.1）
+    - 升级后射程按默认规则增加（每级 × 1.2）
 
     注意：由于子弹存在"误伤"机制，实际命中的怪物 (monsterPosition) 可能在射程外，
     但发射时的原始目标 (originalTargetPosition) 必须在射程内。
@@ -1159,7 +1186,8 @@ def validate_attack_range(
     tx, ty = attack["originalTargetPosition"]
 
     distance = math.sqrt((bx - tx) ** 2 + (by - ty) ** 2)
-    level_factor = building["level"] ** 0.1
+    # 射程按默认升级规则累积：每级 × 1.2
+    level_factor = 1.2 ** (building["level"] - 1)
     min_range = building_config[building["type"]]["range"] * level_factor
     max_range = building_config[building["type"]]["max_range"] * level_factor
 
@@ -1241,7 +1269,8 @@ def position_distance(pos1: list, pos2: list) -> int:
 
 - 伤害总和一致性: attacks 伤害总和 = result.totalDamageDealt，防止伪造总伤害
 - 攻击帧号时序: 帧号递增，防止伪造攻击时序
-- 怪物 ID 有效性: monsterId 必须是服务端下发的 UUID，防止伪造怪物 ID
+- 怪物 ID 有效性: monsterId 和 originalTargetId 都必须是服务端下发的 UUID，防止伪造怪物 ID
+- 原始目标验证: originalTargetId 确保建筑发射时有合法目标（支持"误伤"机制）
 - 累计伤害验证: 被击杀怪物的累计伤害 >= 生命值，防止减少怪物生命值
 - 击杀数量一致性: 根据伤害计算的击杀数 = 上报的击杀数，防止伪造击杀结果
 - 射程验证: 攻击时怪物在建筑射程内，防止增加射程
@@ -1479,31 +1508,22 @@ class LeaderboardEntry(models.Model):
 
 ### 定时清理策略
 
-每局游戏上限 24 小时，超时自动清理：
+每局游戏上限 24 小时，超时自动清理。
 
-```python
-# game/management/commands/cleanup_sessions.py
+**使用方式**：
 
-from datetime import timedelta
+```bash
+# 清理超过 24 小时的会话（默认）
+python manage.py cleanup_sessions
 
-from django.core.management.base import BaseCommand
-from django.utils import timezone
-
-from game.models import GameSession
-
-
-class Command(BaseCommand):
-    help = "清理过期的游戏会话"
-
-    def handle(self, *args, **options):
-        threshold = timezone.now() - timedelta(hours=24)
-        deleted, _ = GameSession.objects.filter(created_at__lt=threshold).delete()
-        self.stdout.write(f"已清理 {deleted} 个过期会话")
+# 清理超过 12 小时的会话（自定义）
+python manage.py cleanup_sessions --hours=12
 ```
 
-定时执行：
+**定时执行（cron）**：
 
 ```cron
+# 每小时执行一次清理
 0 * * * * /app/.venv/bin/python manage.py cleanup_sessions
 ```
 

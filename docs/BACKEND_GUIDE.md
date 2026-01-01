@@ -444,6 +444,15 @@ def test_calc_final_score():
 
 生成指定波次的怪物配置。
 
+**确定性轮询算法**（波次 11+）：
+
+与旧实现的随机算法不同，新实现使用确定性轮询算法：
+- 组大小按 1→2→3→1→2→3... 循环
+- 怪物类型按 0→1→2→...→8→0→1... 轮询
+- 相同的 (wave_number, difficulty) 输入始终产生相同的配置输出
+
+这确保服务端可以独立重建波次配置用于验证，无需存储完整的怪物列表。
+
 ```python
 # tests/test_generators.py
 def test_generate_wave_predefined():
