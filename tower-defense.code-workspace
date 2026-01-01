@@ -21,7 +21,7 @@
       "Vue.volar",
       "dbaeumer.vscode-eslint",
       "esbenp.prettier-vscode",
-      "EditorConfig.EditorConfig"
+      "Vue.vscode-typescript-vue-plugin"
     ]
   }
 }
