@@ -61,17 +61,19 @@
 
 #### 怪物类型（9 种）
 
-| 索引 | 名称 | 生命值 | 速度 | 护盾 | 伤害 | 特点 |
-|------|------|--------|------|------|------|------|
-| 0 | 普通怪 | 50 | 3 | 0 | 1 | 最弱小的怪物 |
-| 1 | 稍强怪 | 50 | 6 | 1 | 2 | 稍强一些 |
-| 2 | 速度怪 | 50 | 12 | 1 | 3 | 速度较快 |
-| 3 | 血量怪 | 500 | 5 | 1 | 3 | 生命值很高 |
-| 4 | 护盾怪 | 50 | 5 | 20 | 3 | 防御很强 |
-| 5 | 伤害怪 | 50 | 7 | 2 | 10 | 到达终点伤害高 |
-| 6 | 速度血量怪 | 100 | 15 | 3 | 3 | 速度、生命都较高 |
-| 7 | 极速怪 | 30 | 30 | 1 | 4 | 速度很快 |
-| 8 | 护盾血量怪 | 300 | 3 | 15 | 5 | 防御强、生命高 |
+| 索引 | 名称 | 生命值 | 速度 | 速度上限 | 护盾 | 伤害 | 金币 | 特点 |
+|------|------|--------|------|----------|------|------|------|------|
+| 0 | 普通怪 | 50 | 3 | 10 | 0 | 1 | 5 | 最弱小的怪物 |
+| 1 | 稍强怪 | 50 | 6 | 20 | 1 | 2 | 8 | 稍强一些 |
+| 2 | 速度怪 | 50 | 12 | 30 | 1 | 3 | 10 | 速度较快 |
+| 3 | 血量怪 | 500 | 5 | 10 | 1 | 3 | 50 | 生命值很高 |
+| 4 | 护盾怪 | 50 | 5 | 10 | 20 | 3 | 30 | 防御很强 |
+| 5 | 伤害怪 | 50 | 7 | 14 | 2 | 10 | 25 | 到达终点伤害高 |
+| 6 | 速度血量怪 | 100 | 15 | 30 | 3 | 3 | 35 | 速度、生命都较高 |
+| 7 | 极速怪 | 30 | 30 | 40 | 1 | 4 | 20 | 速度很快 |
+| 8 | 护盾血量怪 | 300 | 3 | 10 | 15 | 5 | 60 | 防御强、生命高 |
+
+> **金币设计依据**：基础怪物（0-2）金币较低（5-10），高难度怪物（3-8）金币较高（20-60），与怪物的击杀难度成正比。
 
 #### 波次生成规则
 
@@ -602,11 +604,17 @@ interface LeaderboardResponse {
 
 ```typescript
 interface AttackEvent {
-  frame: number;                      // 攻击发生的帧号
-  buildingId: string;                 // 发起攻击的建筑 ID
-  monsterId: string;                  // 被攻击的怪物 ID（使用服务端下发的 UUID）
-  damage: number;                     // 实际造成的伤害（扣除护盾后）
-  monsterPosition: [number, number];  // 怪物所在格子 [x, y]
+  frame: number;                               // 命中发生的帧号
+  buildingId: string;                          // 发起攻击的建筑 ID
+
+  // 发射时的原始目标信息（用于射程验证）
+  originalTargetId: string;                    // 发射时瞄准的怪物 ID
+  originalTargetPosition: [number, number];    // 发射时目标的格子坐标
+
+  // 实际命中信息（子弹可能命中其他怪物）
+  monsterId: string;                           // 实际命中的怪物 ID
+  monsterPosition: [number, number];           // 命中时怪物的格子坐标
+  damage: number;                              // 实际造成的伤害（扣除护盾后）
 }
 ```
 
@@ -614,11 +622,19 @@ interface AttackEvent {
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| frame | number | 攻击发生的帧号，用于验证攻击时序和 DPS |
+| frame | number | 命中发生的帧号，用于验证攻击时序和 DPS |
 | buildingId | string | 发起攻击的建筑 ID，如 "b-001" |
-| monsterId | string | 被攻击的怪物 ID，使用服务端下发的 UUID |
+| originalTargetId | string | 发射时瞄准的怪物 ID（用于验证建筑有合法目标） |
+| originalTargetPosition | [number, number] | 发射时目标的格子坐标（用于射程验证） |
+| monsterId | string | 实际命中的怪物 ID，可能与 originalTargetId 不同（"误伤"） |
+| monsterPosition | [number, number] | 命中时怪物的格子坐标，用于路径验证 |
 | damage | number | 实际伤害 = max(建筑伤害 - 怪物护盾, 建筑伤害 × 0.1) |
-| monsterPosition | [number, number] | 怪物所在格子坐标 [x, y]，用于路径验证 |
+
+**为什么需要记录原始目标？**
+
+子弹系统存在"误伤"机制：建筑向 Monster A 发射子弹，但子弹可能命中路径上的 Monster B。
+- `originalTargetPosition`：用于验证建筑发射时有合法目标（在射程内）
+- `monsterPosition`：用于验证怪物路径合理性（从入口向出口移动）
 
 **monsterPosition 示例**：
 
@@ -631,26 +647,49 @@ interface AttackEvent {
 **记录时机**：
 
 ```typescript
-// 在建筑攻击命中时记录
-function onBuildingHit(building: Building, monster: Monster, rawDamage: number) {
+// 子弹命中时记录（bullet 携带原始目标信息）
+function onBulletHit(bullet: Bullet, hitMonster: Monster) {
   // 最低伤害 = 原始伤害的 10%（保证高伤害武器打护盾怪更有效）
-  const minDamage = Math.ceil(rawDamage * 0.1)
-  const actualDamage = Math.max(rawDamage - monster.shield, minDamage)
+  const minDamage = Math.ceil(bullet.damage * 0.1)
+  const actualDamage = Math.max(bullet.damage - hitMonster.shield, minDamage)
 
   attacks.push({
     frame: currentFrame,
-    buildingId: building.id,
-    monsterId: monster.id,
+    buildingId: bullet.building.id,
+
+    // 原始目标信息（从 bullet 获取）
+    originalTargetId: bullet.originalTarget.id,
+    originalTargetPosition: bullet.originalTargetPosition,
+
+    // 实际命中信息（可能与原始目标不同）
+    monsterId: hitMonster.id,
+    monsterPosition: [hitMonster.gridX, hitMonster.gridY],
     damage: actualDamage,
-    monsterPosition: [monster.gridX, monster.gridY],
   })
 
   // 同时更新统计
   result.totalDamageDealt += actualDamage
-  building.damageDealt += actualDamage
+  bullet.building.damageDealt += actualDamage
 
   // 每次击中时加分（分数 = √伤害）
   result.scoreGained += Math.floor(Math.sqrt(actualDamage))
+}
+
+// laser_gun 即时命中（原始目标 = 实际命中）
+function onLaserHit(building: Building, monster: Monster, rawDamage: number) {
+  const minDamage = Math.ceil(rawDamage * 0.1)
+  const actualDamage = Math.max(rawDamage - monster.shield, minDamage)
+  const monsterPos: [number, number] = [monster.gridX, monster.gridY]
+
+  attacks.push({
+    frame: currentFrame,
+    buildingId: building.id,
+    originalTargetId: monster.id,
+    originalTargetPosition: monsterPos,
+    monsterId: monster.id,
+    monsterPosition: monsterPos,
+    damage: actualDamage,
+  })
 }
 ```
 
@@ -1097,15 +1136,21 @@ def validate_attack_range(
     building: dict,
     building_config: dict,
 ) -> tuple[bool, str]:
-    """验证攻击是否在建筑射程内"""
-    bx, by = building["position"]
-    mx, my = attack["monsterPosition"]
+    """
+    验证发射时的原始目标是否在建筑射程内。
 
-    distance = math.sqrt((bx - mx) ** 2 + (by - my) ** 2)
+    注意：由于子弹存在"误伤"机制，实际命中的怪物 (monsterPosition) 可能在射程外，
+    但发射时的原始目标 (originalTargetPosition) 必须在射程内。
+    """
+    bx, by = building["position"]
+    # 使用原始目标位置进行验证，而不是实际命中位置
+    tx, ty = attack["originalTargetPosition"]
+
+    distance = math.sqrt((bx - tx) ** 2 + (by - ty) ** 2)
     building_range = building_config[building["type"]]["range"] * building["level"] ** 0.1
 
     if distance > building_range + 1:  # 1 格容差（怪物可能在格子边缘）
-        return False, f"攻击超出射程: 建筑 {building['id']} 在 ({bx},{by}), 怪物在 ({mx},{my}), 距离 {distance:.1f}, 射程 {building_range:.1f}"
+        return False, f"发射时目标超出射程: 建筑 {building['id']} 在 ({bx},{by}), 原始目标在 ({tx},{ty}), 距离 {distance:.1f}, 射程 {building_range:.1f}"
 
     return True, ""
 

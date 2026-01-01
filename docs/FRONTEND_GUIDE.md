@@ -42,7 +42,7 @@ frontend/
 |------|------|------|
 | P0 | 项目初始化 | Vite + Vue 3 + TypeScript + Phaser 3 + Vitest |
 | P0 | 类型定义 + Mock | 所有开发的基础 |
-| P1 | 核心系统 (TDD) | PathSystem, DamageSystem, BuildingSystem, EconomySystem, WaveRecorder |
+| P1 | 核心系统 (TDD) | PathSystem, DamageSystem, BuildingSystem, EconomySystem, BulletSystem, WaveManager, WaveRecorder |
 | P1 | Phaser 实体 | Monster, Building, GameScene |
 | P2 | 状态管理 | Pinia Store |
 | P2 | API 层 | Mock → 真实 API 切换 |
@@ -122,6 +122,169 @@ interface EconomySystem {
 }
 ```
 
+### BulletSystem
+
+负责子弹的创建、飞行和碰撞检测。保持与旧实现一致的物理规则。
+
+```typescript
+// src/game/systems/BulletSystem.ts
+interface Bullet {
+  id: string
+  building: Building                         // 发射的建筑
+  damage: number                             // 伤害值
+  speed: number                              // 飞行速度
+  x: number                                  // 当前位置
+  y: number
+  vx: number                                 // 速度向量（发射时计算，之后不变）
+  vy: number
+
+  // 原始目标信息（用于服务端验证射程）
+  originalTargetId: string                   // 发射时瞄准的怪物 ID
+  originalTargetPosition: [number, number]   // 发射时目标的格子坐标
+}
+
+class BulletSystem {
+  private bullets: Bullet[] = []
+
+  // 创建子弹（发射时计算方向，之后不再追踪）
+  createBullet(config: {
+    building: Building
+    target: Monster
+    damage: number
+    speed: number
+    position: [number, number]
+  }): Bullet
+
+  // 每帧更新：移动子弹、检测碰撞、清理无效子弹
+  update(monsters: Monster[], mapBounds: Rect, recorder: WaveRecorder): void
+
+  // 检测子弹与怪物的碰撞（可命中任意怪物，不只是原目标）
+  private checkCollision(bullet: Bullet, monsters: Monster[]): Monster | null
+
+  // 检测子弹是否飞出地图（miss）
+  private isOutOfBounds(bullet: Bullet, mapBounds: Rect): boolean
+
+  // 获取当前所有子弹（用于渲染）
+  getBullets(): Bullet[]
+}
+```
+
+**核心逻辑**：
+
+```typescript
+update(monsters: Monster[], mapBounds: Rect, recorder: WaveRecorder): void {
+  this.bullets = this.bullets.filter(bullet => {
+    // 1. 检查是否飞出地图（miss）
+    if (this.isOutOfBounds(bullet, mapBounds)) {
+      return false  // 移除子弹，不记录（miss 不计入攻击记录）
+    }
+
+    // 2. 检查是否命中任意怪物
+    const hitMonster = this.checkCollision(bullet, monsters)
+    if (hitMonster) {
+      // 计算实际伤害
+      const actualDamage = hitMonster.takeDamage(bullet.damage)
+
+      // 记录攻击事件（包含原始目标和实际命中信息）
+      recorder.recordAttack({
+        buildingId: bullet.building.id,
+        originalTargetId: bullet.originalTargetId,
+        originalTargetPosition: bullet.originalTargetPosition,
+        monsterId: hitMonster.id,
+        monsterPosition: hitMonster.getGridPosition(),
+        damage: actualDamage,
+        frame: currentFrame,
+      })
+
+      return false  // 移除子弹
+    }
+
+    // 3. 移动子弹
+    bullet.x += bullet.vx
+    bullet.y += bullet.vy
+
+    return true  // 保留子弹
+  })
+}
+```
+
+**碰撞检测**（与旧实现一致）：
+
+```typescript
+private checkCollision(bullet: Bullet, monsters: Monster[]): Monster | null {
+  for (const monster of monsters) {
+    if (!monster.isAlive()) continue
+
+    const dx = monster.x - bullet.x
+    const dy = monster.y - bullet.y
+    const distance = Math.sqrt(dx * dx + dy * dy)
+    const hitRadius = (monster.radius + bullet.radius) * Math.sqrt(2)
+
+    if (distance <= hitRadius) {
+      return monster
+    }
+  }
+  return null
+}
+```
+
+### WaveManager
+
+负责波次状态管理和怪物生成调度。
+
+```typescript
+// src/game/systems/WaveManager.ts
+type WaveState = 'idle' | 'spawning' | 'fighting' | 'interval' | 'completed'
+
+class WaveManager {
+  state: WaveState = 'idle'
+  private pendingMonsters: WaveMonster[] = []  // 待生成的怪物队列
+  private spawnInterval: number = 30           // 每 30 帧生成一个怪物
+  private waveIntervalFrames: number = 180     // 波次间隔 180 帧（3 秒）
+
+  // 开始新波次（从服务端下发的配置）
+  startWave(waveConfig: WaveConfig): void {
+    this.pendingMonsters = [...waveConfig.monsters]
+    this.state = 'spawning'
+  }
+
+  // 每帧更新，返回需要生成的怪物（或 null）
+  update(currentFrame: number): WaveMonster | null
+
+  // 注册怪物到管理器（用于追踪存活状态）
+  registerMonster(monster: Monster): void
+
+  // 通知怪物死亡或到达终点
+  onMonsterRemoved(monster: Monster): void
+
+  // 检查波次是否结束（所有怪物死亡或穿过）
+  isWaveComplete(): boolean
+
+  // 获取当前存活的怪物列表
+  getAliveMonsters(): Monster[]
+
+  // 开始波次间隔
+  startInterval(): void
+
+  // 检查波次间隔是否结束
+  isIntervalComplete(): boolean
+}
+```
+
+**状态流转**：
+
+```
+idle → (startWave) → spawning → (所有怪物生成完毕) → fighting
+                                                        ↓
+                                            (所有怪物死亡/穿过)
+                                                        ↓
+interval ← (startInterval) ← completed ← (isWaveComplete)
+    ↓
+(isIntervalComplete)
+    ↓
+  idle → 等待下一波 startWave
+```
+
 ### WaveRecorder（关键）
 
 负责记录所有需要提交给服务端的数据。
@@ -136,14 +299,16 @@ class WaveRecorder {
   recordUpgrade(id: string, level: number, frame: number): void
   recordSell(id: string, frame: number): void
 
-  // 记录攻击事件
-  recordAttack(
-    buildingId: string,
-    monsterId: string,
-    damage: number,
-    monsterPosition: [number, number],
+  // 记录攻击事件（包含原始目标和实际命中信息）
+  recordAttack(event: {
+    buildingId: string
+    originalTargetId: string              // 发射时瞄准的怪物 ID
+    originalTargetPosition: [number, number]  // 发射时目标的格子坐标
+    monsterId: string                     // 实际命中的怪物 ID
+    monsterPosition: [number, number]     // 命中时怪物的格子坐标
+    damage: number
     frame: number
-  ): void
+  }): void
 
   // 记录战斗结果
   recordKill(monsterType: number, monsterLife: number): void
@@ -211,6 +376,36 @@ class Building extends Phaser.GameObjects.Sprite {
   getDamage(): number
   getRange(): number
   getAttackSpeed(): number
+}
+```
+
+**攻击机制**：
+
+保持与旧实现一致的子弹物理系统：
+
+| 特性 | 说明 |
+|------|------|
+| 子弹飞行 | 有物理轨迹，按固定方向直线飞行 |
+| 可能 miss | 目标移走后子弹可能飞出地图 |
+| 误伤机制 | 子弹可以命中路径上的任意怪物 |
+| laser_gun | 即时命中，无子弹飞行 |
+
+```typescript
+// fire() 方法实现思路
+fire(target: Monster, bulletSystem: BulletSystem): void {
+  if (this.type === 'laser_gun') {
+    // 激光枪：即时命中
+    target.takeDamage(this.getDamage())
+  } else {
+    // 其他武器：发射子弹
+    bulletSystem.createBullet({
+      building: this,
+      target: target,
+      damage: this.getDamage(),
+      speed: this.getBulletSpeed(),
+      position: [this.x, this.y],
+    })
+  }
 }
 ```
 
@@ -310,8 +505,26 @@ describe('WaveRecorder', () => {
   })
 
   it('should calculate total damage dealt', () => {
-    recorder.recordAttack('b-001', 'uuid-1', 10, [3, 3], 100)
-    recorder.recordAttack('b-001', 'uuid-2', 15, [4, 4], 120)
+    // 正常命中：原始目标 = 实际命中
+    recorder.recordAttack({
+      buildingId: 'b-001',
+      originalTargetId: 'uuid-1',
+      originalTargetPosition: [3, 3],
+      monsterId: 'uuid-1',
+      monsterPosition: [3, 3],
+      damage: 10,
+      frame: 100,
+    })
+    // 误伤：原始目标是 uuid-2，但命中了 uuid-3
+    recorder.recordAttack({
+      buildingId: 'b-001',
+      originalTargetId: 'uuid-2',
+      originalTargetPosition: [4, 4],
+      monsterId: 'uuid-3',
+      monsterPosition: [5, 5],
+      damage: 15,
+      frame: 120,
+    })
     expect(recorder.getResult().totalDamageDealt).toBe(25)
   })
 
