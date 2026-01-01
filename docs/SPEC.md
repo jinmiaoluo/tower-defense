@@ -832,6 +832,10 @@ if lifeReward > 0:
 
 def calc_new_difficulty(current: float, life_lost: int, wave: int) -> float:
     """根据上一波受伤情况调整难度"""
+    # Wave 1 不调整难度（教学波）
+    if wave == 1:
+        return current
+
     if life_lost == 0:
         # 没有受伤，增加难度
         factor = 1.2 if wave >= 5 else 1.05
@@ -851,8 +855,11 @@ def calc_new_difficulty(current: float, life_lost: int, wave: int) -> float:
 
 **难度调整规则**：
 
+> **注意**：第 1 波（教学波）不调整难度，直接返回当前值。
+
 | 上一波受伤 | 难度变化 | 说明 |
 |------------|----------|------|
+| Wave 1 | ×1.0 | 教学波，不调整 |
 | 0 | ×1.05 ~ ×1.2 | 玩家太强，增加挑战 |
 | 1 ~ 9 | ×1.0 ~ ×1.05 | 表现良好，维持或略增 |
 | 10 ~ 19 | ×0.9 | 略微降低 |

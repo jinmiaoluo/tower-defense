@@ -245,9 +245,14 @@ def test_process_actions_sell():
 
 ### calc_new_difficulty
 
-根据上一波受伤情况计算新难度。
+根据上一波受伤情况计算新难度。第 1 波（教学波）不调整难度。
 
 ```python
+def test_calc_new_difficulty_wave_1_no_adjustment():
+    # Wave 1 不调整难度
+    assert calc_new_difficulty(1.0, 0, 1) == 1.0
+    assert calc_new_difficulty(2.0, 50, 1) == 2.0
+
 def test_calc_new_difficulty_no_damage_early():
     assert calc_new_difficulty(1.0, 0, 3) == 1.05
 
