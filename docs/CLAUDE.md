@@ -1,0 +1,2 @@
+- 避免使用 emoji
+- 使用 markdown list 取代 markdown table
