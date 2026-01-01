@@ -736,6 +736,11 @@ def test_submit_wave_session_not_found(client):
 
 ### POST /api/game/sessions/end
 
+支持两种模式：
+
+- **带 lastWave**：提交最后一波数据并结束（正常结束）
+- **不带 lastWave**：直接结束游戏（提前结束），使用已提交的波次数据
+
 ```python
 @pytest.mark.django_db
 def test_end_session_success(client, game_session_with_waves):
@@ -749,6 +754,19 @@ def test_end_session_success(client, game_session_with_waves):
             "result": {...},
             "buildings": [],
         },
+    }
+    response = client.post("/api/game/sessions/end", data=request_data, content_type="application/json")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["verified"] is True
+    assert "ranking" in data
+
+@pytest.mark.django_db
+def test_end_session_without_last_wave(client, game_session_with_waves):
+    # 提前结束：不带 lastWave，使用已完成的波次数据
+    request_data = {
+        "sessionId": str(game_session_with_waves.id),
+        "nickname": "Player1",
     }
     response = client.post("/api/game/sessions/end", data=request_data, content_type="application/json")
     assert response.status_code == 200

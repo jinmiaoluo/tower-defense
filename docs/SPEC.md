@@ -582,7 +582,10 @@ interface WaveResponse {
 
 ### POST /api/game/sessions/end
 
-提交游戏最终结果（含最后一波数据），获取排名。
+结束游戏会话，获取排名。支持两种模式：
+
+1. **带 lastWave**：提交最后一波数据并结束（正常结束）
+2. **不带 lastWave**：直接结束游戏（提前结束），使用已提交的波次数据计算得分
 
 #### 请求
 
@@ -591,8 +594,9 @@ interface GameEndRequest {
   sessionId: string;
   nickname: string;              // 玩家昵称（1-32 字符，不能为纯空白）
 
-  // 最后一波数据（与 WaveRequest 结构相同）
-  lastWave: {
+  // 最后一波数据（可选，提前结束时不提供）
+  // 不提供 lastWave 时，必须至少已完成一波
+  lastWave?: {
     waveNumber: number;
     actions: Array<{
       type: 'BUILD' | 'UPGRADE' | 'SELL';
