@@ -340,7 +340,7 @@ interval ← (startInterval) ← completed ← (isWaveComplete)
 ```typescript
 // src/game/systems/WaveRecorder.ts
 class WaveRecorder {
-  constructor(waveNumber: number)
+  constructor(waveNumber: number, startFrame: number)
 
   // 记录建筑操作
   recordBuild(id: string, type: string, position: [number, number], frame: number): void
@@ -363,15 +363,26 @@ class WaveRecorder {
   recordPassed(damage: number): void
   addMoney(amount: number): void
   addScore(amount: number): void
-  setDuration(frames: number): void
+  setDuration(currentFrame: number): void  // 设置波次持续帧数
 
   // 导出数据
   getActions(): Action[]
   getAttacks(): AttackEvent[]
   getResult(): WaveResult
   toWaveRequest(sessionId: string, buildings: BuildingState[]): WaveRequest
+
+  // 重置记录器（用于下一波）
+  reset(newWaveNumber: number, newStartFrame: number): void
 }
 ```
+
+**waveDurationFrames 计算**：
+
+- 起点（startFrame）：波次第一个怪物生成的帧号（构造函数或 reset 时传入）
+- 终点（currentFrame）：波次最后一个怪物死亡或穿过时调用 `setDuration(currentFrame)`
+- 计算：`waveDurationFrames = currentFrame - startFrame`
+
+> **注意**：暂停时帧号不增长，因此 `waveDurationFrames` 只记录实际游戏进行的帧数。
 
 ## 游戏实体
 
