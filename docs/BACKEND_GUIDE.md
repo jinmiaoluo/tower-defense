@@ -160,17 +160,19 @@ GAME_CONFIG = {
 }
 
 # 波次 1-10 的预定义配置
+# 来源：旧实现 td-data-stage-1.js:184-250
+# 前 10 波只使用 type 0/1/2 三种基础怪物，难度渐进
 PREDEFINED_WAVES = {
-    1: [{"type": 0, "count": 3}],
-    2: [{"type": 0, "count": 3}, {"type": 1, "count": 2}],
-    3: [{"type": 1, "count": 3}, {"type": 2, "count": 2}],
-    4: [{"type": 0, "count": 2}, {"type": 2, "count": 3}],
-    5: [{"type": 1, "count": 3}, {"type": 3, "count": 1}],
-    6: [{"type": 2, "count": 3}, {"type": 4, "count": 2}],
-    7: [{"type": 3, "count": 2}, {"type": 5, "count": 2}],
-    8: [{"type": 4, "count": 3}, {"type": 6, "count": 2}],
-    9: [{"type": 5, "count": 2}, {"type": 7, "count": 3}],
-    10: [{"type": 6, "count": 2}, {"type": 8, "count": 2}],
+    1: [{"type": 0, "count": 1}],
+    2: [{"type": 0, "count": 1}, {"type": 1, "count": 1}],
+    3: [{"type": 0, "count": 2}, {"type": 1, "count": 1}],
+    4: [{"type": 0, "count": 2}, {"type": 1, "count": 1}],
+    5: [{"type": 0, "count": 3}, {"type": 1, "count": 2}],
+    6: [{"type": 0, "count": 4}, {"type": 1, "count": 2}],
+    7: [{"type": 0, "count": 5}, {"type": 1, "count": 3}, {"type": 2, "count": 1}],
+    8: [{"type": 0, "count": 6}, {"type": 1, "count": 4}, {"type": 2, "count": 1}],
+    9: [{"type": 0, "count": 7}, {"type": 1, "count": 3}, {"type": 2, "count": 2}],
+    10: [{"type": 0, "count": 8}, {"type": 1, "count": 4}, {"type": 2, "count": 3}],
 }
 ```
 
