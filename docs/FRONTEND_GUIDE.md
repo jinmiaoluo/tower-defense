@@ -50,7 +50,7 @@ frontend/
 
 ### PathSystem
 
-负责怪物路径计算。使用动态寻路算法（Dijkstra/BFS），与旧实现保持一致。
+负责怪物路径计算。使用动态寻路算法（BFS），与旧实现保持一致。
 
 **核心特性**：
 
@@ -59,33 +59,78 @@ frontend/
 - 寻路回溯时若有多条等距路径，随机选择一条
 - 建筑放置后该格子变为不可通行，影响后续怪物的路径计算
 
+**怪物重新寻路触发条件**：
+
+- 路径列表为空时
+- 每步有 10% 概率自动重新寻路（模拟随机移动）
+- 下一步格子变为不可通行时（如被新建筑占据）
+
+当建筑阻断怪物当前路线时，怪物会自动重新寻路，可能选择更远的绕行路线。
+
+> **来源**: 旧实现 `td-obj-monster.js:184-203` getNextGrid()
+
 ```typescript
 // src/game/systems/PathSystem.ts
 interface PathSystem {
-  // 为指定怪物计算从当前位置到出口的路径
-  findPath(
-    startPos: [number, number],
-    mapConfig: MapConfig,
-    buildings: Building[]
-  ): [number, number][]
+  // 生成从入口到出口的路径
+  generatePath(mapConfig: MapConfig): Position[]
 
-  // 检查格子是否可通行（考虑障碍物和建筑）
-  isPassable(
-    pos: [number, number],
-    mapConfig: MapConfig,
-    buildings: Building[]
-  ): boolean
-
-  // 检查在指定位置放置建筑是否会阻塞通路或现有怪物
-  wouldBlock(
-    buildPos: [number, number],
-    mapConfig: MapConfig,
-    buildings: Building[],
-    monsters: Monster[]
-  ): boolean
+  // 从指定位置生成到出口的路径（用于怪物独立寻路）
+  generatePathFrom(startPosition: Position, mapConfig: MapConfig): Position[]
 
   // 获取路径上指定进度的位置（用于平滑移动）
-  getPositionAtProgress(path: [number, number][], progress: number): { x: number; y: number }
+  getPositionAtProgress(path: Position[], progress: number): { x: number; y: number }
+
+  // 检查从指定位置是否能到达出口
+  canReachExit(startPosition: Position, excludePosition?: Position): boolean
+}
+```
+
+### GridSystem
+
+负责地图格子状态管理和建筑放置验证。
+
+**双层检查机制**：
+
+建筑放置时需要通过两层检查：
+
+1. 路径检查: 确保入口到出口的路径不被完全阻断
+2. 怪物检查: 确保地图上已有的怪物不会被新建筑完全阻塞
+
+> **注意**: 可以阻断怪物的当前最短路线（怪物会重新寻路走更远的路线），但不能使怪物完全无路可走。
+
+> **来源**: 旧实现 `td-obj-grid.js:47-77` checkBlock()
+
+```typescript
+// src/game/systems/GridSystem.ts
+interface GridSystem {
+  // 检查是否可以在指定位置放置建筑（双层检查）
+  // 1. 检查是否为入口或出口
+  // 2. 检查入口到出口路径是否会被完全阻断
+  // 3. 检查已存在的怪物是否会被完全阻塞
+  canPlaceBuilding(position: Position, monsterPositions: Position[]): boolean
+
+  // 检查放置建筑是否会完全阻断入口到出口的路径
+  wouldBlockPath(position: Position): boolean
+
+  // 检查放置建筑是否会使指定怪物完全无路可走
+  // 参考旧实现：td-obj-monster.js:211-226 chkIfBlocked()
+  wouldBlockMonster(buildPosition: Position, monsterPosition: Position): boolean
+
+  // 检查指定位置是否可通行
+  isPassable(position: Position): boolean
+
+  // 在指定位置放置建筑
+  placeBuilding(position: Position, buildingId: string): boolean
+
+  // 移除指定位置的建筑
+  removeBuilding(position: Position): boolean
+
+  // 从指定位置计算到出口的路径
+  findPathFromPosition(position: Position): Position[]
+
+  // 从指定位置计算到出口的路径（排除某个格子，用于建筑放置检查）
+  findPathFromPositionExcluding(position: Position, excludePosition: Position): Position[]
 }
 ```
 
