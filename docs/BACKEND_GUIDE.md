@@ -52,31 +52,27 @@ backend/
 
 ## 开发优先级
 
-| 阶段 | 内容 | 说明 |
-|------|------|------|
-| P0 | 项目初始化 | Django + DRF + PostgreSQL + pytest |
-| P0 | 数据模型 | GameSession, WaveRecord, LeaderboardEntry |
-| P0 | 游戏配置 | 建筑配置、怪物基础属性、地图配置 |
-| P1 | 计算器 (TDD) | calc_total_cost, process_actions, calc_new_difficulty, calc_monster_attrs, calc_actual_damage, calc_hit_score, calc_life_reward |
-| P1 | 波次生成器 (TDD) | generate_wave, generate_first_wave |
-| P2 | 验证器 (TDD) | Level 1, Level 2, Level 2+, Level 4 |
-| P2 | API 视图 (TDD) | 创建会话, 提交波次, 游戏结束, 排行榜 |
-| P3 | 管理命令 | cleanup_sessions |
-| P3 | 部署配置 | Docker, Gunicorn, Nginx |
+- P0 项目初始化: Django + DRF + PostgreSQL + pytest
+- P0 数据模型: GameSession, WaveRecord, LeaderboardEntry
+- P0 游戏配置: 建筑配置、怪物基础属性、地图配置
+- P1 计算器 (TDD): calc_total_cost, process_actions, calc_new_difficulty, calc_monster_attrs, calc_actual_damage, calc_hit_score, calc_life_reward
+- P1 波次生成器 (TDD): generate_wave, generate_first_wave
+- P2 验证器 (TDD): Level 1, Level 2, Level 2+, Level 4
+- P2 API 视图 (TDD): 创建会话, 提交波次, 游戏结束, 排行榜
+- P3 管理命令: cleanup_sessions
+- P3 部署配置: Docker, Gunicorn, Nginx
 
 ## 游戏配置
 
 服务端内部使用完整的怪物配置（包含所有属性），API 响应时只返回部分属性：
 
-| 属性 | 服务端配置 | API config.monsters | API wave.monsters |
-|------|-----------|---------------------|-------------------|
-| name | ✅ | ✅ | - |
-| color | ✅ | ✅ | - |
-| damage | ✅ | ✅ | - |
-| life | ✅ 基础值 | - | ✅ 计算后 |
-| speed | ✅ 基础值 | - | ✅ 计算后 |
-| shield | ✅ 基础值 | - | ✅ 计算后 |
-| money | ✅ | - | ✅ |
+- name: 服务端配置有，API config.monsters 有，API wave.monsters 无
+- color: 服务端配置有，API config.monsters 有，API wave.monsters 无
+- damage: 服务端配置有，API config.monsters 有，API wave.monsters 无
+- life: 服务端配置有基础值，API config.monsters 无，API wave.monsters 有计算后的值
+- speed: 服务端配置有基础值，API config.monsters 无，API wave.monsters 有计算后的值
+- shield: 服务端配置有基础值，API config.monsters 无，API wave.monsters 有计算后的值
+- money: 服务端配置有，API config.monsters 无，API wave.monsters 有
 
 > **说明**：
 > - `life/speed/shield` 会根据难度系数动态计算，因此在每波怪物配置中返回计算后的值

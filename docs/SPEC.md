@@ -37,41 +37,35 @@
 
 ### 基础设定
 
-| 配置项 | 值 |
-|--------|-----|
-| 游戏类型 | 固定路径塔防（无限模式） |
-| 地图规格 | 16×16 格子 |
-| 格子大小 | 32px |
-| 帧率 | 60 FPS |
-| 入口 | 左上角 (0, 0) |
-| 出口 | 右下角 (15, 15) |
+- 游戏类型: 固定路径塔防（无限模式）
+- 地图规格: 16x16 格子
+- 格子大小: 32px
+- 帧率: 60 FPS
+- 入口: 左上角 (0, 0)
+- 出口: 右下角 (15, 15)
 
 ### 怪物系统
 
 #### 怪物属性
 
-| 属性 | 说明 |
-|------|------|
-| life | 生命值 |
-| speed | 移动速度（1-40） |
-| max_speed | 最大速度 |
-| shield | 护盾值（减伤） |
-| damage | 到达终点造成的伤害（1-10） |
-| money | 击杀奖励金币 |
+- life: 生命值
+- speed: 移动速度（1-40）
+- max_speed: 最大速度
+- shield: 护盾值（减伤）
+- damage: 到达终点造成的伤害（1-10）
+- money: 击杀奖励金币
 
 #### 怪物类型（9 种）
 
-| 索引 | 名称 | 生命值 | 速度 | 速度上限 | 护盾 | 伤害 | 金币 | 特点 |
-|------|------|--------|------|----------|------|------|------|------|
-| 0 | 普通怪 | 50 | 3 | 10 | 0 | 1 | 5 | 最弱小的怪物 |
-| 1 | 稍强怪 | 50 | 6 | 20 | 1 | 2 | 8 | 稍强一些 |
-| 2 | 速度怪 | 50 | 12 | 30 | 1 | 3 | 10 | 速度较快 |
-| 3 | 血量怪 | 500 | 5 | 10 | 1 | 3 | 50 | 生命值很高 |
-| 4 | 护盾怪 | 50 | 5 | 10 | 20 | 3 | 30 | 防御很强 |
-| 5 | 伤害怪 | 50 | 7 | 14 | 2 | 10 | 25 | 到达终点伤害高 |
-| 6 | 速度血量怪 | 100 | 15 | 30 | 3 | 3 | 35 | 速度、生命都较高 |
-| 7 | 极速怪 | 30 | 30 | 40 | 1 | 4 | 20 | 速度很快 |
-| 8 | 护盾血量怪 | 300 | 3 | 10 | 15 | 5 | 60 | 防御强、生命高 |
+- 索引 0 - 普通怪: 生命值 50, 速度 3, 速度上限 10, 护盾 0, 伤害 1, 金币 5, 最弱小的怪物
+- 索引 1 - 稀强怪: 生命值 50, 速度 6, 速度上限 20, 护盾 1, 伤害 2, 金币 8, 稍强一些
+- 索引 2 - 速度怪: 生命值 50, 速度 12, 速度上限 30, 护盾 1, 伤害 3, 金币 10, 速度较快
+- 索引 3 - 血量怪: 生命值 500, 速度 5, 速度上限 10, 护盾 1, 伤害 3, 金币 50, 生命值很高
+- 索引 4 - 护盾怪: 生命值 50, 速度 5, 速度上限 10, 护盾 20, 伤害 3, 金币 30, 防御很强
+- 索引 5 - 伤害怪: 生命值 50, 速度 7, 速度上限 14, 护盾 2, 伤害 10, 金币 25, 到达终点伤害高
+- 索引 6 - 速度血量怪: 生命值 100, 速度 15, 速度上限 30, 护盾 3, 伤害 3, 金币 35, 速度、生命都较高
+- 索引 7 - 极速怪: 生命值 30, 速度 30, 速度上限 40, 护盾 1, 伤害 4, 金币 20, 速度很快
+- 索引 8 - 护盾血量怪: 生命值 300, 速度 3, 速度上限 10, 护盾 15, 伤害 5, 金币 60, 防御强、生命高
 
 > **金币设计依据**：基础怪物（0-2）金币较低（5-10），高难度怪物（3-8）金币较高（20-60），与怪物的击杀难度成正比。
 
@@ -104,56 +98,44 @@ difficulty 最小值为 1
 
 #### 塔属性
 
-| 属性 | 说明 |
-|------|------|
-| damage | 攻击力 |
-| range | 最小攻击范围（格子数） |
-| max_range | 最大攻击范围 |
-| speed | 攻击速度 |
-| bullet_speed | 子弹速度 |
-| life | 塔的生命值 |
-| shield | 塔的护盾值 |
-| cost | 建造费用 |
+- damage: 攻击力
+- range: 最小攻击范围（格子数）
+- max_range: 最大攻击范围
+- speed: 攻击速度
+- bullet_speed: 子弹速度
+- life: 塔的生命值
+- shield: 塔的护盾值
+- cost: 建造费用
 
 #### 塔类型（5 种）
 
-| 类型 | 名称 | 攻击力 | 范围 | 攻速 | 造价 | 特点 |
-|------|------|--------|------|------|------|------|
-| wall | 路障 | 0 | 0 | 0 | 5 | 阻挡路径，不攻击 |
-| cannon | 炮台 | 12 | 4-8 | 2 | 300 | 平衡型 |
-| LMG | 轻机枪 | 5 | 5-10 | 3 | 100 | 低攻击，大范围，经济型 |
-| HMG | 重机枪 | 30 | 3-5 | 3 | 800 | 高攻击，小范围 |
-| laser_gun | 激光枪 | 25 | 6-10 | 20 | 2000 | 高速攻击，高造价 |
+- wall (路障): 攻击力 0, 范围 0, 攻速 0, 造价 5, 阻挡路径不攻击
+- cannon (炮台): 攻击力 12, 范围 4-8, 攻速 2, 造价 300, 平衡型
+- LMG (轻机枪): 攻击力 5, 范围 5-10, 攻速 3, 造价 100, 低攻击大范围经济型
+- HMG (重机枪): 攻击力 30, 范围 3-5, 攻速 3, 造价 800, 高攻击小范围
+- laser_gun (激光枪): 攻击力 25, 范围 6-10, 攻速 20, 造价 2000, 高速攻击高造价
 
 #### 升级机制
 
-| 塔类型 | 升级规则 |
-|--------|----------|
-| 默认 | 每级属性 × 1.2 |
-| cannon（炮台） | 1-10 级 × 1.2，11 级起 × 1.3 |
-| HMG（重机枪） | 每级 × 1.3 |
+- 默认: 每级属性 x 1.2
+- cannon（炮台）: 1-10 级 x 1.2，11 级起 x 1.3
+- HMG（重机枪）: 每级 x 1.3
 
 ### 经济系统
 
-| 配置项 | 值 |
-|--------|-----|
-| 初始金币 | 500 |
-| 初始生命 | 100 |
-| 击杀奖励 | 根据怪物配置（monster.money 或按公式计算） |
+- 初始金币: 500
+- 初始生命: 100
+- 击杀奖励: 根据怪物配置（monster.money 或按公式计算）
 
 **波次奖励**：
 
-| 条件 | 奖励 |
-|------|------|
-| 每 5 波 | +5 生命（不超过 100） |
-| 每 10 波 | +10 生命（不超过 100） |
+- 每 5 波: +5 生命（不超过 100）
+- 每 10 波: +10 生命（不超过 100）
 
 ### 胜负条件
 
-| 条件 | 结果 |
-|------|------|
-| 生命值降为 0 | 失败 |
-| 无限模式 | 无胜利条件 |
+- 生命值降为 0: 失败
+- 无限模式: 无胜利条件
 
 ### 得分计算
 
@@ -175,31 +157,35 @@ difficulty 最小值为 1
 剩余金币奖励 = 剩余金币 × 金币系数
 ```
 
+**得分系数配置**：
+
+- `wave_coefficient`: 10 - 波次奖励 = 完成波次 × 10
+- `life_coefficient`: 5 - 生命奖励 = 剩余生命 × 5
+- `money_coefficient`: 0.1 - 金币奖励 = floor(剩余金币 × 0.1)
+
+> **注意**：金币奖励计算结果会向下取整（floor）。
+
 ---
 
 ## 技术栈
 
 ### 前端
 
-| 技术 | 版本 | 用途 |
-|------|------|------|
-| Vue | 3.5 | UI 框架 |
-| Phaser | 3.90 | 游戏引擎 |
-| Vite | 7.2 | 构建工具 |
-| TypeScript | 5 | 开发语言 |
-| Pinia | 3.0 | 状态管理 |
-| Axios | 1.13 | HTTP 客户端 |
+- Vue 3.5: UI 框架
+- Phaser 3.90: 游戏引擎
+- Vite 7.2: 构建工具
+- TypeScript 5: 开发语言
+- Pinia 3.0: 状态管理
+- Axios 1.13: HTTP 客户端
 
 ### 后端
 
-| 技术 | 版本 | 用途 |
-|------|------|------|
-| Python | 3.13 | 开发语言 |
-| Django | 5.2 | Web 框架 |
-| Django REST Framework | 3.16 | API 框架 |
-| PostgreSQL | 15 | 数据库 |
-| pytest + pytest-django | - | 测试框架 |
-| Docker + Gunicorn | - | 部署 |
+- Python 3.13: 开发语言
+- Django 5.2: Web 框架
+- Django REST Framework 3.16: API 框架
+- PostgreSQL 15: 数据库
+- pytest + pytest-django: 测试框架
+- Docker + Gunicorn: 部署
 
 ---
 
@@ -217,12 +203,10 @@ difficulty 最小值为 1
 
 采用 Level 1 + 2 + 4 验证架构：
 
-| 层级 | 名称 | 验证内容 |
-|------|------|----------|
-| Level 1 | 基础验证 | 收益上限、成本验证、数量一致性 |
-| Level 2 | 伤害验证 | 生命池验证、DPS 容量验证、攻击次数验证 |
-| Level 3 | 行为重放 | 服务端根据操作序列重新模拟，对比结果 |
-| Level 4 | 统计分析 | 击杀率异常、资源效率异常、历史对比 |
+- Level 1 (基础验证): 收益上限、成本验证、数量一致性
+- Level 2 (伤害验证): 生命池验证、DPS 容量验证、攻击次数验证
+- Level 3 (行为重放): 服务端根据操作序列重新模拟，对比结果
+- Level 4 (统计分析): 击杀率异常、资源效率异常、历史对比
 
 > **为何跳过 Level 3？** 开发和计算成本高。Level 1 + 2 + 4 已能覆盖大部分作弊场景。
 
@@ -316,12 +300,10 @@ POST /sessions    无请求     POST /sessions/wave  POST /sessions/end
 
 ### 概览
 
-| API | 方法 | 时机 | 说明 |
-|-----|------|------|------|
-| `/api/game/sessions` | POST | 页面加载 | 创建会话，返回配置和第一波 |
-| `/api/game/sessions/wave` | POST | 每波结束 | 提交结果，返回下一波 |
-| `/api/game/sessions/end` | POST | 游戏结束 | 提交最后一波并结束，返回排名 |
-| `/api/game/leaderboard` | GET | 查看排行榜 | 获取排行榜列表 |
+- `POST /api/game/sessions`: 页面加载时创建会话，返回配置和第一波
+- `POST /api/game/sessions/wave`: 每波结束时提交结果，返回下一波
+- `POST /api/game/sessions/end`: 游戏结束时提交最后一波并结束，返回排名
+- `GET /api/game/leaderboard`: 查看排行榜时获取排行榜列表
 
 ---
 
@@ -571,9 +553,7 @@ interface GameEndResponse {
 
 #### 请求
 
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `limit` | number | 否 | 返回条数，默认 10，最大 100 |
+- `limit` (number, 可选): 返回条数，默认 10，最大 100
 
 #### 响应
 
@@ -595,14 +575,12 @@ interface LeaderboardResponse {
 
 ### 记录时机
 
-| 事件 | 记录内容 | 时机 |
-|------|----------|------|
-| 建造建筑 | type, frame, buildingType, buildingId, position | 立即记录 |
-| 升级建筑 | type, frame, buildingId, level | 立即记录 |
-| 出售建筑 | type, frame, buildingId | 立即记录 |
-| 攻击命中 | frame, buildingId, monsterId, damage, monsterPosition | 每次攻击 |
-| 击杀怪物 | killedByType[type]++, totalLifeDestroyed += life | 击杀时 |
-| 怪物穿过 | 累加 passed, lifeLost | 到达终点时 |
+- 建造建筑: 立即记录 type, frame, buildingType, buildingId, position
+- 升级建筑: 立即记录 type, frame, buildingId, level
+- 出售建筑: 立即记录 type, frame, buildingId
+- 攻击命中: 每次攻击记录 frame, buildingId, monsterId, damage, monsterPosition
+- 击杀怪物: 击杀时记录 killedByType[type]++, totalLifeDestroyed += life
+- 怪物穿过: 到达终点时累加 passed, lifeLost
 
 ### 攻击事件记录
 
@@ -626,15 +604,13 @@ interface AttackEvent {
 
 **字段说明**：
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| frame | number | 命中发生的帧号，用于验证攻击时序和 DPS |
-| buildingId | string | 发起攻击的建筑 ID，如 "b-001" |
-| originalTargetId | string | 发射时瞄准的怪物 ID（用于验证建筑有合法目标） |
-| originalTargetPosition | [number, number] | 发射时目标的格子坐标（用于射程验证） |
-| monsterId | string | 实际命中的怪物 ID，可能与 originalTargetId 不同（"误伤"） |
-| monsterPosition | [number, number] | 命中时怪物的格子坐标，用于路径验证 |
-| damage | number | 实际伤害 = max(建筑伤害 - 怪物护盾, 建筑伤害 × 0.1) |
+- frame (number): 命中发生的帧号，用于验证攻击时序和 DPS
+- buildingId (string): 发起攻击的建筑 ID，如 "b-001"
+- originalTargetId (string): 发射时瞄准的怪物 ID（用于验证建筑有合法目标）
+- originalTargetPosition ([number, number]): 发射时目标的格子坐标（用于射程验证）
+- monsterId (string): 实际命中的怪物 ID，可能与 originalTargetId 不同（"误伤"）
+- monsterPosition ([number, number]): 命中时怪物的格子坐标，用于路径验证
+- damage (number): 实际伤害 = max(建筑伤害 - 怪物护盾, 建筑伤害 x 0.1)
 
 **为什么需要记录原始目标？**
 
@@ -727,13 +703,11 @@ interface WaveRecord {
 
 ### 数据量估算
 
-| 数据类型 | 每条大小 | 典型数量/波 | 小计 |
-|---------|---------|------------|------|
-| 建筑操作 | ~80 bytes | 5 | ~400 bytes |
-| 攻击事件 | ~50 bytes | 500 | ~25 KB |
-| 战斗结果 | ~200 bytes | 1 | ~200 bytes |
-| 建筑列表 | ~60 bytes | 10 | ~600 bytes |
-| **合计** | - | - | **~26 KB/波** |
+- 建筑操作: 每条约 80 bytes，典型 5 条/波，小计约 400 bytes
+- 攻击事件: 每条约 50 bytes，典型 500 条/波，小计约 25 KB
+- 战斗结果: 约 200 bytes，1 条/波，小计约 200 bytes
+- 建筑列表: 每条约 60 bytes，典型 10 条/波，小计约 600 bytes
+- 合计: 约 26 KB/波
 
 **整局游戏（42 波）**：约 1.1 MB（压缩后约 150 KB）
 
@@ -747,11 +721,9 @@ interface WaveRecord {
 
 **成本公式**：
 
-| 操作 | 公式 |
-|------|------|
-| BUILD | `config.buildings[type].cost` |
-| UPGRADE | `total_cost × upgradeCostRatio` |
-| SELL | `total_cost × sellRatio` |
+- BUILD: `config.buildings[type].cost`
+- UPGRADE: `total_cost x upgradeCostRatio`
+- SELL: `total_cost x sellRatio`
 
 其中 `total_cost` = 建造成本 + 历次升级成本。
 
@@ -862,17 +834,15 @@ def calc_new_difficulty(current: float, life_lost: int, wave: int) -> float:
 
 > **注意**：第 1 波（教学波）不调整难度，直接返回当前值。
 
-| 上一波受伤 | 难度变化 | 说明 |
-|------------|----------|------|
-| Wave 1 | ×1.0 | 教学波，不调整 |
-| 0 (wave < 5) | ×1.05 | 早期无伤，小幅增加 |
-| 0 (difficulty > 30) | ×1.1 | 高难度无伤，减缓增长 |
-| 0 (其他) | ×1.2 | 正常无伤，较大增加 |
-| 1 ~ 9 | ×1.0 ~ ×1.05 | 表现良好，维持或略增 |
-| 10 ~ 19 | ×0.9 | 略微降低 |
-| 20 ~ 29 | ×0.8 | 中等降低 |
-| 30 ~ 49 | ×0.7 | 较多降低 |
-| ≥ 50 | ×0.6 | 大幅降低 |
+- Wave 1: x1.0，教学波不调整
+- 0 伤害 (wave < 5): x1.05，早期无伤小幅增加
+- 0 伤害 (difficulty > 30): x1.1，高难度无伤减缓增长
+- 0 伤害 (其他): x1.2，正常无伤较大增加
+- 1-9 伤害: x1.0 ~ x1.05，表现良好维持或略增
+- 10-19 伤害: x0.9，略微降低
+- 20-29 伤害: x0.8，中等降低
+- 30-49 伤害: x0.7，较多降低
+- 50+ 伤害: x0.6，大幅降低
 
 ### 怪物属性计算
 
@@ -903,11 +873,15 @@ def calc_monster_attrs(base: dict, difficulty: float) -> dict:
 
 **属性计算公式**：
 
-| 属性 | 公式 | 约束 | difficulty=1.0 时 | difficulty=2.0 时 |
-|------|------|------|-------------------|-------------------|
-| speed | `base + difficulty/2` | `1 <= speed <= max_speed` | base + 0.5 | base + 1.0 |
-| life | `base × (difficulty+1) × 0.5` | `life >= 1` | base × 1.0 | base × 1.5 |
-| shield | `base + difficulty/2` | `shield >= 0` | base + 0.5 | base + 1.0 |
+- speed: `base + difficulty/2`，约束 `1 <= speed <= max_speed`
+  - difficulty=1.0 时: base + 0.5
+  - difficulty=2.0 时: base + 1.0
+- life: `base x (difficulty+1) x 0.5`，约束 `life >= 1`
+  - difficulty=1.0 时: base x 1.0
+  - difficulty=2.0 时: base x 1.5
+- shield: `base + difficulty/2`，约束 `shield >= 0`
+  - difficulty=1.0 时: base + 0.5
+  - difficulty=2.0 时: base + 1.0
 
 > **约束来源**：旧实现 `td-obj-monster.js:27-36`，确保游戏平衡性。如极速怪 (type 7) 的 `max_speed=40`，防止高难度下速度超过 40。
 
@@ -1265,16 +1239,14 @@ def position_distance(pos1: list, pos2: list) -> int:
 
 **验证能力总结**：
 
-| 验证项 | 说明 | 作弊类型 |
-|--------|------|---------|
-| 伤害总和一致性 | attacks 伤害总和 = result.totalDamageDealt | 伪造总伤害 |
-| 攻击帧号时序 | 帧号递增 | 伪造攻击时序 |
-| 怪物 ID 有效性 | monsterId 必须是服务端下发的 UUID | 伪造怪物 ID |
-| 累计伤害验证 | 被击杀怪物的累计伤害 ≥ 生命值 | 减少怪物生命值 |
-| 击杀数量一致性 | 根据伤害计算的击杀数 = 上报的击杀数 | 伪造击杀结果 |
-| 射程验证 | 攻击时怪物在建筑射程内 | 增加射程 |
-| 伤害值合法性 | 伤害 ≤ 建筑伤害，伤害 ≥ 1 | 增加伤害 |
-| 路径合理性 | 怪物从入口向出口移动 | 绕圈刷分 |
+- 伤害总和一致性: attacks 伤害总和 = result.totalDamageDealt，防止伪造总伤害
+- 攻击帧号时序: 帧号递增，防止伪造攻击时序
+- 怪物 ID 有效性: monsterId 必须是服务端下发的 UUID，防止伪造怪物 ID
+- 累计伤害验证: 被击杀怪物的累计伤害 >= 生命值，防止减少怪物生命值
+- 击杀数量一致性: 根据伤害计算的击杀数 = 上报的击杀数，防止伪造击杀结果
+- 射程验证: 攻击时怪物在建筑射程内，防止增加射程
+- 伤害值合法性: 伤害 <= 建筑伤害且伤害 >= 1，防止增加伤害
+- 路径合理性: 怪物从入口向出口移动，防止绕圈刷分
 
 ### Level 4：统计分析
 
@@ -1346,11 +1318,9 @@ def validate_game_end(session: GameSession) -> tuple[bool, str]:
 
 ### 错误码
 
-| 错误码 | 说明 | 客户端处理 |
-|--------|------|-----------|
-| `SESSION_NOT_FOUND` | 会话不存在或已被清理 | 提示并重新加载页面 |
-| `VALIDATION_FAILED` | 数据验证失败 | 显示错误信息 |
-| `INVALID_REQUEST` | 请求格式错误 | 显示错误信息 |
+- `SESSION_NOT_FOUND`: 会话不存在或已被清理，客户端应提示并重新加载页面
+- `VALIDATION_FAILED`: 数据验证失败，客户端应显示错误信息
+- `INVALID_REQUEST`: 请求格式错误，客户端应显示错误信息
 
 ### 客户端处理示例
 
@@ -1486,10 +1456,8 @@ class WaveRecord(models.Model):
 
 **WaveRecord 创建时机**：
 
-| API | 创建的 WaveRecord | 说明 |
-|-----|-------------------|------|
-| `POST /wave` | 第 1 ~ N-1 波 | 普通波次，验证通过后创建 |
-| `POST /end` | 第 N 波 | 最后一波，从 lastWave 创建 |
+- `POST /wave`: 创建第 1 ~ N-1 波的记录，普通波次验证通过后创建
+- `POST /end`: 创建第 N 波的记录，最后一波从 lastWave 创建
 
 > **原则**：WaveRecord 只创建不更新，是不可变的历史记录。
 

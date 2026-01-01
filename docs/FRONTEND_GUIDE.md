@@ -38,15 +38,13 @@ frontend/
 
 ## 开发优先级
 
-| 阶段 | 内容 | 说明 |
-|------|------|------|
-| P0 | 项目初始化 | Vite + Vue 3 + TypeScript + Phaser 3 + Vitest |
-| P0 | 类型定义 + Mock | 所有开发的基础 |
-| P1 | 核心系统 (TDD) | PathSystem, DamageSystem, BuildingSystem, EconomySystem, BulletSystem, WaveManager, WaveRecorder |
-| P1 | Phaser 实体 | Monster, Building, GameScene |
-| P2 | 状态管理 | Pinia Store |
-| P2 | API 层 | Mock → 真实 API 切换 |
-| P3 | Vue UI | GameHeader, BuildingPanel, GameOverModal, LeaderboardView |
+- P0 项目初始化: Vite + Vue 3 + TypeScript + Phaser 3 + Vitest
+- P0 类型定义 + Mock: 所有开发的基础
+- P1 核心系统 (TDD): PathSystem, DamageSystem, BuildingSystem, EconomySystem, BulletSystem, WaveManager, WaveRecorder
+- P1 Phaser 实体: Monster, Building, GameScene
+- P2 状态管理: Pinia Store
+- P2 API 层: Mock -> 真实 API 切换
+- P3 Vue UI: GameHeader, BuildingPanel, GameOverModal, LeaderboardView
 
 ## 核心系统
 
@@ -386,12 +384,10 @@ class Building extends Phaser.GameObjects.Sprite {
 
 保持与旧实现一致的子弹物理系统：
 
-| 特性 | 说明 |
-|------|------|
-| 子弹飞行 | 有物理轨迹，按固定方向直线飞行 |
-| 可能 miss | 目标移走后子弹可能飞出地图 |
-| 误伤机制 | 子弹可以命中路径上的任意怪物 |
-| laser_gun | 即时命中，无子弹飞行 |
+- 子弹飞行: 有物理轨迹，按固定方向直线飞行
+- 可能 miss: 目标移走后子弹可能飞出地图
+- 误伤机制: 子弹可以命中路径上的任意怪物
+- laser_gun: 即时命中，无子弹飞行
 
 ```typescript
 // fire() 方法实现思路
@@ -473,14 +469,12 @@ VITE_API_BASE_URL=/api
 
 ## Vue 组件
 
-| 组件 | 功能 |
-|------|------|
-| `GameHeader.vue` | 显示金钱、生命、分数、波次 |
-| `BuildingPanel.vue` | 建筑选择面板，升级/出售按钮 |
-| `PhaserCanvas.vue` | Phaser 游戏容器 |
-| `GameOverModal.vue` | 游戏结束弹窗 + 昵称输入 |
-| `LeaderboardView.vue` | 排行榜展示 |
-| `ErrorToast.vue` | 错误提示 |
+- `GameHeader.vue`: 显示金钱、生命、分数、波次
+- `BuildingPanel.vue`: 建筑选择面板，升级/出售按钮
+- `PhaserCanvas.vue`: Phaser 游戏容器
+- `GameOverModal.vue`: 游戏结束弹窗 + 昵称输入
+- `LeaderboardView.vue`: 排行榜展示
+- `ErrorToast.vue`: 错误提示
 
 ## 测试规范
 
