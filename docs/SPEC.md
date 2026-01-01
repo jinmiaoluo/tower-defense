@@ -128,8 +128,10 @@ difficulty 最小值为 1
 #### 升级机制
 
 - 默认: 每级属性 x 1.2
-- cannon（炮台）: 1-10 级 x 1.2，11 级起 x 1.3
+- cannon（炮台）: 前 11 次升级 x 1.2，第 12 次升级起 x 1.3（即 Level 2-12 用 1.2，Level 13+ 用 1.3）
 - HMG（重机枪）: 每级 x 1.3
+
+**精度处理**：计算过程中保持浮点精度，仅在最终结果时截断（floor）。这与旧实现的 `_upgrade_records` 机制一致。
 
 ### 经济系统
 
@@ -1211,9 +1213,11 @@ def validate_damage_value(
     level = building["level"]
 
     # 计算建筑在当前等级的伤害（升级规则：每级 ×1.2）
-    expected_damage = base_damage
+    # 重要：保持浮点精度，仅在最后截断
+    expected_damage = float(base_damage)
     for _ in range(1, level):
-        expected_damage = int(expected_damage * 1.2)
+        expected_damage = expected_damage * 1.2
+    expected_damage = int(expected_damage)
 
     # 实际伤害 = max(建筑伤害 - 怪物护盾, 建筑伤害 × 0.1)
     # 由于不知道具体打的是哪个怪物，只验证伤害不超过建筑伤害
