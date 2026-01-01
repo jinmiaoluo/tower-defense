@@ -124,6 +124,18 @@ interface EconomySystem {
 
 负责子弹的创建、飞行和碰撞检测。保持与旧实现一致的物理规则。
 
+**速度计算公式**:
+
+```typescript
+// 子弹实际速度 = bullet_speed × 20 × GLOBAL_SPEED
+// GLOBAL_SPEED = 0.1，所以实际为: bullet_speed × 2 像素/帧
+// 例如: cannon bullet_speed=6 → 实际速度 = 6 × 20 × 0.1 = 12 像素/帧
+const BULLET_SPEED_FACTOR = 20
+const actualSpeed = bulletSpeed * BULLET_SPEED_FACTOR * GLOBAL_SPEED
+```
+
+> **与怪物速度的对比**: 怪物速度公式为 `speed × GLOBAL_SPEED`（无 20 倍系数）。子弹额外的 20 倍系数确保子弹飞行速度远快于怪物移动速度。来源: 旧实现 `td-obj-building.js:466`。
+
 ```typescript
 // src/game/systems/BulletSystem.ts
 interface Bullet {
