@@ -174,7 +174,6 @@ class Monster extends Phaser.GameObjects.Sprite {
   speed: number
   shield: number
   money: number
-  score: number
   damage: number       // 到达终点造成的伤害（从 config.monsters[type].damage 获取）
   progress: number     // 路径进度 0-1
 

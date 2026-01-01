@@ -468,7 +468,6 @@ interface WaveResponse {
       speed: number;
       shield: number;
       money: number;
-      score: number;
     }>;
     lifeReward?: number;           // 生命恢复奖励，下一波开始前应用（每 5 波 +5，每 10 波 +10，上限 100）
   };
