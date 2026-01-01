@@ -502,6 +502,22 @@ def test_validate_basic_success():
     ok, err = validate_basic(result, wave_config)
     assert ok is True
 
+def test_validate_basic_with_remaining():
+    # 提前结束场景：场上还有怪物
+    result = {
+        "killed": 1,
+        "killedByType": {0: 1},
+        "passed": 0,
+        "remaining": 2,  # 2 只在场怪物
+        "moneyGained": 10,
+        "totalDamageDealt": 50,
+    }
+    wave_config = {
+        "monsters": [{"type": 0, "count": 3, "money": 10, "life": 50}]
+    }
+    ok, err = validate_basic(result, wave_config)
+    assert ok is True
+
 def test_validate_basic_killed_mismatch():
     result = {"killed": 5, "killedByType": {0: 3}, "passed": 0}
     wave_config = {"monsters": [{"type": 0, "count": 3}]}
@@ -643,6 +659,81 @@ def test_validate_cumulative_damage():
     result = {"killedByType": {0: 1}}
     monsters_config = {"uuid-1": {"type": 0, "life": 50}}
     ok, err = validate_cumulative_damage(attacks, result, monsters_config)
+    assert ok is True
+
+def test_validate_remaining_monsters_success():
+    # 提前结束场景：2 只怪物在场，累计伤害都不足以击杀
+    attacks = [
+        {"monsterId": "uuid-1", "damage": 30},  # 累计 30 < 50，未击杀
+        {"monsterId": "uuid-2", "damage": 20},  # 累计 20 < 50，未击杀
+    ]
+    result = {
+        "remaining": 2,
+        "remaining_monster_ids": ["uuid-1", "uuid-2"],
+    }
+    monsters_config = {
+        "uuid-1": {"type": 0, "life": 50},
+        "uuid-2": {"type": 0, "life": 50},
+    }
+    ok, err = validate_remaining_monsters(attacks, result, monsters_config)
+    assert ok is True
+
+def test_validate_remaining_monsters_count_mismatch():
+    # 失败：remaining 数量与 ID 列表不一致
+    attacks = []
+    result = {
+        "remaining": 2,
+        "remaining_monster_ids": ["uuid-1"],  # 只有 1 个 ID
+    }
+    monsters_config = {"uuid-1": {"type": 0, "life": 50}}
+    ok, err = validate_remaining_monsters(attacks, result, monsters_config)
+    assert ok is False
+    assert "数量与 remaining 不一致" in err
+
+def test_validate_remaining_monsters_invalid_id():
+    # 失败：remaining 怪物 ID 不是服务端下发的
+    attacks = []
+    result = {
+        "remaining": 1,
+        "remaining_monster_ids": ["fake-id"],
+    }
+    monsters_config = {"uuid-1": {"type": 0, "life": 50}}
+    ok, err = validate_remaining_monsters(attacks, result, monsters_config)
+    assert ok is False
+    assert "不是服务端下发的 UUID" in err
+
+def test_validate_remaining_monsters_should_be_killed():
+    # 失败：remaining 怪物累计伤害 >= 生命值，应被击杀
+    attacks = [
+        {"monsterId": "uuid-1", "damage": 60},  # 累计 60 >= 50，应被击杀
+    ]
+    result = {
+        "remaining": 1,
+        "remaining_monster_ids": ["uuid-1"],
+    }
+    monsters_config = {"uuid-1": {"type": 0, "life": 50}}
+    ok, err = validate_remaining_monsters(attacks, result, monsters_config)
+    assert ok is False
+    assert "应被击杀而非 remaining" in err
+
+def test_validate_remaining_monsters_duplicate_ids():
+    # 失败：remaining 怪物 ID 重复
+    attacks = []
+    result = {
+        "remaining": 2,
+        "remaining_monster_ids": ["uuid-1", "uuid-1"],  # 重复
+    }
+    monsters_config = {"uuid-1": {"type": 0, "life": 50}}
+    ok, err = validate_remaining_monsters(attacks, result, monsters_config)
+    assert ok is False
+    assert "重复" in err
+
+def test_validate_remaining_monsters_zero_remaining():
+    # 成功：remaining 为 0 时跳过验证（向后兼容）
+    attacks = []
+    result = {"remaining": 0}  # 不提供 remaining_monster_ids
+    monsters_config = {}
+    ok, err = validate_remaining_monsters(attacks, result, monsters_config)
     assert ok is True
 ```
 

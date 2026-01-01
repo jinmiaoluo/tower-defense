@@ -522,6 +522,8 @@ interface WaveRequest {
     killed: number;                // 击杀怪物总数
     killedByType: Record<number, number>;  // 每种怪物的击杀数 {typeId: count}
     passed: number;                // 穿过终点的怪物数
+    remaining?: number;            // 提前结束时场上剩余的怪物数（可选，默认 0）
+    remainingMonsterIds?: string[];  // 提前结束时场上剩余怪物的 ID 列表（可选）
     scoreGained: number;           // 获得分数
     moneyGained: number;           // 获得金钱
     lifeLost: number;              // 损失生命
@@ -617,6 +619,8 @@ interface GameEndRequest {
       killed: number;
       killedByType: Record<number, number>;
       passed: number;
+      remaining?: number;            // 提前结束时场上剩余的怪物数（可选，默认 0）
+      remainingMonsterIds?: string[];  // 提前结束时场上剩余怪物的 ID 列表（可选）
       scoreGained: number;
       moneyGained: number;
       lifeLost: number;
@@ -801,6 +805,8 @@ interface WaveRecord {
     killed: number;
     killedByType: Record<number, number>;  // {typeId: count}
     passed: number;
+    remaining?: number;            // 提前结束时场上剩余的怪物数（可选，默认 0）
+    remainingMonsterIds?: string[];  // 提前结束时场上剩余怪物的 ID 列表（可选）
     scoreGained: number;
     moneyGained: number;
     lifeLost: number;
@@ -1066,9 +1072,14 @@ def validate_basic(result: dict, wave_config: dict) -> tuple[bool, str]:
         if killed_count > wave_monsters[monster_type]["count"]:
             return False, f"怪物 {monster_type} 击杀数超出配置"
 
+    # remaining 字段验证（向后兼容，默认为 0）
+    remaining = result.get("remaining", 0)
+    if remaining < 0:
+        return False, "remaining 不能为负数"
+
     # 总数量一致性验证
     total_monsters = sum(m["count"] for m in wave_config["monsters"])
-    if result["killed"] + result["passed"] != total_monsters:
+    if result["killed"] + result["passed"] + remaining != total_monsters:
         return False, "怪物数量不一致"
 
     # 金钱收益验证（基于 killedByType 精确计算）
@@ -1108,6 +1119,63 @@ def validate_buildings_consistency(
 
     if calc_map != submit_map:
         return False, "建筑列表不一致"
+    return True, ""
+
+
+def validate_remaining_monsters(
+    attacks: list[dict],
+    result: dict,
+    monsters_config: dict,
+) -> tuple[bool, str]:
+    """验证 remaining 怪物的合法性
+
+    验证项目：
+    1. remainingMonsterIds 长度 == remaining
+    2. 每个 ID 都是服务端下发的有效 UUID
+    3. 这些怪物的累计伤害 < 生命值（确实没被击杀）
+    4. 这些怪物 ID 不重复
+
+    Args:
+        attacks: 攻击事件列表
+        result: 波次结果
+        monsters_config: 服务端下发的怪物配置 {id: {type, life, ...}}
+
+    Returns:
+        (成功标志, 错误信息)
+    """
+    remaining = result.get("remaining", 0)
+    remaining_ids = result.get("remaining_monster_ids", [])
+
+    # 如果 remaining 为 0，跳过验证（向后兼容）
+    if remaining == 0:
+        return True, ""
+
+    # 1. 数量一致性
+    if len(remaining_ids) != remaining:
+        return False, f"remainingMonsterIds 数量与 remaining 不一致: {len(remaining_ids)} != {remaining}"
+
+    # 2. ID 不重复
+    if len(remaining_ids) != len(set(remaining_ids)):
+        return False, "remainingMonsterIds 包含重复的怪物 ID"
+
+    # 3. ID 有效性
+    for mid in remaining_ids:
+        if mid not in monsters_config:
+            return False, f"未知的 remaining 怪物 ID: {mid}（不是服务端下发的 UUID）"
+
+    # 4. 计算每个怪物的累计伤害
+    damage_by_monster: dict[str, int] = {}
+    for attack in attacks:
+        mid = attack["monsterId"]
+        damage_by_monster[mid] = damage_by_monster.get(mid, 0) + attack["damage"]
+
+    # 5. 验证 remaining 怪物确实没被击杀
+    for mid in remaining_ids:
+        total_damage = damage_by_monster.get(mid, 0)
+        monster_life = monsters_config[mid]["life"]
+        if total_damage >= monster_life:
+            return False, f"怪物 {mid} 累计伤害 {total_damage} >= 生命值 {monster_life}，应被击杀而非 remaining"
+
     return True, ""
 ```
 
@@ -1403,6 +1471,7 @@ def position_distance(pos1: list, pos2: list) -> int:
 - 射程验证: 攻击时怪物在建筑射程内，防止增加射程
 - 伤害值合法性: 伤害 <= 建筑伤害且伤害 >= 1，防止增加伤害
 - 路径合理性: 怪物整体朝出口方向移动，防止反向移动刷分（注：只验证方向合法性，不验证具体路径，因为旧实现的路径有随机性和动态性）
+- remaining 怪物验证: remainingMonsterIds 必须是有效 UUID 且累计伤害 < 生命值，防止把 passed 怪物伪装成 remaining 来避免生命损失
 
 ### Level 4：统计分析
 
@@ -1587,6 +1656,7 @@ class WaveRecord(models.Model):
     # 战斗结果（客户端提供，验证后写入）
     killed = models.IntegerField()
     passed = models.IntegerField()
+    remaining = models.IntegerField(default=0)  # 提前结束时场上剩余的怪物数
     score_gained = models.IntegerField()
     money_gained = models.IntegerField()
     life_lost = models.IntegerField()

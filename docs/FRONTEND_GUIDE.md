@@ -406,6 +406,7 @@ class WaveRecorder {
   // 记录战斗结果
   recordKill(monsterType: number, monsterLife: number): void
   recordPassed(damage: number): void
+  recordRemainingMonster(monsterId: string): void  // 提前结束时记录单个在场怪物 ID
   addMoney(amount: number): void
   addScore(amount: number): void
   setDuration(currentFrame: number): void  // 设置波次持续帧数
@@ -414,6 +415,7 @@ class WaveRecorder {
   getActions(): Action[]
   getAttacks(): AttackEvent[]
   getResult(): WaveResult
+  getRemainingMonsterIds(): string[]  // 获取在场怪物 ID 列表
   toWaveRequest(sessionId: string, buildings: BuildingState[]): WaveRequest
 
   // 重置记录器（用于下一波）
@@ -650,5 +652,15 @@ describe('WaveRecorder', () => {
 4. **帧号记录**：所有操作和攻击都要记录准确的帧号
 5. **攻击位置记录**：攻击时记录怪物的格子坐标，用于服务端路径验证
 6. **提前结束功能**：支持两种结束方式
-   - 波次进行中结束：调用 `/end` 带 `lastWave` 数据
+   - 波次进行中结束：调用 `/end` 带 `lastWave` 数据，需要记录 `result.remaining` 表示场上剩余怪物数
    - 波次完成后结束：调用 `/end` 不带 `lastWave`（必须至少完成一波）
+7. **remaining 字段**：提前结束时使用
+   - `remaining` 表示场上还未被击杀也未穿过终点的怪物数
+   - 验证公式：`killed + passed + remaining == total`
+   - 该字段可选，默认为 0（向后兼容）
+8. **remainingMonsterIds 字段**：配合 `remaining` 使用的防作弊字段
+   - 当 `remaining > 0` 时必须提供 `remainingMonsterIds` 数组
+   - 数组中的 ID 必须是服务端下发的有效 UUID
+   - 数组长度必须等于 `remaining` 的值
+   - 这些怪物必须确实没有被击杀（累计伤害 < 生命值）
+   - 使用 `WaveRecorder.recordRemainingMonster(monsterId)` 记录在场怪物
