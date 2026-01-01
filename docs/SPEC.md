@@ -1013,6 +1013,8 @@ def calc_monster_attrs(base: dict, difficulty: float) -> dict:
 
 > **约束来源**：旧实现 `td-obj-monster.js:27-36`，确保游戏平衡性。如极速怪 (type 7) 的 `max_speed=40`，防止高难度下速度超过 40。
 
+> **与旧实现的差异**：旧实现在计算 speed/life/damage 时包含随机因子 `(Math.random() * 0.5 + 0.75)`，使同一波次同类型怪物的属性有 ±25% 的变化。新实现**有意移除**了这一随机因子，原因是服务端验证需要确定性：服务端必须能够仅凭 `(wave_number, difficulty)` 精确重建波次配置，随机因子会使服务端无法独立计算每个怪物的实际属性。这是安全性与游戏体验的设计权衡。
+
 **波次生成流程**：
 
 ```
