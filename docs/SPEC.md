@@ -109,8 +109,8 @@ difficulty 最小值为 1
 #### 塔属性
 
 - damage: 攻击力
-- range: 最小攻击范围（格子数）
-- max_range: 最大攻击范围
+- range: 初始射程（格子数），可升级
+- max_range: 射程升级上限
 - speed: 攻击速度
 - bullet_speed: 子弹速度
 - life: 塔的生命值
@@ -1173,10 +1173,11 @@ def validate_attack_range(
     """
     验证发射时的原始目标是否在建筑射程内。
 
-    射程规则：
-    - range: 最小射程（太近的目标无法攻击）
-    - max_range: 最大射程（太远的目标无法攻击）
-    - 升级后射程按默认规则增加（每级 × 1.2）
+    射程规则（与旧实现一致，参考 td-obj-building.js:187-204）：
+    - range: 初始射程（1 级时的值）
+    - max_range: 射程升级上限
+    - 升级后射程：min(range * 1.2^(level-1), max_range)
+    - 建筑可攻击 0 到当前射程内的任意目标（无最小射程限制）
 
     注意：由于子弹存在"误伤"机制，实际命中的怪物 (monsterPosition) 可能在射程外，
     但发射时的原始目标 (originalTargetPosition) 必须在射程内。
@@ -1186,16 +1187,16 @@ def validate_attack_range(
     tx, ty = attack["originalTargetPosition"]
 
     distance = math.sqrt((bx - tx) ** 2 + (by - ty) ** 2)
-    # 射程按默认升级规则累积：每级 × 1.2
+
+    # 计算当前射程：range 每级 × 1.2，但不超过 max_range
+    base_range = building_config[building["type"]]["range"]
+    max_range = building_config[building["type"]]["max_range"]
     level_factor = 1.2 ** (building["level"] - 1)
-    min_range = building_config[building["type"]]["range"] * level_factor
-    max_range = building_config[building["type"]]["max_range"] * level_factor
+    current_range = min(base_range * level_factor, max_range)
 
-    if distance < min_range - 1:  # 1 格容差
-        return False, f"目标太近: 建筑 {building['id']} 最小射程 {min_range:.1f}, 目标距离 {distance:.1f}"
-
-    if distance > max_range + 1:  # 1 格容差（怪物可能在格子边缘）
-        return False, f"目标太远: 建筑 {building['id']} 最大射程 {max_range:.1f}, 目标距离 {distance:.1f}"
+    # 只验证最大射程（无最小射程限制，与旧实现一致）
+    if distance > current_range + 1:  # 1 格容差（怪物可能在格子边缘）
+        return False, f"目标太远: 建筑 {building['id']} 射程 {current_range:.1f}, 目标距离 {distance:.1f}"
 
     return True, ""
 
