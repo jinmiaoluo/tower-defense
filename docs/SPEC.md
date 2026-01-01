@@ -881,22 +881,35 @@ def calc_new_difficulty(current: float, life_lost: int, wave: int) -> float:
 ```python
 def calc_monster_attrs(base: dict, difficulty: float) -> dict:
     """基于 difficulty 计算怪物实际属性"""
+    speed = base["speed"] + difficulty / 2
+    if "max_speed" in base:
+        speed = min(speed, base["max_speed"])
+    speed = max(speed, 1)
+
+    life = int(base["life"] * (difficulty + 1) * 0.5)
+    life = max(life, 1)
+
+    shield = int(base["shield"] + difficulty / 2)
+    shield = max(shield, 0)
+
     return {
         **base,
-        "speed": base["speed"] + difficulty / 2,
-        "life": int(base["life"] * (difficulty + 1) * 0.5),
-        "shield": int(base["shield"] + difficulty / 2),
-        # money 和 score 不受 difficulty 影响
+        "speed": speed,
+        "life": life,
+        "shield": shield,
+        # money 不受 difficulty 影响
     }
 ```
 
 **属性计算公式**：
 
-| 属性 | 公式 | difficulty=1.0 时 | difficulty=2.0 时 |
-|------|------|-------------------|-------------------|
-| speed | `base + difficulty/2` | base + 0.5 | base + 1.0 |
-| life | `base × (difficulty+1) × 0.5` | base × 1.0 | base × 1.5 |
-| shield | `base + difficulty/2` | base + 0.5 | base + 1.0 |
+| 属性 | 公式 | 约束 | difficulty=1.0 时 | difficulty=2.0 时 |
+|------|------|------|-------------------|-------------------|
+| speed | `base + difficulty/2` | `1 <= speed <= max_speed` | base + 0.5 | base + 1.0 |
+| life | `base × (difficulty+1) × 0.5` | `life >= 1` | base × 1.0 | base × 1.5 |
+| shield | `base + difficulty/2` | `shield >= 0` | base + 0.5 | base + 1.0 |
+
+> **约束来源**：旧实现 `td-obj-monster.js:27-36`，确保游戏平衡性。如极速怪 (type 7) 的 `max_speed=40`，防止高难度下速度超过 40。
 
 **波次生成流程**：
 

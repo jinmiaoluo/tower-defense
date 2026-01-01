@@ -274,6 +274,11 @@ def test_calc_new_difficulty_min_value():
 
 基于难度系数计算怪物实际属性。
 
+约束条件（来源：旧实现 `td-obj-monster.js:27-36`）：
+- `speed`: 最小值 1，最大值 `max_speed`（如有）
+- `life`: 最小值 1
+- `shield`: 最小值 0
+
 ```python
 def test_calc_monster_attrs_default_difficulty():
     base = {"life": 50, "speed": 3, "shield": 0, "money": 10}
@@ -287,6 +292,21 @@ def test_calc_monster_attrs_high_difficulty():
     result = calc_monster_attrs(base, 3.0)
     assert result["life"] == 100  # 50 * (3+1) * 0.5 = 100
     assert result["speed"] == 4.5  # 3 + 3.0/2
+
+def test_calc_monster_attrs_max_speed_limit():
+    # 极速怪 base speed=30, max_speed=40, difficulty=30.0
+    # 计算速度 = 30 + 30/2 = 45，被 max_speed 限制为 40
+    base = {"life": 30, "speed": 30, "max_speed": 40, "shield": 1, "money": 20}
+    result = calc_monster_attrs(base, 30.0)
+    assert result["speed"] == 40
+
+def test_calc_monster_attrs_min_values():
+    # 极端情况：验证最小值约束
+    base = {"life": 1, "speed": 0, "max_speed": 10, "shield": -5, "money": 10}
+    result = calc_monster_attrs(base, 0.0)
+    assert result["speed"] == 1   # 最小值 1
+    assert result["life"] == 1    # 最小值 1
+    assert result["shield"] == 0  # 最小值 0
 ```
 
 ### calc_actual_damage
