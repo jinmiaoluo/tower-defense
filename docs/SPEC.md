@@ -361,8 +361,8 @@ interface GameStartResponse {
   firstWave: {
     waveNumber: 1;
     monsters: Array<{
-      type: number;
-      count: number;
+      id: string;                  // 怪物唯一 ID（服务端生成的 UUID）
+      type: number;                // 怪物类型（0-8）
       life: number;
       speed: number;
       shield: number;
@@ -400,7 +400,7 @@ interface WaveRequest {
   attacks: Array<{
     frame: number;                 // 攻击帧号
     buildingId: string;            // 建筑 ID
-    monsterId: string;             // 怪物 ID
+    monsterId: string;             // 怪物 ID（使用服务端下发的 UUID）
     damage: number;                // 实际伤害
     monsterPosition: [number, number];  // 怪物所在格子 [x, y]
   }>;
@@ -448,8 +448,8 @@ interface WaveResponse {
   nextWave?: {
     waveNumber: number;
     monsters: Array<{
-      type: number;
-      count: number;
+      id: string;                  // 怪物唯一 ID（服务端生成的 UUID）
+      type: number;                // 怪物类型（0-8）
       life: number;
       speed: number;
       shield: number;
@@ -494,7 +494,7 @@ interface GameEndRequest {
     attacks: Array<{
       frame: number;
       buildingId: string;
-      monsterId: string;
+      monsterId: string;             // 使用服务端下发的 UUID
       damage: number;
       monsterPosition: [number, number];
     }>;
@@ -579,7 +579,7 @@ interface LeaderboardResponse {
 | 建造建筑 | type, frame, buildingType, buildingId, position | 立即记录 |
 | 升级建筑 | type, frame, buildingId, level | 立即记录 |
 | 出售建筑 | type, frame, buildingId | 立即记录 |
-| 攻击命中 | frame, buildingId, monsterId, damage, monsterGrid | 每次攻击 |
+| 攻击命中 | frame, buildingId, monsterId, damage, monsterPosition | 每次攻击 |
 | 击杀怪物 | killedByType[type]++, totalLifeDestroyed += life | 击杀时 |
 | 怪物穿过 | 累加 passed, lifeLost | 到达终点时 |
 
@@ -591,7 +591,7 @@ interface LeaderboardResponse {
 interface AttackEvent {
   frame: number;                      // 攻击发生的帧号
   buildingId: string;                 // 发起攻击的建筑 ID
-  monsterId: string;                  // 被攻击的怪物 ID
+  monsterId: string;                  // 被攻击的怪物 ID（使用服务端下发的 UUID）
   damage: number;                     // 实际造成的伤害（扣除护盾后）
   monsterPosition: [number, number];  // 怪物所在格子 [x, y]
 }
@@ -603,7 +603,7 @@ interface AttackEvent {
 |------|------|------|
 | frame | number | 攻击发生的帧号，用于验证攻击时序和 DPS |
 | buildingId | string | 发起攻击的建筑 ID，如 "b-001" |
-| monsterId | string | 被攻击的怪物 ID，如 "m-042" |
+| monsterId | string | 被攻击的怪物 ID，使用服务端下发的 UUID |
 | damage | number | 实际伤害 = max(建筑伤害 - 怪物护盾, 1) |
 | monsterPosition | [number, number] | 怪物所在格子坐标 [x, y]，用于路径验证 |
 
@@ -977,8 +977,9 @@ def validate_attacks(
     result: dict,
     building_config: dict,
     map_config: dict,
+    monsters_config: dict,  # 服务端下发的怪物配置 {id: {type, life, ...}}
 ) -> tuple[bool, str]:
-    """攻击事件验证：伤害一致性、射程验证、路径合理性"""
+    """攻击事件验证：伤害一致性、射程验证、路径合理性、累计伤害验证"""
 
     building_map = {b["id"]: b for b in buildings}
 
@@ -992,7 +993,12 @@ def validate_attacks(
         if attacks[i]["frame"] < attacks[i - 1]["frame"]:
             return False, "攻击帧号时序错误"
 
-    # 3. 逐条验证
+    # 3. 怪物 ID 有效性验证（必须是服务端下发的 UUID）
+    ok, err = validate_monster_ids(attacks, monsters_config)
+    if not ok:
+        return False, err
+
+    # 4. 逐条验证
     for attack in attacks:
         building = building_map.get(attack["buildingId"])
         if not building:
@@ -1008,10 +1014,61 @@ def validate_attacks(
         if not ok:
             return False, err
 
-    # 4. 路径合理性验证
+    # 5. 累计伤害验证
+    ok, err = validate_cumulative_damage(attacks, result, monsters_config)
+    if not ok:
+        return False, err
+
+    # 6. 路径合理性验证
     ok, err = validate_monster_paths(attacks, map_config)
     if not ok:
         return False, err
+
+    return True, ""
+
+
+def validate_monster_ids(
+    attacks: list[dict],
+    monsters_config: dict,
+) -> tuple[bool, str]:
+    """验证攻击事件中的 monsterId 是否是服务端下发的有效 UUID"""
+    for attack in attacks:
+        mid = attack["monsterId"]
+        if mid not in monsters_config:
+            return False, f"未知的 monsterId: {mid}（不是服务端下发的 UUID）"
+    return True, ""
+
+
+def validate_cumulative_damage(
+    attacks: list[dict],
+    result: dict,
+    monsters_config: dict,
+) -> tuple[bool, str]:
+    """验证击杀怪物的累计伤害是否足够"""
+    # 按 monsterId 分组计算累计伤害
+    damage_by_monster: dict[str, int] = {}
+    for attack in attacks:
+        mid = attack["monsterId"]
+        damage_by_monster[mid] = damage_by_monster.get(mid, 0) + attack["damage"]
+
+    # 验证被击杀怪物的累计伤害
+    killed_by_type = result.get("killedByType", {})
+    killed_count_by_type: dict[int, int] = {int(k): 0 for k in killed_by_type.keys()}
+
+    for mid, total_damage in damage_by_monster.items():
+        monster = monsters_config[mid]
+        monster_life = monster["life"]
+
+        if total_damage >= monster_life:
+            # 怪物应被击杀
+            killed_count_by_type[monster["type"]] = killed_count_by_type.get(monster["type"], 0) + 1
+        # 如果累计伤害 < 生命值，怪物未被击杀（可能逃脱）
+
+    # 验证击杀数量一致性
+    for monster_type, expected_count in killed_by_type.items():
+        actual_count = killed_count_by_type.get(int(monster_type), 0)
+        if actual_count != expected_count:
+            return False, f"类型 {monster_type} 击杀数不一致: 期望 {expected_count}, 实际根据伤害计算为 {actual_count}"
 
     return True, ""
 
@@ -1105,6 +1162,9 @@ def position_distance(pos1: list, pos2: list) -> int:
 |--------|------|---------|
 | 伤害总和一致性 | attacks 伤害总和 = result.totalDamageDealt | 伪造总伤害 |
 | 攻击帧号时序 | 帧号递增 | 伪造攻击时序 |
+| 怪物 ID 有效性 | monsterId 必须是服务端下发的 UUID | 伪造怪物 ID |
+| 累计伤害验证 | 被击杀怪物的累计伤害 ≥ 生命值 | 减少怪物生命值 |
+| 击杀数量一致性 | 根据伤害计算的击杀数 = 上报的击杀数 | 伪造击杀结果 |
 | 射程验证 | 攻击时怪物在建筑射程内 | 增加射程 |
 | 伤害值合法性 | 伤害 ≤ 建筑伤害，伤害 ≥ 1 | 增加伤害 |
 | 路径合理性 | 怪物从入口向出口移动 | 绕圈刷分 |
