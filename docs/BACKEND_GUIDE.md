@@ -77,9 +77,11 @@ backend/
 | speed | ✅ 基础值 | - | ✅ 计算后 |
 | shield | ✅ 基础值 | - | ✅ 计算后 |
 | money | ✅ | - | ✅ |
-| score | ✅ | - | ✅ |
 
-> **说明**：`life/speed/shield` 会根据难度系数动态计算，因此在每波怪物配置中返回计算后的值。`damage` 是静态属性，不受难度影响，放在 `config.monsters` 中。
+> **说明**：
+> - `life/speed/shield` 会根据难度系数动态计算，因此在每波怪物配置中返回计算后的值
+> - `damage` 是静态属性，不受难度影响，放在 `config.monsters` 中
+> - 得分基于每次攻击伤害计算（`√伤害`），不再是怪物的固定属性
 
 ```python
 # game/config.py
@@ -133,15 +135,15 @@ GAME_CONFIG = {
         },
     },
     "monsters": {
-        0: {"name": "普通怪", "life": 50, "speed": 3, "shield": 0, "damage": 1, "money": 10, "score": 10, "color": "#00ff00"},
-        1: {"name": "稍强怪", "life": 50, "speed": 6, "shield": 1, "damage": 2, "money": 15, "score": 15, "color": "#33ff33"},
-        2: {"name": "速度怪", "life": 50, "speed": 12, "shield": 1, "damage": 3, "money": 20, "score": 20, "color": "#66ff66"},
-        3: {"name": "血量怪", "life": 500, "speed": 5, "shield": 1, "damage": 3, "money": 50, "score": 50, "color": "#ff0000"},
-        4: {"name": "护盾怪", "life": 50, "speed": 5, "shield": 20, "damage": 3, "money": 30, "score": 30, "color": "#0000ff"},
-        5: {"name": "伤害怪", "life": 50, "speed": 7, "shield": 2, "damage": 10, "money": 25, "score": 25, "color": "#ff00ff"},
-        6: {"name": "速度血量怪", "life": 100, "speed": 15, "shield": 3, "damage": 3, "money": 35, "score": 35, "color": "#ffff00"},
-        7: {"name": "极速怪", "life": 30, "speed": 30, "shield": 1, "damage": 4, "money": 20, "score": 20, "color": "#00ffff"},
-        8: {"name": "护盾血量怪", "life": 300, "speed": 3, "shield": 15, "damage": 5, "money": 60, "score": 60, "color": "#ff6600"},
+        0: {"name": "普通怪", "life": 50, "speed": 3, "shield": 0, "damage": 1, "money": 10, "color": "#00ff00"},
+        1: {"name": "稍强怪", "life": 50, "speed": 6, "shield": 1, "damage": 2, "money": 15, "color": "#33ff33"},
+        2: {"name": "速度怪", "life": 50, "speed": 12, "shield": 1, "damage": 3, "money": 20, "color": "#66ff66"},
+        3: {"name": "血量怪", "life": 500, "speed": 5, "shield": 1, "damage": 3, "money": 50, "color": "#ff0000"},
+        4: {"name": "护盾怪", "life": 50, "speed": 5, "shield": 20, "damage": 3, "money": 30, "color": "#0000ff"},
+        5: {"name": "伤害怪", "life": 50, "speed": 7, "shield": 2, "damage": 10, "money": 25, "color": "#ff00ff"},
+        6: {"name": "速度血量怪", "life": 100, "speed": 15, "shield": 3, "damage": 3, "money": 35, "color": "#ffff00"},
+        7: {"name": "极速怪", "life": 30, "speed": 30, "shield": 1, "damage": 4, "money": 20, "color": "#00ffff"},
+        8: {"name": "护盾血量怪", "life": 300, "speed": 3, "shield": 15, "damage": 5, "money": 60, "color": "#ff6600"},
     },
     "map": {
         "width": 16,
@@ -242,14 +244,14 @@ def test_calc_new_difficulty_min_value():
 
 ```python
 def test_calc_monster_attrs_default_difficulty():
-    base = {"life": 50, "speed": 3, "shield": 0, "money": 10, "score": 10}
+    base = {"life": 50, "speed": 3, "shield": 0, "money": 10}
     result = calc_monster_attrs(base, 1.0)
     assert result["life"] == 50   # 50 * (1+1) * 0.5 = 50
     assert result["speed"] == 3.5  # 3 + 1.0/2
     assert result["shield"] == 0   # 0 + 1.0/2 = 0.5 -> int = 0
 
 def test_calc_monster_attrs_high_difficulty():
-    base = {"life": 50, "speed": 3, "shield": 0, "money": 10, "score": 10}
+    base = {"life": 50, "speed": 3, "shield": 0, "money": 10}
     result = calc_monster_attrs(base, 3.0)
     assert result["life"] == 100  # 50 * (3+1) * 0.5 = 100
     assert result["speed"] == 4.5  # 3 + 3.0/2
@@ -290,6 +292,24 @@ def test_generate_wave_monster_ids():
 
 ## 验证器
 
+### 伤害和得分计算规则
+
+```python
+# game/calculators.py
+
+def calc_actual_damage(raw_damage: int, shield: int) -> int:
+    """计算实际伤害 = max(原始伤害 - 护盾, 原始伤害 × 0.1)"""
+    min_damage = math.ceil(raw_damage * 0.1)
+    return max(raw_damage - shield, min_damage)
+
+
+def calc_hit_score(actual_damage: int) -> int:
+    """计算命中得分 = floor(√实际伤害)"""
+    return int(math.sqrt(actual_damage))
+```
+
+> **说明**：得分在每次攻击命中时累加（`√伤害`），而非击杀时加分。这使高攻速武器在得分上更有价值。
+
 ### Level 1：基础验证
 
 ```python
@@ -300,10 +320,10 @@ def test_validate_basic_success():
         "killedByType": {0: 3},
         "passed": 0,
         "moneyGained": 30,
-        "scoreGained": 30,
+        "totalDamageDealt": 150,
     }
     wave_config = {
-        "monsters": [{"type": 0, "count": 3, "money": 10, "score": 10}]
+        "monsters": [{"type": 0, "count": 3, "money": 10, "life": 50}]
     }
     ok, err = validate_basic(result, wave_config)
     assert ok is True
@@ -321,10 +341,10 @@ def test_validate_basic_money_mismatch():
         "killedByType": {0: 3},
         "passed": 0,
         "moneyGained": 100,  # 错误值
-        "scoreGained": 30,
+        "totalDamageDealt": 150,
     }
     wave_config = {
-        "monsters": [{"type": 0, "count": 3, "money": 10, "score": 10}]
+        "monsters": [{"type": 0, "count": 3, "money": 10, "life": 50}]
     }
     ok, err = validate_basic(result, wave_config)
     assert ok is False

@@ -155,13 +155,22 @@ difficulty 最小值为 1
 
 ### 得分计算
 
-```
-最终得分 = 击杀得分 + 波次奖励 + 剩余生命奖励 + 剩余金币奖励
+**实时得分**（每次攻击命中时累加）：
 
-击杀得分 = Σ(怪物基础分 × 难度系数)
+```
+命中得分 = floor(√实际伤害)
+```
+
+> **设计说明**：每次击中怪物时立即加分，而非击杀时加分。这使得高攻速武器（如激光枪）在得分上更有价值。
+
+**最终得分**（游戏结束时）：
+
+```
+最终得分 = 累计命中得分 + 波次奖励 + 剩余生命奖励 + 剩余金币奖励
+
 波次奖励 = 完成波次数 × 波次系数
-剩余生命 = 剩余生命 × 生命系数
-剩余金币 = 剩余金币 × 金币系数
+剩余生命奖励 = 剩余生命 × 生命系数
+剩余金币奖励 = 剩余金币 × 金币系数
 ```
 
 ---
@@ -373,7 +382,6 @@ interface GameStartResponse {
       speed: number;
       shield: number;
       money: number;               // 击杀获得金钱
-      score: number;               // 击杀获得分数
     }>;
   };
 }
@@ -610,7 +618,7 @@ interface AttackEvent {
 | frame | number | 攻击发生的帧号，用于验证攻击时序和 DPS |
 | buildingId | string | 发起攻击的建筑 ID，如 "b-001" |
 | monsterId | string | 被攻击的怪物 ID，使用服务端下发的 UUID |
-| damage | number | 实际伤害 = max(建筑伤害 - 怪物护盾, 1) |
+| damage | number | 实际伤害 = max(建筑伤害 - 怪物护盾, 建筑伤害 × 0.1) |
 | monsterPosition | [number, number] | 怪物所在格子坐标 [x, y]，用于路径验证 |
 
 **monsterPosition 示例**：
@@ -626,7 +634,9 @@ interface AttackEvent {
 ```typescript
 // 在建筑攻击命中时记录
 function onBuildingHit(building: Building, monster: Monster, rawDamage: number) {
-  const actualDamage = Math.max(rawDamage - monster.shield, 1)
+  // 最低伤害 = 原始伤害的 10%（保证高伤害武器打护盾怪更有效）
+  const minDamage = Math.ceil(rawDamage * 0.1)
+  const actualDamage = Math.max(rawDamage - monster.shield, minDamage)
 
   attacks.push({
     frame: currentFrame,
@@ -639,6 +649,9 @@ function onBuildingHit(building: Building, monster: Monster, rawDamage: number) 
   // 同时更新统计
   result.totalDamageDealt += actualDamage
   building.damageDealt += actualDamage
+
+  // 每次击中时加分（分数 = √伤害）
+  result.scoreGained += Math.floor(Math.sqrt(actualDamage))
 }
 ```
 
@@ -899,14 +912,15 @@ def validate_basic(result: dict, wave_config: dict) -> tuple[bool, str]:
     if result["money_gained"] != expected_money:
         return False, "金钱收益不匹配"
 
-    # 分数收益验证（基于 killedByType 精确计算）
-    expected_score = sum(
-        killed_by_type.get(m["type"], 0) * m["score"]
-        for m in wave_config["monsters"]
-    )
-    if result["score_gained"] != expected_score:
-        return False, "分数收益不匹配"
+    return True, ""
 
+
+def validate_score(attacks: list[dict], result: dict) -> tuple[bool, str]:
+    """验证得分：基于攻击伤害计算"""
+    # 得分 = Σ floor(√每次攻击伤害)
+    expected_score = sum(int(math.sqrt(a["damage"])) for a in attacks)
+    if result["score_gained"] != expected_score:
+        return False, f"分数不匹配: 期望 {expected_score}, 实际 {result['score_gained']}"
     return True, ""
 
 
@@ -1111,7 +1125,7 @@ def validate_damage_value(
     for _ in range(1, level):
         expected_damage = int(expected_damage * 1.2)
 
-    # 实际伤害 = 建筑伤害 - 怪物护盾，最低为 1
+    # 实际伤害 = max(建筑伤害 - 怪物护盾, 建筑伤害 × 0.1)
     # 由于不知道具体打的是哪个怪物，只验证伤害不超过建筑伤害
     if attack["damage"] > expected_damage:
         return False, f"伤害值超过建筑上限: {attack['damage']} > {expected_damage}"

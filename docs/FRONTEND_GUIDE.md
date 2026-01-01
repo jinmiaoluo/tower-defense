@@ -64,13 +64,35 @@ interface PathSystem {
 
 ### DamageSystem
 
-负责伤害计算。
+负责伤害和得分计算。
 
 ```typescript
 // src/game/systems/DamageSystem.ts
 interface DamageSystem {
-  calculate(rawDamage: number, shield: number): number  // max(damage - shield, 1)
+  // 计算实际伤害 = max(rawDamage - shield, rawDamage × 0.1)
+  // 最低伤害为原始伤害的 10%，保证高伤害武器打护盾怪更有效
+  calculate(rawDamage: number, shield: number): number
+
+  // 计算命中得分 = floor(√actualDamage)
+  calculateScore(actualDamage: number): number
+
   isKilled(monster: Monster, damage: number): boolean
+}
+
+// 实现示例
+const damageSystem: DamageSystem = {
+  calculate(rawDamage: number, shield: number): number {
+    const minDamage = Math.ceil(rawDamage * 0.1)
+    return Math.max(rawDamage - shield, minDamage)
+  },
+
+  calculateScore(actualDamage: number): number {
+    return Math.floor(Math.sqrt(actualDamage))
+  },
+
+  isKilled(monster: Monster, damage: number): boolean {
+    return monster.currentLife - damage <= 0
+  },
 }
 ```
 
