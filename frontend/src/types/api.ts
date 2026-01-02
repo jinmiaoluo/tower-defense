@@ -93,16 +93,23 @@ export interface Action {
 
 /** 攻击事件记录 */
 export interface AttackEvent {
-  /** 攻击帧号 */
+  /** 命中发生的帧号 */
   frame: number
   /** 发起攻击的建筑 ID */
   buildingId: string
-  /** 被攻击的怪物 ID（使用服务端下发的 UUID） */
+
+  /** 发射时瞄准的怪物 ID（用于验证建筑有合法目标） */
+  originalTargetId: string
+  /** 发射时目标的格子坐标（用于射程验证） */
+  originalTargetPosition: Position
+
+  /** 实际命中的怪物 ID，可能与 originalTargetId 不同（"误伤"） */
   monsterId: string
+  /** 命中时怪物的格子坐标，用于路径验证 */
+  monsterPosition: Position
+
   /** 实际伤害 = max(原伤害 - 护盾, 原伤害 × 0.1) */
   damage: number
-  /** 怪物所在格子坐标 */
-  monsterPosition: Position
 }
 
 /** 波次战斗结果 */

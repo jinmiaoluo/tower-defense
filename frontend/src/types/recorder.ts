@@ -80,9 +80,15 @@ export interface SellActionData {
 /** 攻击记录数据 */
 export interface AttackRecordData {
   buildingId: string
+  /** 发射时瞄准的怪物 ID（用于验证建筑有合法目标） */
+  originalTargetId: string
+  /** 发射时目标的格子坐标（用于射程验证） */
+  originalTargetPosition: Position
+  /** 实际命中的怪物 ID，可能与 originalTargetId 不同（"误伤"） */
   monsterId: string
-  damage: number
+  /** 命中时怪物的格子坐标，用于路径验证 */
   monsterPosition: Position
+  damage: number
   frame: number
 }
 
