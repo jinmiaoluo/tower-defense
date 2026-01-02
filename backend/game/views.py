@@ -9,17 +9,20 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from game.calculators import (
+    calc_final_score,
     calc_life_reward,
     calc_new_difficulty,
     process_actions,
 )
-from game.config import GAME_CONFIG, INITIAL
+from game.config import GAME_CONFIG, INITIAL, SCORE_CONFIG
 from game.generators import generate_first_wave, generate_wave
-from game.models import GameSession, WaveRecord
+from game.models import GameSession, LeaderboardEntry, WaveRecord
 from game.validators import (
     validate_basic,
     validate_buildings_consistency,
+    validate_game_end,
     validate_money_balance,
+    validate_nickname,
     validate_score,
     validate_wave_continuity,
 )
@@ -218,19 +221,177 @@ class EndSessionView(APIView):
     """POST /api/game/sessions/end - 结束游戏会话"""
 
     def post(self, request: Request) -> Response:
-        # TODO: 实现结束会话逻辑
+        data = request.data
+
+        ok, msg = _require_fields(data, "sessionId", "nickname", "lastWave")
+        if not ok:
+            return Response(
+                {"error": {"code": "INVALID_REQUEST", "message": msg}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ok, msg = validate_nickname(data["nickname"])
+        if not ok:
+            return Response(
+                {"error": {"code": "INVALID_REQUEST", "message": msg}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            session = GameSession.objects.get(id=data["sessionId"])
+        except GameSession.DoesNotExist:
+            return Response(
+                {"error": {"code": "SESSION_NOT_FOUND", "message": "会话不存在"}},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        last_wave_data = data["lastWave"]
+        wave_number = last_wave_data["waveNumber"]
+        actions = last_wave_data["actions"]
+        attacks = last_wave_data["attacks"]
+        result = _convert_keys_to_snake_case(last_wave_data["result"])
+        submitted_buildings = last_wave_data["buildings"]
+
+        ok, msg = validate_wave_continuity(session, wave_number)
+        if not ok:
+            return self._validation_error(msg)
+
+        wave_config = _build_wave_config_for_validation(session.next_wave)
+        ok, msg = validate_basic(result, wave_config)
+        if not ok:
+            return self._validation_error(msg)
+
+        ok, msg = validate_score(attacks, result)
+        if not ok:
+            return self._validation_error(msg)
+
+        spent, income, calculated_buildings = process_actions(
+            actions, session.buildings, GAME_CONFIG
+        )
+
+        new_money = session.money - spent + income + result["money_gained"]
+        new_state = {"money": new_money}
+
+        ok, msg = validate_money_balance(new_state)
+        if not ok:
+            return self._validation_error(msg)
+
+        ok, msg = validate_buildings_consistency(calculated_buildings, submitted_buildings)
+        if not ok:
+            return self._validation_error(msg)
+
+        new_score = session.score + result["score_gained"]
+        new_life = session.life - result["life_lost"]
+        new_difficulty = calc_new_difficulty(
+            session.difficulty, result["life_lost"], wave_number
+        )
+
+        try:
+            with transaction.atomic():
+                WaveRecord.objects.create(
+                    session=session,
+                    wave_number=wave_number,
+                    killed=result["killed"],
+                    killed_by_type=result["killed_by_type"],
+                    passed=result["passed"],
+                    score_gained=result["score_gained"],
+                    money_gained=result["money_gained"],
+                    life_lost=result["life_lost"],
+                    total_damage_dealt=result["total_damage_dealt"],
+                    total_life_destroyed=result["total_life_destroyed"],
+                    wave_duration_frames=result["wave_duration_frames"],
+                    money_spent=spent,
+                    money_income=income,
+                    building_count=len(calculated_buildings),
+                    end_money=new_money,
+                    end_score=new_score,
+                    end_life=new_life,
+                    end_difficulty=new_difficulty,
+                )
+
+                session.money = new_money
+                session.score = new_score
+                session.life = new_life
+                session.difficulty = new_difficulty
+                session.wave_count = wave_number
+                session.buildings = calculated_buildings
+                session.save()
+
+                ok, msg = validate_game_end(session)
+                if not ok:
+                    raise ValueError(msg)
+
+                final_score = calc_final_score(
+                    accumulated_score=new_score,
+                    waves_completed=wave_number,
+                    remaining_life=new_life,
+                    remaining_money=new_money,
+                    score_config=SCORE_CONFIG,
+                )
+
+                entry = LeaderboardEntry.objects.create(
+                    nickname=data["nickname"],
+                    score=final_score,
+                    waves_completed=wave_number,
+                )
+
+                rank = LeaderboardEntry.objects.filter(score__gt=final_score).count() + 1
+                total = LeaderboardEntry.objects.count()
+                is_new_record = rank == 1
+
+                session.delete()
+        except ValueError as e:
+            return self._validation_error(str(e))
+
+        return Response({
+            "verified": True,
+            "ranking": {
+                "rank": rank,
+                "total": total,
+                "isNewRecord": is_new_record,
+            },
+        })
+
+    def _validation_error(self, message: str) -> Response:
+        """返回验证错误响应."""
         return Response(
-            {"error": {"code": "NOT_IMPLEMENTED", "message": "尚未实现"}},
-            status=status.HTTP_501_NOT_IMPLEMENTED,
+            {
+                "verified": False,
+                "error": {"code": "VALIDATION_FAILED", "message": message},
+            },
+            status=status.HTTP_400_BAD_REQUEST,
         )
 
 
 class LeaderboardView(APIView):
     """GET /api/game/leaderboard - 获取排行榜"""
 
+    DEFAULT_LIMIT = 10
+    MAX_LIMIT = 100
+
     def get(self, request: Request) -> Response:
-        # TODO: 实现排行榜逻辑
-        return Response(
-            {"error": {"code": "NOT_IMPLEMENTED", "message": "尚未实现"}},
-            status=status.HTTP_501_NOT_IMPLEMENTED,
-        )
+        try:
+            limit = int(request.query_params.get("limit", self.DEFAULT_LIMIT))
+            if limit <= 0:
+                limit = self.DEFAULT_LIMIT
+        except (TypeError, ValueError):
+            limit = self.DEFAULT_LIMIT
+
+        limit = min(limit, self.MAX_LIMIT)
+
+        entries = LeaderboardEntry.objects.order_by(
+            "-score", "-waves_completed"
+        )[:limit]
+
+        return Response({
+            "entries": [
+                {
+                    "rank": idx + 1,
+                    "nickname": entry.nickname,
+                    "score": entry.score,
+                    "wavesCompleted": entry.waves_completed,
+                    "createdAt": entry.created_at.isoformat(),
+                }
+                for idx, entry in enumerate(entries)
+            ]
+        })

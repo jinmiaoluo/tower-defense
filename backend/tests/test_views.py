@@ -6,9 +6,9 @@ import uuid
 import pytest
 from rest_framework.test import APIClient
 
-from game.config import GAME_CONFIG, INITIAL
+from game.config import GAME_CONFIG, INITIAL, SCORE_CONFIG
 from game.generators import generate_wave
-from game.models import GameSession, WaveRecord
+from game.models import GameSession, LeaderboardEntry, WaveRecord
 
 
 class TestCreateSession:
@@ -729,3 +729,610 @@ class TestSubmitWaveView:
         data = response.json()
         assert data["valid"] is False
         assert "建筑列表不一致" in data["error"]["message"]
+
+
+class TestEndSessionView:
+    """POST /api/game/sessions/end 测试."""
+
+    @pytest.fixture
+    def session_with_waves(self, db) -> GameSession:
+        """创建带有波次记录的会话（模拟玩家已完成 5 波）."""
+        wave_6 = generate_wave(6, 1.2)
+        session = GameSession.objects.create(
+            money=800,
+            life=90,
+            score=150,
+            difficulty=1.2,
+            wave_count=5,
+            buildings=[],
+            config=GAME_CONFIG,
+            next_wave=wave_6,
+        )
+
+        for i in range(1, 6):
+            WaveRecord.objects.create(
+                session=session,
+                wave_number=i,
+                killed=3,
+                killed_by_type={0: 3},
+                passed=0,
+                score_gained=30,
+                money_gained=15,
+                life_lost=2,
+                total_damage_dealt=100,
+                total_life_destroyed=100,
+                wave_duration_frames=1000,
+                money_spent=0,
+                money_income=0,
+                building_count=0,
+                end_money=500 + i * 15,
+                end_score=i * 30,
+                end_life=100 - i * 2,
+                end_difficulty=1.0 + i * 0.04,
+            )
+
+        return session
+
+    def _make_wave_monsters_map(self, wave_config: dict) -> dict:
+        """构建怪物 ID 到怪物数据的映射."""
+        return {m["id"]: m for m in wave_config["monsters"]}
+
+    def _make_valid_wave_result(self, wave_config: dict) -> dict:
+        """根据波次配置生成有效的波次结果."""
+        monsters = wave_config["monsters"]
+        killed_by_type: dict[int, int] = {}
+        total_life = 0
+        total_money = 0
+
+        for m in monsters:
+            t = m["type"]
+            killed_by_type[t] = killed_by_type.get(t, 0) + 1
+            total_life += m["life"]
+            total_money += m["money"]
+
+        total_killed = len(monsters)
+        score = sum(int(math.sqrt(m["life"])) for m in monsters)
+
+        return {
+            "killed": total_killed,
+            "killedByType": killed_by_type,
+            "passed": 0,
+            "scoreGained": score,
+            "moneyGained": total_money,
+            "lifeLost": 0,
+            "totalDamageDealt": total_life,
+            "totalLifeDestroyed": total_life,
+            "waveDurationFrames": 1000,
+        }
+
+    def _make_valid_attacks(self, wave_config: dict) -> list[dict]:
+        """根据波次配置生成有效的攻击事件."""
+        attacks = []
+        frame = 100
+        for m in wave_config["monsters"]:
+            attacks.append({
+                "frame": frame,
+                "buildingId": "b-001",
+                "originalTargetId": m["id"],
+                "originalTargetPosition": [5, 5],
+                "monsterId": m["id"],
+                "monsterPosition": [5, 5],
+                "damage": m["life"],
+            })
+            frame += 10
+        return attacks
+
+    def _make_valid_last_wave(self, session: GameSession) -> dict:
+        """生成有效的 lastWave 数据."""
+        wave_config = session.next_wave
+        return {
+            "waveNumber": session.wave_count + 1,
+            "actions": [],
+            "attacks": self._make_valid_attacks(wave_config),
+            "result": self._make_valid_wave_result(wave_config),
+            "buildings": [],
+        }
+
+    @pytest.mark.django_db
+    def test_end_session_success(
+        self, api_client: APIClient, session_with_waves: GameSession
+    ):
+        """测试成功结束会话."""
+        session = session_with_waves
+        last_wave = self._make_valid_last_wave(session)
+
+        request_data = {
+            "sessionId": str(session.id),
+            "nickname": "TestPlayer",
+            "lastWave": last_wave,
+        }
+
+        response = api_client.post(
+            "/api/game/sessions/end",
+            data=request_data,
+            format="json",
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["verified"] is True
+        assert "ranking" in data
+        assert "rank" in data["ranking"]
+        assert "total" in data["ranking"]
+        assert "isNewRecord" in data["ranking"]
+
+    @pytest.mark.django_db
+    def test_end_session_creates_leaderboard_entry(
+        self, api_client: APIClient, session_with_waves: GameSession
+    ):
+        """测试成功后创建排行榜记录."""
+        session = session_with_waves
+        last_wave = self._make_valid_last_wave(session)
+
+        request_data = {
+            "sessionId": str(session.id),
+            "nickname": "TestPlayer",
+            "lastWave": last_wave,
+        }
+
+        response = api_client.post(
+            "/api/game/sessions/end",
+            data=request_data,
+            format="json",
+        )
+
+        assert response.status_code == 200
+
+        entry = LeaderboardEntry.objects.filter(nickname="TestPlayer").first()
+        assert entry is not None
+        assert entry.waves_completed == 6
+
+    @pytest.mark.django_db
+    def test_end_session_deletes_game_session(
+        self, api_client: APIClient, session_with_waves: GameSession
+    ):
+        """测试成功后删除游戏会话."""
+        session = session_with_waves
+        session_id = session.id
+        last_wave = self._make_valid_last_wave(session)
+
+        request_data = {
+            "sessionId": str(session_id),
+            "nickname": "TestPlayer",
+            "lastWave": last_wave,
+        }
+
+        response = api_client.post(
+            "/api/game/sessions/end",
+            data=request_data,
+            format="json",
+        )
+
+        assert response.status_code == 200
+        assert not GameSession.objects.filter(id=session_id).exists()
+
+    @pytest.mark.django_db
+    def test_end_session_session_not_found(self, api_client: APIClient, db):
+        """测试会话不存在."""
+        request_data = {
+            "sessionId": str(uuid.uuid4()),
+            "nickname": "TestPlayer",
+            "lastWave": {
+                "waveNumber": 1,
+                "actions": [],
+                "attacks": [],
+                "result": {
+                    "killed": 0,
+                    "killedByType": {},
+                    "passed": 1,
+                    "scoreGained": 0,
+                    "moneyGained": 0,
+                    "lifeLost": 1,
+                    "totalDamageDealt": 0,
+                    "totalLifeDestroyed": 0,
+                    "waveDurationFrames": 100,
+                },
+                "buildings": [],
+            },
+        }
+
+        response = api_client.post(
+            "/api/game/sessions/end",
+            data=request_data,
+            format="json",
+        )
+
+        assert response.status_code == 404
+        data = response.json()
+        assert data["error"]["code"] == "SESSION_NOT_FOUND"
+
+    @pytest.mark.django_db
+    def test_end_session_missing_fields(
+        self, api_client: APIClient, session_with_waves: GameSession
+    ):
+        """测试缺少必填字段."""
+        request_data = {
+            "sessionId": str(session_with_waves.id),
+        }
+
+        response = api_client.post(
+            "/api/game/sessions/end",
+            data=request_data,
+            format="json",
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert data["error"]["code"] == "INVALID_REQUEST"
+
+    @pytest.mark.django_db
+    def test_end_session_invalid_wave_number(
+        self, api_client: APIClient, session_with_waves: GameSession
+    ):
+        """测试 lastWave 波次不连续."""
+        session = session_with_waves
+        last_wave = self._make_valid_last_wave(session)
+        last_wave["waveNumber"] = 10
+
+        request_data = {
+            "sessionId": str(session.id),
+            "nickname": "TestPlayer",
+            "lastWave": last_wave,
+        }
+
+        response = api_client.post(
+            "/api/game/sessions/end",
+            data=request_data,
+            format="json",
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert data["verified"] is False
+        assert "波次不连续" in data["error"]["message"]
+
+    @pytest.mark.django_db
+    def test_end_session_lastwave_validation_failure(
+        self, api_client: APIClient, session_with_waves: GameSession
+    ):
+        """测试 lastWave 基础验证失败."""
+        session = session_with_waves
+        last_wave = self._make_valid_last_wave(session)
+        last_wave["result"]["moneyGained"] = 9999
+
+        request_data = {
+            "sessionId": str(session.id),
+            "nickname": "TestPlayer",
+            "lastWave": last_wave,
+        }
+
+        response = api_client.post(
+            "/api/game/sessions/end",
+            data=request_data,
+            format="json",
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert data["verified"] is False
+        assert "金钱收益不匹配" in data["error"]["message"]
+
+    @pytest.mark.django_db
+    def test_end_session_ranking_calculation(
+        self, api_client: APIClient, session_with_waves: GameSession
+    ):
+        """测试排名计算."""
+        LeaderboardEntry.objects.create(
+            nickname="HighScorer",
+            score=99999,
+            waves_completed=100,
+        )
+        LeaderboardEntry.objects.create(
+            nickname="LowScorer",
+            score=10,
+            waves_completed=1,
+        )
+
+        session = session_with_waves
+        last_wave = self._make_valid_last_wave(session)
+
+        request_data = {
+            "sessionId": str(session.id),
+            "nickname": "TestPlayer",
+            "lastWave": last_wave,
+        }
+
+        response = api_client.post(
+            "/api/game/sessions/end",
+            data=request_data,
+            format="json",
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["ranking"]["rank"] == 2
+        assert data["ranking"]["total"] == 3
+
+    @pytest.mark.django_db
+    def test_end_session_is_new_record(
+        self, api_client: APIClient, session_with_waves: GameSession
+    ):
+        """测试 isNewRecord 标志（第一条记录）."""
+        session = session_with_waves
+        last_wave = self._make_valid_last_wave(session)
+
+        request_data = {
+            "sessionId": str(session.id),
+            "nickname": "TestPlayer",
+            "lastWave": last_wave,
+        }
+
+        response = api_client.post(
+            "/api/game/sessions/end",
+            data=request_data,
+            format="json",
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["ranking"]["isNewRecord"] is True
+        assert data["ranking"]["rank"] == 1
+
+    @pytest.mark.django_db
+    def test_end_session_final_score_calculation(
+        self, api_client: APIClient, session_with_waves: GameSession
+    ):
+        """测试最终得分计算."""
+        session = session_with_waves
+        last_wave = self._make_valid_last_wave(session)
+        last_wave_score = last_wave["result"]["scoreGained"]
+        last_wave_money = last_wave["result"]["moneyGained"]
+
+        request_data = {
+            "sessionId": str(session.id),
+            "nickname": "TestPlayer",
+            "lastWave": last_wave,
+        }
+
+        response = api_client.post(
+            "/api/game/sessions/end",
+            data=request_data,
+            format="json",
+        )
+
+        assert response.status_code == 200
+
+        entry = LeaderboardEntry.objects.get(nickname="TestPlayer")
+
+        accumulated_score = session.score + last_wave_score
+        waves_completed = 6
+        remaining_life = 90
+        remaining_money = session.money + last_wave_money
+
+        expected_score = (
+            accumulated_score
+            + waves_completed * SCORE_CONFIG["wave_coefficient"]
+            + remaining_life * SCORE_CONFIG["life_coefficient"]
+            + int(remaining_money * SCORE_CONFIG["money_coefficient"])
+        )
+
+        assert entry.score == expected_score
+
+    @pytest.mark.django_db
+    def test_end_session_validate_game_end_score_mismatch(
+        self, api_client: APIClient, db
+    ):
+        """测试 validate_game_end 分数累计不一致."""
+        wave_1 = generate_wave(1, 1.0)
+        session = GameSession.objects.create(
+            money=500,
+            life=100,
+            score=9999,  # 故意设置错误的分数
+            difficulty=1.0,
+            wave_count=0,
+            buildings=[],
+            config=GAME_CONFIG,
+            next_wave=wave_1,
+        )
+
+        last_wave = {
+            "waveNumber": 1,
+            "actions": [],
+            "attacks": self._make_valid_attacks(wave_1),
+            "result": self._make_valid_wave_result(wave_1),
+            "buildings": [],
+        }
+
+        request_data = {
+            "sessionId": str(session.id),
+            "nickname": "TestPlayer",
+            "lastWave": last_wave,
+        }
+
+        response = api_client.post(
+            "/api/game/sessions/end",
+            data=request_data,
+            format="json",
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert data["verified"] is False
+        assert "分数累计不一致" in data["error"]["message"]
+
+    @pytest.mark.django_db
+    def test_end_session_nickname_too_long(
+        self, api_client: APIClient, session_with_waves: GameSession
+    ):
+        """测试昵称过长."""
+        session = session_with_waves
+        last_wave = self._make_valid_last_wave(session)
+
+        request_data = {
+            "sessionId": str(session.id),
+            "nickname": "A" * 33,  # 超过 32 字符限制
+            "lastWave": last_wave,
+        }
+
+        response = api_client.post(
+            "/api/game/sessions/end",
+            data=request_data,
+            format="json",
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert data["error"]["code"] == "INVALID_REQUEST"
+
+    @pytest.mark.django_db
+    def test_end_session_nickname_empty(
+        self, api_client: APIClient, session_with_waves: GameSession
+    ):
+        """测试昵称为空."""
+        session = session_with_waves
+        last_wave = self._make_valid_last_wave(session)
+
+        request_data = {
+            "sessionId": str(session.id),
+            "nickname": "",
+            "lastWave": last_wave,
+        }
+
+        response = api_client.post(
+            "/api/game/sessions/end",
+            data=request_data,
+            format="json",
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert data["error"]["code"] == "INVALID_REQUEST"
+
+
+class TestLeaderboardView:
+    """GET /api/game/leaderboard 测试."""
+
+    @pytest.fixture
+    def leaderboard_entries(self, db):
+        """创建测试用排行榜数据."""
+        from game.models import LeaderboardEntry
+
+        entries = []
+        for i in range(20):
+            entries.append(
+                LeaderboardEntry.objects.create(
+                    nickname=f"Player{i}",
+                    score=1000 - i * 50,
+                    waves_completed=10 + i,
+                )
+            )
+        return entries
+
+    @pytest.mark.django_db
+    def test_get_leaderboard_success(
+        self, api_client: APIClient, leaderboard_entries
+    ):
+        """成功获取排行榜."""
+        response = api_client.get("/api/game/leaderboard")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "entries" in data
+
+    @pytest.mark.django_db
+    def test_get_leaderboard_default_limit(
+        self, api_client: APIClient, leaderboard_entries
+    ):
+        """默认返回 10 条."""
+        response = api_client.get("/api/game/leaderboard")
+        data = response.json()
+
+        assert len(data["entries"]) == 10
+
+    @pytest.mark.django_db
+    def test_get_leaderboard_custom_limit(
+        self, api_client: APIClient, leaderboard_entries
+    ):
+        """自定义返回条数."""
+        response = api_client.get("/api/game/leaderboard?limit=5")
+        data = response.json()
+
+        assert len(data["entries"]) == 5
+
+    @pytest.mark.django_db
+    def test_get_leaderboard_max_limit(
+        self, api_client: APIClient, leaderboard_entries
+    ):
+        """limit 最大为 100."""
+        response = api_client.get("/api/game/leaderboard?limit=200")
+        data = response.json()
+
+        assert len(data["entries"]) <= 100
+
+    @pytest.mark.django_db
+    def test_get_leaderboard_order_by_score(
+        self, api_client: APIClient, leaderboard_entries
+    ):
+        """按分数降序排列."""
+        response = api_client.get("/api/game/leaderboard")
+        data = response.json()
+
+        scores = [e["score"] for e in data["entries"]]
+        assert scores == sorted(scores, reverse=True)
+
+    @pytest.mark.django_db
+    def test_get_leaderboard_entry_structure(
+        self, api_client: APIClient, leaderboard_entries
+    ):
+        """每条记录包含必需字段."""
+        response = api_client.get("/api/game/leaderboard")
+        data = response.json()
+
+        entry = data["entries"][0]
+        assert "rank" in entry
+        assert "nickname" in entry
+        assert "score" in entry
+        assert "wavesCompleted" in entry
+        assert "createdAt" in entry
+
+    @pytest.mark.django_db
+    def test_get_leaderboard_rank_starts_at_1(
+        self, api_client: APIClient, leaderboard_entries
+    ):
+        """排名从 1 开始."""
+        response = api_client.get("/api/game/leaderboard")
+        data = response.json()
+
+        ranks = [e["rank"] for e in data["entries"]]
+        assert ranks == list(range(1, len(ranks) + 1))
+
+    @pytest.mark.django_db
+    def test_get_leaderboard_empty(self, api_client: APIClient, db):
+        """空排行榜."""
+        response = api_client.get("/api/game/leaderboard")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["entries"] == []
+
+    @pytest.mark.django_db
+    def test_get_leaderboard_invalid_limit(
+        self, api_client: APIClient, leaderboard_entries
+    ):
+        """无效 limit 使用默认值."""
+        response = api_client.get("/api/game/leaderboard?limit=abc")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["entries"]) == 10
+
+    @pytest.mark.django_db
+    def test_get_leaderboard_negative_limit(
+        self, api_client: APIClient, leaderboard_entries
+    ):
+        """负数 limit 使用默认值."""
+        response = api_client.get("/api/game/leaderboard?limit=-5")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["entries"]) == 10
