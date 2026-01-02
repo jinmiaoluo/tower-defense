@@ -196,8 +196,8 @@ class TestCleanupSessionsScheduler:
 
         cmd = Command()
 
-        # 验证定时间隔设置正确 (2 小时 = 7200 秒)
-        assert cmd.DEFAULT_INTERVAL == 7200
+        # 验证定时间隔设置正确 (1 小时 = 3600 秒)
+        assert cmd.DEFAULT_INTERVAL == 3600
 
     @pytest.mark.django_db
     def test_daemon_mode_custom_interval(self, db):

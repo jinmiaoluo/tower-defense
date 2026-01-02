@@ -107,28 +107,30 @@ class TestGenerateWaveAuto:
     """自动生成波次（11+）测试."""
 
     def test_wave_11_auto_generated(self):
-        """第 11 波开始自动生成."""
+        """第 11 波开始自动生成.
+
+        count = floor(11^1.1) = floor(13.98) = 13
+        """
         wave = generate_wave(11, 1.0)
         assert wave["waveNumber"] == 11
-        # 怪物数量 = floor(11^1.1) ≈ 13
-        assert 10 <= len(wave["monsters"]) <= 20
+        assert len(wave["monsters"]) == 13
 
     def test_wave_15_monster_count(self):
         """第 15 波怪物数量.
 
-        count = min(floor(15^1.1), 100) ≈ 19
+        count = floor(15^1.1) = floor(19.67) = 19
         """
         wave = generate_wave(15, 1.0)
         assert wave["waveNumber"] == 15
-        assert 15 <= len(wave["monsters"]) <= 25
+        assert len(wave["monsters"]) == 19
 
     def test_wave_50_monster_count(self):
         """第 50 波怪物数量.
 
-        count = min(floor(50^1.1), 100) ≈ 69
+        count = floor(50^1.1) = floor(73.94) = 73
         """
         wave = generate_wave(50, 1.0)
-        assert 60 <= len(wave["monsters"]) <= 80
+        assert len(wave["monsters"]) == 73
 
     def test_wave_100_capped_at_max(self):
         """第 100 波怪物数量不超过上限.
