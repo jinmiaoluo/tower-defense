@@ -385,12 +385,13 @@ def validate_attack_range(
 ) -> tuple[bool, str]:
     """验证发射时的原始目标是否在建筑射程内.
 
-    来源：SPEC.md L1147-1172
+    来源：旧实现 td-obj-building.js:187-204, td-cfg-buildings.js
 
-    射程规则：
-    - range: 最小射程（太近的目标无法攻击）
-    - max_range: 最大射程（太远的目标无法攻击）
-    - 升级后射程按默认规则增加（每级 x 1.2）
+    射程规则（与旧实现一致）：
+    - range: 初始射程（1 级时的值）
+    - max_range: 射程升级上限（升级时 range 不能超过此值）
+    - 升级后射程：min(range * 1.2^(level-1), max_range)
+    - 建筑可攻击 0 到当前射程内的任意目标（无最小射程限制）
 
     Args:
         attack: 攻击事件
@@ -404,16 +405,16 @@ def validate_attack_range(
     tx, ty = attack["originalTargetPosition"]
 
     distance = math.sqrt((bx - tx) ** 2 + (by - ty) ** 2)
-    # 射程按默认升级规则累积：每级 x 1.2
+
+    # 计算当前射程：range 每级 × 1.2，但不超过 max_range
+    base_range = building_config[building["type"]]["range"]
+    max_range = building_config[building["type"]]["max_range"]
     level_factor = 1.2 ** (building["level"] - 1)
-    min_range = building_config[building["type"]]["range"] * level_factor
-    max_range = building_config[building["type"]]["max_range"] * level_factor
+    current_range = min(base_range * level_factor, max_range)
 
-    if distance < min_range - 1:  # 1 格容差
-        return False, f"目标太近: 建筑 {building['id']} 最小射程 {min_range:.1f}, 目标距离 {distance:.1f}"
-
-    if distance > max_range + 1:  # 1 格容差
-        return False, f"目标太远: 建筑 {building['id']} 最大射程 {max_range:.1f}, 目标距离 {distance:.1f}"
+    # 只验证最大射程（无最小射程限制，与旧实现一致）
+    if distance > current_range + 1:  # 1 格容差（怪物可能在格子边缘）
+        return False, f"目标太远: 建筑 {building['id']} 射程 {current_range:.1f}, 目标距离 {distance:.1f}"
 
     return True, ""
 
@@ -421,21 +422,25 @@ def validate_attack_range(
 def _get_damage_multiplier(building_type: str, current_level: int) -> float:
     """获取建筑在指定等级的伤害升级系数.
 
-    来源：SPEC.md L120-122
-    - 默认：每级 × 1.2
-    - cannon（炮台）：1-10 级 × 1.2，11 级起 × 1.3
-    - HMG（重机枪）：每级 × 1.3
+    来源：SPEC.md L120-122, 旧实现 td-cfg-buildings.js:51-53
+    - 默认：每级 x 1.2
+    - cannon（炮台）：前 11 次升级 x 1.2，第 12 次升级起 x 1.3
+    - HMG（重机枪）：每级 x 1.3
+
+    旧实现中 cannon 的规则是 `old_level <= 10 ? 1.2 : 1.3`，其中 old_level 是
+    0-based（刚建造时 level=0）。新实现使用 1-based level（刚建造时 level=1），
+    因此 current_level=1 对应旧实现的 old_level=0，需要将阈值调整为 > 11。
 
     Args:
         building_type: 建筑类型
-        current_level: 当前等级（升级前的等级）
+        current_level: 当前等级（1-based，表示第几次升级）
 
     Returns:
         伤害升级系数
     """
     if building_type == "HMG":
         return 1.3
-    if building_type == "cannon" and current_level > 10:
+    if building_type == "cannon" and current_level > 11:
         return 1.3
     return 1.2
 
@@ -447,7 +452,13 @@ def calc_building_damage(
 ) -> int:
     """计算建筑在指定等级的伤害.
 
-    来源：SPEC.md L120-122, 旧实现 td-cfg-buildings.js
+    来源：SPEC.md L120-122, 旧实现 td-cfg-buildings.js, td-obj-building.js:258-272
+
+    重要：计算过程中保持浮点精度，仅在最后返回时截断。
+    这与旧实现的 _upgrade_records 机制一致：
+    - 旧实现在 _upgrade_records 中存储浮点值
+    - 每次升级使用浮点值计算
+    - 仅在赋值给 this[k] 时 Math.floor()
 
     Args:
         building_type: 建筑类型
@@ -455,13 +466,13 @@ def calc_building_damage(
         level: 目标等级
 
     Returns:
-        计算后的伤害值
+        计算后的伤害值（向下取整）
     """
-    damage = base_damage
+    damage = float(base_damage)
     for current_level in range(1, level):
         multiplier = _get_damage_multiplier(building_type, current_level)
-        damage = int(damage * multiplier)
-    return damage
+        damage = damage * multiplier
+    return int(damage)
 
 
 def validate_damage_value(

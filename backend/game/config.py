@@ -16,8 +16,8 @@ class BuildingConfig(TypedDict):
     name: str
     cost: int
     damage: int
-    range: int  # 最小攻击范围（格子数）
-    max_range: int  # 最大攻击范围（格子数）
+    range: int  # 初始射程（格子数），可升级
+    max_range: int  # 射程升级上限（格子数）
     speed: int  # 攻击间隔（帧），0 表示不攻击
     bullet_speed: int  # 子弹速度，0 表示无子弹（如 wall）或瞬发（如 laser_gun）
     life: int  # 建筑生命值

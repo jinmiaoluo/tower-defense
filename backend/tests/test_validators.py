@@ -538,11 +538,11 @@ class TestValidateDamage:
     def test_high_level_building_dps(self):
         """成功：高等级建筑的 DPS 计算（验证指数增长差异显著）.
 
-        HMG 每级 x 1.3：
-        - Level 5 HMG: 30 -> 39 -> 50 -> 65 -> 84
-        - DPS = 84 / 3 = 28
-        - max_damage = 28 * 100 = 2800
-        - 10% 容差内: 2800 * 1.1 = 3080
+        HMG 每级 x 1.3，保持浮点精度：
+        - Level 5 HMG: int(30 * 1.3^4) = int(85.68) = 85
+        - DPS = 85 / 3 = 28.33
+        - max_damage = 28.33 * 100 = 2833
+        - 10% 容差内: 2833 * 1.1 = 3116
 
         对比线性计算 30 * 5 / 3 = 50 DPS, max = 5000，差异显著
         """
@@ -568,7 +568,7 @@ class TestValidateDamage:
         """失败：伤害超过指数增长计算的 DPS 上限.
 
         使用线性计算的值会超过指数增长的上限：
-        - Level 5 HMG 指数: 84 伤害, DPS = 28, max = 2800
+        - Level 5 HMG 指数（保持浮点精度）: 85 伤害, DPS = 28.33, max = 2833 * 1.1 = 3116
         - Level 5 HMG 线性: 150 伤害, DPS = 50, max = 5000
 
         测试使用 4000 伤害：在线性计算内但超过指数计算上限
@@ -597,14 +597,14 @@ class TestValidateDamage:
 
         cannon 升级规则：1-10 级 x 1.2，11 级起 x 1.3
 
-        伤害计算（迭代累乘，每次取整）：
-        - Level 10: 52 (经过 9 次 x 1.2)
-        - Level 11: 62 (current_level=10 时仍用 1.2，因为 10 <= 10)
-        - Level 12: 80 (current_level=11 时开始用 1.3，因为 11 > 10)
+        保持浮点精度计算：
+        - Level 10: int(12 * 1.2^9) = 61
+        - Level 11: int(12 * 1.2^10) = 74 (current_level=10 <= 10, 用 1.2)
+        - Level 12: int(12 * 1.2^10 * 1.3) = 96 (current_level=11 > 10, 用 1.3)
 
         对比线性计算的差异：
-        - Level 10 线性: 12 * 10 = 120，差异 130%
-        - Level 12 线性: 12 * 12 = 144，差异 80%
+        - Level 10 线性: 12 * 10 = 120，实际 61，差异 49%
+        - Level 12 线性: 12 * 12 = 144，实际 96，差异 33%
         """
         building_config = {
             "cannon": {"damage": 12, "speed": 2},
@@ -613,7 +613,7 @@ class TestValidateDamage:
             "monsters": [{"type": 0, "count": 100, "life": 50, "money": 5}]
         }
 
-        # Level 10 cannon: damage = 52, DPS = 26, max = 2600, 10% 容差 = 2860
+        # Level 10 cannon: damage = 61, DPS = 30.5, max = 3050, 10% 容差 = 3355
         result_level_10 = {
             "killed_by_type": {0: 50},
             "total_life_destroyed": 2500,
@@ -626,7 +626,7 @@ class TestValidateDamage:
         ok, err = validate_damage(result_level_10, buildings_level_10, wave_config, building_config)
         assert ok is True, f"Level 10 应通过: {err}"
 
-        # Level 12 cannon: damage = 80, DPS = 40, max = 4000, 10% 容差 = 4400
+        # Level 12 cannon: damage = 96, DPS = 48, max = 4800, 10% 容差 = 5280
         result_level_12 = {
             "killed_by_type": {0: 80},
             "total_life_destroyed": 4000,
@@ -642,8 +642,8 @@ class TestValidateDamage:
     def test_cannon_high_level_linear_damage_rejected(self):
         """失败：cannon 高等级使用线性计算的伤害值被拒绝.
 
-        Level 10 cannon:
-        - 指数计算: damage = 52, DPS = 26, max_damage = 2600, 10% 容差 = 2860
+        Level 10 cannon（保持浮点精度）:
+        - 指数计算: damage = 61, DPS = 30.5, max_damage = 3050, 10% 容差 = 3355
         - 线性计算: damage = 120, DPS = 60, max_damage = 6000
 
         测试使用 5000 伤害：在线性计算内但超过指数计算上限
@@ -944,10 +944,11 @@ class TestValidateAttackRange:
         ok, err = validate_attack_range(attack, building, building_config)
         assert ok is True
 
-    def test_at_max_range(self):
-        """成功：目标在最大射程边界."""
+    def test_at_current_range(self):
+        """成功：目标在当前射程边界."""
+        # level 1: current_range = min(4, 8) = 4
         attack = {
-            "originalTargetPosition": [13, 5],  # 距离 8
+            "originalTargetPosition": [9, 5],  # 距离 4，等于当前射程
         }
         building = {"id": "b-001", "type": "cannon", "level": 1, "position": [5, 5]}
         building_config = {
@@ -956,10 +957,10 @@ class TestValidateAttackRange:
         ok, err = validate_attack_range(attack, building, building_config)
         assert ok is True
 
-    def test_at_min_range(self):
-        """成功：目标在最小射程边界."""
+    def test_very_close_target(self):
+        """成功：目标很近也可以攻击（无最小射程限制）."""
         attack = {
-            "originalTargetPosition": [9, 5],  # 距离 4
+            "originalTargetPosition": [6, 5],  # 距离 1
         }
         building = {"id": "b-001", "type": "cannon", "level": 1, "position": [5, 5]}
         building_config = {
@@ -981,25 +982,11 @@ class TestValidateAttackRange:
         assert ok is False
         assert "目标太远" in err
 
-    def test_too_close(self):
-        """失败：目标太近."""
-        attack = {
-            "originalTargetPosition": [6, 5],  # 距离 1 < 4-1
-        }
-        building = {"id": "b-001", "type": "cannon", "level": 1, "position": [5, 5]}
-        building_config = {
-            "cannon": {"range": 4, "max_range": 8},
-        }
-        ok, err = validate_attack_range(attack, building, building_config)
-        assert ok is False
-        assert "目标太近" in err
-
     def test_upgraded_building_range(self):
         """成功：升级建筑射程增加."""
-        # level 3: range * 1.2^2 = 4 * 1.44 = 5.76
-        # max_range * 1.2^2 = 8 * 1.44 = 11.52
+        # level 3: current_range = min(4 * 1.2^2, 8) = min(5.76, 8) = 5.76
         attack = {
-            "originalTargetPosition": [14, 5],  # 距离 9，在升级后射程内
+            "originalTargetPosition": [11, 5],  # 距离 6，在升级后射程内（5.76 + 1 容差）
         }
         building = {"id": "b-001", "type": "cannon", "level": 3, "position": [5, 5]}
         building_config = {
@@ -1008,12 +995,28 @@ class TestValidateAttackRange:
         ok, err = validate_attack_range(attack, building, building_config)
         assert ok is True
 
-    def test_tolerance_at_max_range(self):
+    def test_tolerance_at_range(self):
         """成功：利用 1 格容差."""
+        # level 1: current_range = min(4, 8) = 4
+        # 距离 5 在容差内（4 + 1 = 5）
         attack = {
-            "originalTargetPosition": [14, 5],  # 距离 9 = 8 + 1（容差内）
+            "originalTargetPosition": [10, 5],  # 距离 5 = 4 + 1（容差内）
         }
         building = {"id": "b-001", "type": "cannon", "level": 1, "position": [5, 5]}
+        building_config = {
+            "cannon": {"range": 4, "max_range": 8},
+        }
+        ok, err = validate_attack_range(attack, building, building_config)
+        assert ok is True
+
+    def test_range_capped_by_max_range(self):
+        """成功：射程不超过 max_range."""
+        # level 10: range * 1.2^9 = 4 * 5.16 = 20.64，但被 max_range=8 限制
+        # current_range = min(20.64, 8) = 8
+        attack = {
+            "originalTargetPosition": [13, 5],  # 距离 8，等于 max_range
+        }
+        building = {"id": "b-001", "type": "cannon", "level": 10, "position": [5, 5]}
         building_config = {
             "cannon": {"range": 4, "max_range": 8},
         }
@@ -1058,10 +1061,11 @@ class TestValidateDamageValue:
         assert ok is True
 
     def test_level_3_damage(self):
-        """成功：3 级建筑的伤害."""
-        # level 2: 12 * 1.2 = 14.4 -> 14
-        # level 3: 14 * 1.2 = 16.8 -> 16
-        attack = {"damage": 16}
+        """成功：3 级建筑的伤害.
+
+        旧实现保持浮点精度：12 * 1.2 = 14.4 * 1.2 = 17.28 -> 17
+        """
+        attack = {"damage": 17}
         building = {"id": "b-001", "type": "cannon", "level": 3}
         building_config = {"cannon": {"damage": 12}}
         ok, err = validate_damage_value(attack, building, building_config)
@@ -1105,27 +1109,22 @@ class TestValidateDamageValue:
         assert ok is True
 
     def test_cannon_upgrade_rule_high_level(self):
-        """成功：cannon 11 级及以上使用 1.3 倍.
+        """成功：cannon 第 12 次升级起使用 1.3 倍.
 
-        cannon 基础伤害 12
-        level 1-10: × 1.2
-        level 11+: × 1.3
+        cannon 基础伤害 12，保持浮点精度计算（与旧实现 td-cfg-buildings.js:51-53 一致）：
+        旧实现条件：old_level <= 10 ? 1.2 : 1.3（old_level 是 0-based）
+        新实现对应：current_level <= 11 用 1.2，current_level > 11 用 1.3
 
-        level 10: calc_building_damage("cannon", 12, 10)
-        level 11: level_10_damage × 1.2（升级到 11 级时，current_level=10，还未超过 10）
-        level 12: level_11_damage × 1.3（升级到 12 级时，current_level=11，超过 10）
+        level 11: int(12 * 1.2^10) = int(74.30...) = 74（current_level=10，用 1.2）
+        level 12: int(12 * 1.2^11) = int(89.16...) = 89（current_level=11 <= 11，用 1.2）
+        level 13: int(12 * 1.2^11 * 1.3) = int(115.90...) = 115（current_level=12 > 11，用 1.3）
         """
-        level_10_damage = calc_building_damage("cannon", 12, 10)
-        level_11_damage = calc_building_damage("cannon", 12, 11)
-        level_12_damage = calc_building_damage("cannon", 12, 12)
-
-        # 验证 11 级使用 1.2（因为从 10 升到 11 时 current_level=10）
-        assert level_11_damage == int(level_10_damage * 1.2)
-        # 验证 12 级使用 1.3（因为从 11 升到 12 时 current_level=11 > 10）
-        assert level_12_damage == int(level_11_damage * 1.3)
+        assert calc_building_damage("cannon", 12, 11) == 74
+        assert calc_building_damage("cannon", 12, 12) == 89
+        assert calc_building_damage("cannon", 12, 13) == 115
 
         building_config = {"cannon": {"damage": 12}}
-        attack = {"damage": level_12_damage}
+        attack = {"damage": 89}
         building = {"id": "b-001", "type": "cannon", "level": 12}
         ok, _ = validate_damage_value(attack, building, building_config)
         assert ok is True
@@ -1167,17 +1166,19 @@ class TestCalcBuildingDamage:
         assert calc_building_damage("HMG", 30, 3) == 50
 
     def test_cannon_upgrade_transition(self):
-        """cannon 在 10 级后切换到 1.3 倍."""
-        base = 12
-        # 验证 1-10 级使用 1.2
-        damage_10 = calc_building_damage("cannon", base, 10)
-        damage_11 = calc_building_damage("cannon", base, 11)
-        # 从 level 10 升到 11 时，current_level=10，还是用 1.2
-        assert damage_11 == int(damage_10 * 1.2)
+        """cannon 第 12 次升级起切换到 1.3 倍.
 
-        # 从 level 11 升到 12 时，current_level=11 > 10，用 1.3
-        damage_12 = calc_building_damage("cannon", base, 12)
-        assert damage_12 == int(damage_11 * 1.3)
+        保持浮点精度计算（与旧实现 td-cfg-buildings.js:51-53 一致）：
+        旧实现条件：old_level <= 10 ? 1.2 : 1.3（old_level 是 0-based）
+        新实现对应：current_level <= 11 用 1.2，current_level > 11 用 1.3
+
+        level 11: int(12 * 1.2^10) = 74 (current_level=10 <= 11, 用 1.2)
+        level 12: int(12 * 1.2^11) = 89 (current_level=11 <= 11, 用 1.2)
+        level 13: int(12 * 1.2^11 * 1.3) = 115 (current_level=12 > 11, 用 1.3)
+        """
+        assert calc_building_damage("cannon", 12, 11) == 74
+        assert calc_building_damage("cannon", 12, 12) == 89
+        assert calc_building_damage("cannon", 12, 13) == 115
 
 
 class TestValidateMonsterPaths:
@@ -1249,22 +1250,24 @@ class TestValidateAttacks:
 
     def test_success_complete_validation(self):
         """成功：完整的攻击事件验证."""
+        # level 1 cannon: current_range = min(4, 8) = 4，加 1 容差 = 5
+        # 建筑位于 [5, 5]，目标需要在距离 <= 5 的范围内
         attacks = [
             {
                 "buildingId": "b-001",
                 "monsterId": "m-001",
                 "frame": 10,
                 "damage": 12,
-                "originalTargetPosition": [10, 5],
-                "monsterPosition": [10, 5],
+                "originalTargetPosition": [8, 5],  # 距离 3
+                "monsterPosition": [8, 5],
             },
             {
                 "buildingId": "b-001",
                 "monsterId": "m-001",
                 "frame": 20,
                 "damage": 12,
-                "originalTargetPosition": [11, 6],
-                "monsterPosition": [11, 6],
+                "originalTargetPosition": [9, 6],  # 距离 sqrt(16+1) ≈ 4.12
+                "monsterPosition": [9, 6],
             },
         ]
         buildings = [

@@ -217,7 +217,7 @@ class TestSubmitWaveView:
     ) -> list[dict]:
         """根据波次配置生成有效的攻击事件.
 
-        位置 [7, 7] 在射程内（距离 [0,0] 约 9.9）。
+        位置 [4, 3] 在射程内（距离 [0,0] = 5，等于 LMG 1 级射程）。
         每次攻击造成建筑的固定伤害，多次攻击累计击杀怪物。
         """
         attacks = []
@@ -233,9 +233,9 @@ class TestSubmitWaveView:
                     "frame": frame,
                     "buildingId": building_id,
                     "originalTargetId": m["id"],
-                    "originalTargetPosition": [7, 7],
+                    "originalTargetPosition": [4, 3],
                     "monsterId": m["id"],
-                    "monsterPosition": [7, 7],
+                    "monsterPosition": [4, 3],
                     "damage": building_damage,
                 })
                 frame += 3
@@ -935,6 +935,7 @@ class TestEndSessionView:
     ) -> list[dict]:
         """根据波次配置生成有效的攻击事件.
 
+        位置 [4, 3] 在射程内（距离 [0,0] = 5，等于 LMG 1 级射程）。
         使用多击模式: 每次攻击造成建筑固定伤害。
         """
         attacks = []
@@ -950,9 +951,9 @@ class TestEndSessionView:
                     "frame": frame,
                     "buildingId": building_id,
                     "originalTargetId": m["id"],
-                    "originalTargetPosition": [7, 7],
+                    "originalTargetPosition": [4, 3],
                     "monsterId": m["id"],
-                    "monsterPosition": [7, 7],
+                    "monsterPosition": [4, 3],
                     "damage": building_damage,
                 })
                 frame += 3
