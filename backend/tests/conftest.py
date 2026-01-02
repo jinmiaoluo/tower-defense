@@ -21,20 +21,23 @@ def game_config() -> dict:
 
 @pytest.fixture
 def first_wave() -> dict:
-    """第一波怪物配置."""
+    """第一波怪物配置.
+
+    与旧实现一致：第一波只有 1 个 type 0 怪物。
+    参考 td-data-stage-1.js:189-191
+    """
     monster = MONSTERS[0]
     return {
         "waveNumber": 1,
         "monsters": [
             {
-                "id": f"m-00{i}",
+                "id": "m-001",
                 "type": 0,
                 "life": monster["life"],
                 "speed": monster["speed"],
                 "shield": monster["shield"],
                 "money": monster["money"],
             }
-            for i in range(1, 4)
         ],
     }
 
