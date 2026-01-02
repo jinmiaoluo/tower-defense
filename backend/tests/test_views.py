@@ -1429,6 +1429,118 @@ class TestEndSessionView:
         data = response.json()
         assert data["error"]["code"] == "INVALID_REQUEST"
 
+    @pytest.mark.django_db
+    def test_end_session_without_last_wave_success(
+        self, api_client: APIClient, session_with_waves: GameSession
+    ):
+        """测试不带 lastWave 的提前结束（已完成的波次数据用于计算得分）."""
+        session = session_with_waves
+
+        request_data = {
+            "sessionId": str(session.id),
+            "nickname": "EarlyEnder",
+        }
+
+        response = api_client.post(
+            "/api/game/sessions/end",
+            data=request_data,
+            format="json",
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["verified"] is True
+        assert "ranking" in data
+
+        entry = LeaderboardEntry.objects.get(nickname="EarlyEnder")
+        assert entry.waves_completed == 5
+
+    @pytest.mark.django_db
+    def test_end_session_without_last_wave_requires_at_least_one_wave(
+        self, api_client: APIClient, db
+    ):
+        """测试不带 lastWave 时必须至少完成一波."""
+        wave_1 = generate_wave(1, 1.0)
+        session = GameSession.objects.create(
+            money=500,
+            life=100,
+            score=0,
+            difficulty=1.0,
+            wave_count=0,
+            buildings=[],
+            config=GAME_CONFIG,
+            next_wave=wave_1,
+        )
+
+        request_data = {
+            "sessionId": str(session.id),
+            "nickname": "NoWavePlayer",
+        }
+
+        response = api_client.post(
+            "/api/game/sessions/end",
+            data=request_data,
+            format="json",
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert data["verified"] is False
+        assert "至少完成一波" in data["error"]["message"]
+
+    @pytest.mark.django_db
+    def test_end_session_without_last_wave_final_score(
+        self, api_client: APIClient, session_with_waves: GameSession
+    ):
+        """测试不带 lastWave 时的最终得分计算."""
+        session = session_with_waves
+
+        request_data = {
+            "sessionId": str(session.id),
+            "nickname": "ScoreChecker",
+        }
+
+        response = api_client.post(
+            "/api/game/sessions/end",
+            data=request_data,
+            format="json",
+        )
+
+        assert response.status_code == 200
+
+        entry = LeaderboardEntry.objects.get(nickname="ScoreChecker")
+
+        expected_score = (
+            session.score
+            + session.wave_count * SCORE_CONFIG["wave_coefficient"]
+            + session.life * SCORE_CONFIG["life_coefficient"]
+            + int(session.money * SCORE_CONFIG["money_coefficient"])
+        )
+
+        assert entry.score == expected_score
+
+    @pytest.mark.django_db
+    def test_end_session_without_last_wave_deletes_session(
+        self, api_client: APIClient, session_with_waves: GameSession
+    ):
+        """测试不带 lastWave 的提前结束后删除会话."""
+        session = session_with_waves
+        session_id = session.id
+
+        request_data = {
+            "sessionId": str(session_id),
+            "nickname": "SessionDeleter",
+        }
+
+        response = api_client.post(
+            "/api/game/sessions/end",
+            data=request_data,
+            format="json",
+        )
+
+        assert response.status_code == 200
+        assert not GameSession.objects.filter(id=session_id).exists()
+
 
 class TestLeaderboardView:
     """GET /api/game/leaderboard 测试."""
