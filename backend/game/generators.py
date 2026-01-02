@@ -23,7 +23,10 @@ def generate_wave(wave_number: int, difficulty: float) -> dict[str, Any]:
         difficulty: 当前难度系数
 
     Returns:
-        波次配置字典，包含 waveNumber 和 monsters 列表
+        波次配置字典，包含:
+        - waveNumber: 波次号
+        - monsters: 展开的怪物列表（每个怪物有唯一 ID）
+        - waveConfig: 聚合格式的波次配置（用于服务端验证）
 
     Raises:
         ValueError: 波次号小于等于 0 时
@@ -36,11 +39,12 @@ def generate_wave(wave_number: int, difficulty: float) -> dict[str, Any]:
     else:
         wave_def = _generate_auto_wave(wave_number)
 
-    monsters = _expand_wave_def(wave_def, difficulty)
+    monsters, wave_config = _expand_wave_def(wave_def, difficulty)
 
     return {
         "waveNumber": wave_number,
         "monsters": monsters,
+        "waveConfig": wave_config,
     }
 
 
@@ -98,7 +102,7 @@ def _generate_auto_wave(wave_number: int) -> list[dict[str, int]]:
 def _expand_wave_def(
     wave_def: list[dict[str, int]],
     difficulty: float,
-) -> list[dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """展开波次定义为具体怪物列表.
 
     Args:
@@ -106,9 +110,12 @@ def _expand_wave_def(
         difficulty: 难度系数
 
     Returns:
-        怪物列表，每个怪物包含 id, type, life, speed, shield, money
+        (monsters, wave_config) 元组:
+        - monsters: 怪物列表，每个怪物包含 id, type, life, speed, shield, money
+        - wave_config: 聚合格式的验证配置 [{"type", "count", "life", "money"}, ...]
     """
     monsters = []
+    wave_config = []
 
     for group in wave_def:
         monster_type = group["type"]
@@ -116,6 +123,13 @@ def _expand_wave_def(
         base_attrs = MONSTERS[monster_type]
 
         attrs = calc_monster_attrs(base_attrs, difficulty)
+
+        wave_config.append({
+            "type": monster_type,
+            "count": count,
+            "life": attrs["life"],
+            "money": attrs["money"],
+        })
 
         for _ in range(count):
             monsters.append({
@@ -127,4 +141,4 @@ def _expand_wave_def(
                 "money": attrs["money"],
             })
 
-    return monsters
+    return monsters, wave_config

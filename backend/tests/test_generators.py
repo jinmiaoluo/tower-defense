@@ -178,6 +178,44 @@ class TestGenerateWaveMonsterAttributes:
             assert 0 <= monster["type"] <= 8
 
 
+class TestGenerateWaveConfig:
+    """waveConfig 聚合格式测试."""
+
+    def test_wave_config_present(self):
+        """返回包含 waveConfig 字段."""
+        wave = generate_wave(1, 1.0)
+        assert "waveConfig" in wave
+
+    def test_wave_config_structure(self):
+        """waveConfig 包含正确的字段."""
+        wave = generate_wave(1, 1.0)
+        for config in wave["waveConfig"]:
+            assert "type" in config
+            assert "count" in config
+            assert "life" in config
+            assert "money" in config
+
+    def test_wave_config_matches_monsters(self):
+        """waveConfig 与 monsters 列表一致."""
+        wave = generate_wave(7, 1.0)
+        # 从 monsters 统计
+        monster_counts: dict[int, int] = {}
+        for m in wave["monsters"]:
+            t = m["type"]
+            monster_counts[t] = monster_counts.get(t, 0) + 1
+        # 从 waveConfig 统计
+        config_counts = {c["type"]: c["count"] for c in wave["waveConfig"]}
+        assert monster_counts == config_counts
+
+    def test_wave_config_attributes_match_monsters(self):
+        """waveConfig 中的属性与 monsters 一致."""
+        wave = generate_wave(1, 2.0)
+        config = wave["waveConfig"][0]
+        monster = wave["monsters"][0]
+        assert config["life"] == monster["life"]
+        assert config["money"] == monster["money"]
+
+
 class TestGenerateFirstWave:
     """generate_first_wave 测试."""
 
