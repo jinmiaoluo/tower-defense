@@ -401,43 +401,6 @@ def test_calc_life_reward_every_10_waves():
     assert calc_life_reward(30) == 10
 ```
 
-### calc_final_score
-
-计算游戏结束时的最终得分（P2 阶段实现）。
-
-```python
-# game/calculators.py
-def calc_final_score(
-    accumulated_score: int,
-    waves_completed: int,
-    remaining_life: int,
-    remaining_money: int,
-    score_config: dict,
-) -> int:
-    """计算最终得分
-
-    最终得分 = 累计命中得分 + 波次奖励 + 剩余生命奖励 + 剩余金币奖励
-    """
-    wave_bonus = waves_completed * score_config["wave_coefficient"]
-    life_bonus = remaining_life * score_config["life_coefficient"]
-    money_bonus = int(remaining_money * score_config["money_coefficient"])
-    return accumulated_score + wave_bonus + life_bonus + money_bonus
-```
-
-```python
-# tests/test_calculators.py
-def test_calc_final_score():
-    score_config = {
-        "wave_coefficient": 10,
-        "life_coefficient": 5,
-        "money_coefficient": 0.1,
-    }
-    # 累计 1000 分 + 10 波 × 10 + 50 生命 × 5 + 200 金币 × 0.1
-    # = 1000 + 100 + 250 + 20 = 1370
-    result = calc_final_score(1000, 10, 50, 200, score_config)
-    assert result == 1370
-```
-
 ## 波次生成器
 
 ### generate_wave
