@@ -70,6 +70,7 @@ class WaveRecord(models.Model):
         default=dict, help_text="每种怪物类型的击杀数 {type_id: count}"
     )
     passed = models.IntegerField(help_text="穿过终点的怪物数")
+    remaining = models.IntegerField(default=0, help_text="提前结束时场上剩余的怪物数")
     score_gained = models.IntegerField(help_text="本波获得的分数")
     money_gained = models.IntegerField(help_text="本波获得的金钱")
     life_lost = models.IntegerField(help_text="本波损失的生命值")

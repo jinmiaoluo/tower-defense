@@ -26,6 +26,7 @@ from game.validators import (
     validate_game_end,
     validate_money_balance,
     validate_nickname,
+    validate_remaining_monsters,
     validate_score,
     validate_wave_continuity,
 )
@@ -49,6 +50,7 @@ def _convert_keys_to_snake_case(result: dict[str, Any]) -> dict[str, Any]:
         "totalDamageDealt": "total_damage_dealt",
         "totalLifeDestroyed": "total_life_destroyed",
         "waveDurationFrames": "wave_duration_frames",
+        "remainingMonsterIds": "remaining_monster_ids",
     }
     return {mapping.get(k, k): v for k, v in result.items()}
 
@@ -160,6 +162,11 @@ class SubmitWaveView(APIView):
         if not ok:
             return self._validation_error(msg)
 
+        # remaining 怪物验证（防作弊）
+        ok, msg = validate_remaining_monsters(attacks, result, monsters_config)
+        if not ok:
+            return self._validation_error(msg)
+
         spent, income, calculated_buildings = process_actions(
             actions, session.buildings, GAME_CONFIG
         )
@@ -186,6 +193,7 @@ class SubmitWaveView(APIView):
                 killed=result["killed"],
                 killed_by_type=result["killed_by_type"],
                 passed=result["passed"],
+                remaining=result.get("remaining", 0),
                 score_gained=result["score_gained"],
                 money_gained=result["money_gained"],
                 life_lost=result["life_lost"],
@@ -329,6 +337,10 @@ class EndSessionView(APIView):
         if not ok:
             return self._validation_error(msg)
 
+        ok, msg = validate_remaining_monsters(attacks, result, monsters_config)
+        if not ok:
+            return self._validation_error(msg)
+
         spent, income, calculated_buildings = process_actions(
             actions, session.buildings, GAME_CONFIG
         )
@@ -358,6 +370,7 @@ class EndSessionView(APIView):
                     killed=result["killed"],
                     killed_by_type=result["killed_by_type"],
                     passed=result["passed"],
+                    remaining=result.get("remaining", 0),
                     score_gained=result["score_gained"],
                     money_gained=result["money_gained"],
                     life_lost=result["life_lost"],

@@ -48,8 +48,9 @@ def validate_basic(
     验证项目：
     1. killed_by_type 总和 == killed
     2. 每种怪物击杀数 <= 配置数量
-    3. killed + passed == 波次怪物总数
-    4. money_gained == 基于击杀计算的金钱
+    3. remaining >= 0（向后兼容，默认为 0）
+    4. killed + passed + remaining == 波次怪物总数
+    5. money_gained == 基于击杀计算的金钱
 
     Args:
         result: 客户端提交的波次结果
@@ -73,12 +74,17 @@ def validate_basic(
         if killed_count > wave_monsters[monster_type]["count"]:
             return False, f"怪物 {monster_type} 击杀数超出配置"
 
-    # 3. 总数量一致性验证
+    # 3. remaining 字段验证（向后兼容，默认为 0）
+    remaining = result.get("remaining", 0)
+    if remaining < 0:
+        return False, "remaining 不能为负数"
+
+    # 4. 总数量一致性验证
     total_monsters = sum(m["count"] for m in wave_config["monsters"])
-    if result["killed"] + result["passed"] != total_monsters:
+    if result["killed"] + result["passed"] + remaining != total_monsters:
         return False, "怪物数量不一致"
 
-    # 4. 金钱收益验证
+    # 5. 金钱收益验证
     expected_money = sum(
         killed_by_type.get(m["type"], 0) * m["money"]
         for m in wave_config["monsters"]
@@ -374,6 +380,65 @@ def validate_cumulative_damage(
         actual_count = killed_count_by_type.get(int(monster_type), 0)
         if actual_count != expected_count:
             return False, f"类型 {monster_type} 击杀数不一致: 期望 {expected_count}, 实际根据伤害计算为 {actual_count}"
+
+    return True, ""
+
+
+def validate_remaining_monsters(
+    attacks: list[dict[str, Any]],
+    result: dict[str, Any],
+    monsters_config: dict[str, Any],
+) -> tuple[bool, str]:
+    """验证 remaining 怪物的合法性.
+
+    来源：SPEC.md remaining 怪物验证规则
+
+    验证项目：
+    1. remainingMonsterIds 长度 == remaining
+    2. 每个 ID 都是服务端下发的有效 UUID
+    3. 这些怪物的累计伤害 < 生命值（确实没被击杀）
+    4. 这些怪物 ID 不重复
+
+    当 remaining == 0 时跳过验证（向后兼容）。
+
+    Args:
+        attacks: 攻击事件列表
+        result: 波次结果，包含 remaining 和 remaining_monster_ids
+        monsters_config: 服务端下发的怪物配置 {id: {type, life, ...}}
+
+    Returns:
+        (成功标志, 错误信息)
+    """
+    remaining = result.get("remaining", 0)
+    if remaining == 0:
+        return True, ""
+
+    remaining_ids = result.get("remaining_monster_ids", [])
+
+    # 1. 数量一致性验证
+    if len(remaining_ids) != remaining:
+        return False, f"remainingMonsterIds 数量不一致: 期望 {remaining}, 实际 {len(remaining_ids)}"
+
+    # 2. ID 唯一性验证
+    if len(remaining_ids) != len(set(remaining_ids)):
+        return False, "remainingMonsterIds 包含重复 ID"
+
+    # 按 monsterId 分组计算累计伤害
+    damage_by_monster: dict[str, int] = {}
+    for attack in attacks:
+        mid = attack["monsterId"]
+        damage_by_monster[mid] = damage_by_monster.get(mid, 0) + attack["damage"]
+
+    for mid in remaining_ids:
+        # 3. ID 有效性验证
+        if mid not in monsters_config:
+            return False, f"未知的 remainingMonsterId: {mid}（不是服务端下发的 UUID）"
+
+        # 4. 累计伤害验证：在场怪物不应被击杀
+        monster = monsters_config[mid]
+        total_damage = damage_by_monster.get(mid, 0)
+        if total_damage >= monster["life"]:
+            return False, f"怪物 {mid} 累计伤害 {total_damage} >= 生命值 {monster['life']}，应被击杀而非 remaining"
 
     return True, ""
 

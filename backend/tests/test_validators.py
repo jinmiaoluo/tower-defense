@@ -18,6 +18,7 @@ from game.validators import (
     validate_monster_ids,
     validate_monster_paths,
     validate_nickname,
+    validate_remaining_monsters,
     validate_score,
     validate_wave_continuity,
 )
@@ -153,11 +154,12 @@ class TestValidateBasic:
         assert "击杀数超出配置" in err
 
     def test_total_mismatch(self):
-        """失败：killed + passed != 总数."""
+        """失败：killed + passed + remaining != 总数."""
         result = {
             "killed": 2,
             "killed_by_type": {0: 2},
             "passed": 0,  # 总数应为 3
+            "remaining": 0,
             "money_gained": 10,
         }
         wave_config = {
@@ -166,6 +168,86 @@ class TestValidateBasic:
         ok, err = validate_basic(result, wave_config)
         assert ok is False
         assert "怪物数量不一致" in err
+
+    def test_success_with_remaining(self):
+        """成功：提前结束场景，场上有 remaining 怪物."""
+        result = {
+            "killed": 1,
+            "killed_by_type": {0: 1},
+            "passed": 0,
+            "remaining": 2,  # 2 只在场怪物
+            "money_gained": 5,  # 只算击杀的
+        }
+        wave_config = {
+            "monsters": [{"type": 0, "count": 3, "money": 5}]
+        }
+        ok, err = validate_basic(result, wave_config)
+        assert ok is True
+
+    def test_success_remaining_multiple_types(self):
+        """成功：提前结束场景，多种怪物类型都有 remaining."""
+        result = {
+            "killed": 2,
+            "killed_by_type": {0: 1, 1: 1},
+            "passed": 1,
+            "remaining": 2,  # 还有 2 只在场
+            "money_gained": 13,  # 1*5 + 1*8 = 13
+        }
+        wave_config = {
+            "monsters": [
+                {"type": 0, "count": 2, "money": 5},
+                {"type": 1, "count": 3, "money": 8},
+            ]
+        }
+        ok, err = validate_basic(result, wave_config)
+        assert ok is True
+
+    def test_success_remaining_default_zero(self):
+        """成功：remaining 字段默认为 0（向后兼容）."""
+        result = {
+            "killed": 3,
+            "killed_by_type": {0: 3},
+            "passed": 0,
+            # 不提供 remaining 字段
+            "money_gained": 15,
+        }
+        wave_config = {
+            "monsters": [{"type": 0, "count": 3, "money": 5}]
+        }
+        ok, err = validate_basic(result, wave_config)
+        assert ok is True
+
+    def test_remaining_exceeds_limit(self):
+        """失败：remaining 数量过大，超出总数."""
+        result = {
+            "killed": 1,
+            "killed_by_type": {0: 1},
+            "passed": 0,
+            "remaining": 10,  # 超过总数 3
+            "money_gained": 5,
+        }
+        wave_config = {
+            "monsters": [{"type": 0, "count": 3, "money": 5}]
+        }
+        ok, err = validate_basic(result, wave_config)
+        assert ok is False
+        assert "怪物数量不一致" in err
+
+    def test_remaining_negative(self):
+        """失败：remaining 为负数."""
+        result = {
+            "killed": 3,
+            "killed_by_type": {0: 3},
+            "passed": 0,
+            "remaining": -1,  # 负数
+            "money_gained": 15,
+        }
+        wave_config = {
+            "monsters": [{"type": 0, "count": 3, "money": 5}]
+        }
+        ok, err = validate_basic(result, wave_config)
+        assert ok is False
+        assert "remaining 不能为负数" in err
 
     def test_money_mismatch(self):
         """失败：金钱收益不匹配."""
@@ -927,6 +1009,170 @@ class TestValidateCumulativeDamage:
         }
         ok, err = validate_cumulative_damage(attacks, result, monsters_config)
         assert ok is False
+
+
+class TestValidateRemainingMonsters:
+    """remaining 怪物验证测试."""
+
+    def test_zero_remaining_skip_validation(self):
+        """成功：remaining=0 时跳过验证."""
+        attacks = []
+        result = {"remaining": 0}
+        monsters_config = {}
+        ok, err = validate_remaining_monsters(attacks, result, monsters_config)
+        assert ok is True
+        assert err == ""
+
+    def test_remaining_default_zero(self):
+        """成功：remaining 字段不存在时默认为 0，跳过验证."""
+        attacks = []
+        result = {}  # 不提供 remaining 字段
+        monsters_config = {}
+        ok, err = validate_remaining_monsters(attacks, result, monsters_config)
+        assert ok is True
+        assert err == ""
+
+    def test_success_with_valid_remaining_ids(self):
+        """成功：remainingMonsterIds 有效且未被击杀."""
+        attacks = [
+            {"monsterId": "m-001", "damage": 30},  # 累计 30 < 50
+        ]
+        result = {
+            "remaining": 2,
+            "remaining_monster_ids": ["m-001", "m-002"],
+        }
+        monsters_config = {
+            "m-001": {"type": 0, "life": 50},
+            "m-002": {"type": 0, "life": 50},
+        }
+        ok, err = validate_remaining_monsters(attacks, result, monsters_config)
+        assert ok is True
+        assert err == ""
+
+    def test_success_no_damage_to_remaining(self):
+        """成功：在场怪物未受过攻击."""
+        attacks = [
+            {"monsterId": "m-001", "damage": 50},  # 击杀 m-001
+        ]
+        result = {
+            "remaining": 1,
+            "remaining_monster_ids": ["m-002"],  # m-002 从未被攻击
+        }
+        monsters_config = {
+            "m-001": {"type": 0, "life": 50},
+            "m-002": {"type": 0, "life": 50},
+        }
+        ok, err = validate_remaining_monsters(attacks, result, monsters_config)
+        assert ok is True
+        assert err == ""
+
+    def test_count_mismatch(self):
+        """失败：remainingMonsterIds 数量与 remaining 不一致."""
+        attacks = []
+        result = {
+            "remaining": 2,
+            "remaining_monster_ids": ["m-001"],  # 只有 1 个
+        }
+        monsters_config = {
+            "m-001": {"type": 0, "life": 50},
+        }
+        ok, err = validate_remaining_monsters(attacks, result, monsters_config)
+        assert ok is False
+        assert "数量不一致" in err
+        assert "期望 2" in err
+
+    def test_missing_remaining_ids(self):
+        """失败：remaining > 0 但未提供 remainingMonsterIds."""
+        attacks = []
+        result = {
+            "remaining": 1,
+            # 没有 remaining_monster_ids
+        }
+        monsters_config = {}
+        ok, err = validate_remaining_monsters(attacks, result, monsters_config)
+        assert ok is False
+        assert "数量不一致" in err
+
+    def test_duplicate_ids(self):
+        """失败：remainingMonsterIds 包含重复 ID."""
+        attacks = []
+        result = {
+            "remaining": 2,
+            "remaining_monster_ids": ["m-001", "m-001"],  # 重复
+        }
+        monsters_config = {
+            "m-001": {"type": 0, "life": 50},
+        }
+        ok, err = validate_remaining_monsters(attacks, result, monsters_config)
+        assert ok is False
+        assert "重复 ID" in err
+
+    def test_invalid_id(self):
+        """失败：remainingMonsterIds 包含无效 ID."""
+        attacks = []
+        result = {
+            "remaining": 1,
+            "remaining_monster_ids": ["fake-id"],  # 无效 ID
+        }
+        monsters_config = {
+            "m-001": {"type": 0, "life": 50},
+        }
+        ok, err = validate_remaining_monsters(attacks, result, monsters_config)
+        assert ok is False
+        assert "fake-id" in err
+        assert "不是服务端下发的 UUID" in err
+
+    def test_should_be_killed(self):
+        """失败：怪物累计伤害 >= 生命值，应被击杀而非 remaining."""
+        attacks = [
+            {"monsterId": "m-001", "damage": 30},
+            {"monsterId": "m-001", "damage": 25},  # 累计 55 >= 50
+        ]
+        result = {
+            "remaining": 1,
+            "remaining_monster_ids": ["m-001"],  # 声称 m-001 在场
+        }
+        monsters_config = {
+            "m-001": {"type": 0, "life": 50},
+        }
+        ok, err = validate_remaining_monsters(attacks, result, monsters_config)
+        assert ok is False
+        assert "m-001" in err
+        assert "应被击杀而非 remaining" in err
+
+    def test_exact_damage_should_be_killed(self):
+        """失败：累计伤害刚好等于生命值，应被击杀而非 remaining."""
+        attacks = [
+            {"monsterId": "m-001", "damage": 50},  # 刚好 50 == 50
+        ]
+        result = {
+            "remaining": 1,
+            "remaining_monster_ids": ["m-001"],
+        }
+        monsters_config = {
+            "m-001": {"type": 0, "life": 50},
+        }
+        ok, err = validate_remaining_monsters(attacks, result, monsters_config)
+        assert ok is False
+        assert "应被击杀而非 remaining" in err
+
+    def test_multiple_remaining_mixed_types(self):
+        """成功：多个不同类型的在场怪物."""
+        attacks = [
+            {"monsterId": "m-001", "damage": 20},  # 累计 20 < 50
+            {"monsterId": "m-003", "damage": 30},  # 累计 30 < 100
+        ]
+        result = {
+            "remaining": 3,
+            "remaining_monster_ids": ["m-001", "m-002", "m-003"],
+        }
+        monsters_config = {
+            "m-001": {"type": 0, "life": 50},
+            "m-002": {"type": 0, "life": 50},   # 从未被攻击
+            "m-003": {"type": 1, "life": 100},
+        }
+        ok, err = validate_remaining_monsters(attacks, result, monsters_config)
+        assert ok is True
 
 
 class TestValidateAttackRange:

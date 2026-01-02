@@ -865,6 +865,201 @@ class TestSubmitWaveView:
         assert data["valid"] is False
         assert "建筑列表不一致" in data["error"]["message"]
 
+    # ========== remaining 字段验证测试 ==========
+
+    @pytest.fixture
+    def session_with_multi_monster_wave(self, db) -> GameSession:
+        """创建带有多怪物波次配置的会话（用于测试 remaining 场景）.
+
+        使用第 5 波配置，包含多个怪物，便于测试部分击杀场景。
+        """
+        wave_5 = generate_wave(5, 1.0)
+        return GameSession.objects.create(
+            money=600,
+            life=90,
+            difficulty=1.0,
+            wave_count=4,
+            buildings=[],
+            config=GAME_CONFIG,
+            next_wave=wave_5,
+        )
+
+    def _make_partial_kill_wave_data(
+        self,
+        wave_config: dict,
+        killed_count: int,
+        remaining_count: int,
+        building_id: str = "b-001",
+        building_type: str = "LMG",
+    ) -> tuple[list[dict], dict, list[str]]:
+        """生成部分击杀场景的攻击事件和结果.
+
+        Args:
+            wave_config: 波次配置
+            killed_count: 击杀的怪物数量
+            remaining_count: 场上剩余的怪物数量
+            building_id: 建筑 ID
+            building_type: 建筑类型
+
+        Returns:
+            (attacks, result, remaining_monster_ids)
+        """
+        monsters = wave_config["monsters"]
+        total_monsters = len(monsters)
+        passed_count = total_monsters - killed_count - remaining_count
+
+        building_damage = GAME_CONFIG["buildings"][building_type]["damage"]
+
+        attacks = []
+        frame = 100
+        killed_by_type: dict[int, int] = {}
+        total_life_destroyed = 0
+        total_money = 0
+        remaining_monster_ids = []
+
+        for idx, m in enumerate(monsters):
+            if idx < killed_count:
+                hits_needed = (m["life"] + building_damage - 1) // building_damage
+                for _ in range(hits_needed):
+                    attacks.append({
+                        "frame": frame,
+                        "buildingId": building_id,
+                        "originalTargetId": m["id"],
+                        "originalTargetPosition": [4, 3],
+                        "monsterId": m["id"],
+                        "monsterPosition": [4, 3],
+                        "damage": building_damage,
+                    })
+                    frame += 3
+
+                t = m["type"]
+                killed_by_type[t] = killed_by_type.get(t, 0) + 1
+                total_life_destroyed += m["life"]
+                total_money += m["money"]
+            elif idx < killed_count + remaining_count:
+                remaining_monster_ids.append(m["id"])
+
+        total_damage = sum(a["damage"] for a in attacks)
+        score = sum(int(math.sqrt(a["damage"])) for a in attacks)
+
+        result = {
+            "killed": killed_count,
+            "killedByType": killed_by_type,
+            "passed": passed_count,
+            "remaining": remaining_count,
+            "remainingMonsterIds": remaining_monster_ids,
+            "scoreGained": score,
+            "moneyGained": total_money,
+            "lifeLost": passed_count,
+            "totalDamageDealt": total_damage,
+            "totalLifeDestroyed": total_life_destroyed,
+            "waveDurationFrames": 1000,
+        }
+
+        return attacks, result, remaining_monster_ids
+
+    @pytest.mark.django_db
+    def test_submit_wave_with_remaining_success(
+        self, api_client: APIClient, session_with_multi_monster_wave: GameSession
+    ):
+        """测试提交带 remaining 的波次成功."""
+        session = session_with_multi_monster_wave
+        wave_config = session.next_wave
+        monsters = wave_config["monsters"]
+        total_monsters = len(monsters)
+
+        killed_count = min(2, total_monsters - 1)
+        remaining_count = total_monsters - killed_count
+
+        building = self._make_valid_building()
+        attacks, result, _ = self._make_partial_kill_wave_data(
+            wave_config, killed_count, remaining_count
+        )
+        building["damageDealt"] = result["totalDamageDealt"]
+        building["kills"] = killed_count
+
+        actions = [{
+            "type": "BUILD",
+            "frame": 10,
+            "buildingType": building["type"],
+            "buildingId": building["id"],
+            "position": building["position"],
+        }]
+
+        request_data = {
+            "sessionId": str(session.id),
+            "waveNumber": 5,
+            "actions": actions,
+            "attacks": attacks,
+            "result": result,
+            "buildings": [building],
+        }
+
+        response = api_client.post(
+            "/api/game/sessions/wave",
+            data=request_data,
+            format="json",
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["valid"] is True
+
+        wave_record = WaveRecord.objects.filter(session=session, wave_number=5).first()
+        assert wave_record is not None
+        assert wave_record.remaining == remaining_count
+
+    @pytest.mark.django_db
+    def test_submit_wave_remaining_monster_ids_invalid(
+        self, api_client: APIClient, session_with_multi_monster_wave: GameSession
+    ):
+        """测试 remainingMonsterIds 包含无效 UUID 时失败."""
+        session = session_with_multi_monster_wave
+        wave_config = session.next_wave
+        monsters = wave_config["monsters"]
+        total_monsters = len(monsters)
+
+        killed_count = min(2, total_monsters - 1)
+        remaining_count = total_monsters - killed_count
+
+        building = self._make_valid_building()
+        attacks, result, remaining_ids = self._make_partial_kill_wave_data(
+            wave_config, killed_count, remaining_count
+        )
+
+        result["remainingMonsterIds"] = ["invalid-uuid-not-from-server"] + remaining_ids[1:]
+
+        building["damageDealt"] = result["totalDamageDealt"]
+        building["kills"] = killed_count
+
+        actions = [{
+            "type": "BUILD",
+            "frame": 10,
+            "buildingType": building["type"],
+            "buildingId": building["id"],
+            "position": building["position"],
+        }]
+
+        request_data = {
+            "sessionId": str(session.id),
+            "waveNumber": 5,
+            "actions": actions,
+            "attacks": attacks,
+            "result": result,
+            "buildings": [building],
+        }
+
+        response = api_client.post(
+            "/api/game/sessions/wave",
+            data=request_data,
+            format="json",
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert data["valid"] is False
+        assert "remainingMonsterId" in data["error"]["message"]
+
 
 class TestEndSessionView:
     """POST /api/game/sessions/end 测试."""
@@ -1540,6 +1735,371 @@ class TestEndSessionView:
 
         assert response.status_code == 200
         assert not GameSession.objects.filter(id=session_id).exists()
+
+    # ========== 带 remainingMonsterIds 的提前结束集成测试 ==========
+
+    @pytest.fixture
+    def session_with_multi_monster_wave(self, db) -> GameSession:
+        """创建带有多怪物波次配置的会话（模拟提前结束场景）.
+
+        使用第 6 波配置，包含多个怪物，便于测试部分击杀场景。
+        """
+        wave_6 = generate_wave(6, 1.0)
+        session = GameSession.objects.create(
+            money=800,
+            life=90,
+            score=150,
+            difficulty=1.0,
+            wave_count=5,
+            buildings=[],
+            config=GAME_CONFIG,
+            next_wave=wave_6,
+        )
+
+        for i in range(1, 6):
+            WaveRecord.objects.create(
+                session=session,
+                wave_number=i,
+                killed=3,
+                killed_by_type={0: 3},
+                passed=0,
+                score_gained=30,
+                money_gained=15,
+                life_lost=2,
+                total_damage_dealt=100,
+                total_life_destroyed=100,
+                wave_duration_frames=1000,
+                money_spent=0,
+                money_income=0,
+                building_count=0,
+                end_money=500 + i * 15,
+                end_score=i * 30,
+                end_life=100 - i * 2,
+                end_difficulty=1.0,
+            )
+
+        return session
+
+    def _make_partial_kill_last_wave(
+        self,
+        session: GameSession,
+        killed_count: int,
+        remaining_count: int,
+    ) -> dict:
+        """生成部分击杀场景的 lastWave 数据.
+
+        Args:
+            session: 游戏会话
+            killed_count: 击杀的怪物数量
+            remaining_count: 场上剩余的怪物数量（提前结束）
+
+        Returns:
+            lastWave 请求数据
+
+        Note:
+            passed 会根据总怪物数自动计算：
+            passed = total_monsters - killed_count - remaining_count
+        """
+        wave_config = session.next_wave
+        monsters = wave_config["monsters"]
+        total_monsters = len(monsters)
+        passed_count = total_monsters - killed_count - remaining_count
+
+        building = self._make_valid_building()
+        building_damage = GAME_CONFIG["buildings"]["LMG"]["damage"]
+
+        attacks = []
+        frame = 100
+        killed_by_type: dict[int, int] = {}
+        total_life_destroyed = 0
+        total_money = 0
+        remaining_monster_ids = []
+
+        for idx, m in enumerate(monsters):
+            if idx < killed_count:
+                hits_needed = (m["life"] + building_damage - 1) // building_damage
+                for _ in range(hits_needed):
+                    attacks.append({
+                        "frame": frame,
+                        "buildingId": building["id"],
+                        "originalTargetId": m["id"],
+                        "originalTargetPosition": [4, 3],
+                        "monsterId": m["id"],
+                        "monsterPosition": [4, 3],
+                        "damage": building_damage,
+                    })
+                    frame += 3
+
+                t = m["type"]
+                killed_by_type[t] = killed_by_type.get(t, 0) + 1
+                total_life_destroyed += m["life"]
+                total_money += m["money"]
+            elif idx < killed_count + remaining_count:
+                remaining_monster_ids.append(m["id"])
+
+        total_damage = sum(a["damage"] for a in attacks)
+        score = sum(int(math.sqrt(a["damage"])) for a in attacks)
+
+        result = {
+            "killed": killed_count,
+            "killedByType": killed_by_type,
+            "passed": passed_count,
+            "remaining": remaining_count,
+            "remainingMonsterIds": remaining_monster_ids,
+            "scoreGained": score,
+            "moneyGained": total_money,
+            "lifeLost": passed_count,
+            "totalDamageDealt": total_damage,
+            "totalLifeDestroyed": total_life_destroyed,
+            "waveDurationFrames": 1000,
+        }
+
+        building["damageDealt"] = total_damage
+        building["kills"] = killed_count
+
+        actions = [{
+            "type": "BUILD",
+            "frame": 10,
+            "buildingType": building["type"],
+            "buildingId": building["id"],
+            "position": building["position"],
+        }]
+
+        return {
+            "waveNumber": session.wave_count + 1,
+            "actions": actions,
+            "attacks": attacks,
+            "result": result,
+            "buildings": [building],
+        }
+
+    @pytest.mark.django_db
+    def test_end_session_with_remaining_monsters_success(
+        self, api_client: APIClient, session_with_multi_monster_wave: GameSession
+    ):
+        """测试带 remainingMonsterIds 的提前结束成功场景.
+
+        场景：波次进行中，部分怪物被击杀，部分还在场上时结束游戏。
+        验证：
+        1. API 返回验证通过
+        2. LeaderboardEntry 正确创建
+        3. 会话被正确删除
+
+        注意：WaveRecord 会随会话级联删除（CASCADE），因此不在此处验证。
+        """
+        session = session_with_multi_monster_wave
+        session_id = session.id
+        monsters = session.next_wave["monsters"]
+        total_monsters = len(monsters)
+
+        killed_count = min(2, total_monsters - 1)
+        remaining_count = total_monsters - killed_count
+
+        last_wave = self._make_partial_kill_last_wave(
+            session, killed_count, remaining_count
+        )
+
+        request_data = {
+            "sessionId": str(session.id),
+            "nickname": "RemainingTester",
+            "lastWave": last_wave,
+        }
+
+        response = api_client.post(
+            "/api/game/sessions/end",
+            data=request_data,
+            format="json",
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["verified"] is True
+        assert "ranking" in data
+
+        entry = LeaderboardEntry.objects.get(nickname="RemainingTester")
+        assert entry.waves_completed == 6
+
+        assert not GameSession.objects.filter(id=session_id).exists()
+
+    @pytest.mark.django_db
+    def test_end_session_remaining_monster_ids_count_mismatch(
+        self, api_client: APIClient, session_with_multi_monster_wave: GameSession
+    ):
+        """测试 remainingMonsterIds 数量与 remaining 不一致时失败."""
+        session = session_with_multi_monster_wave
+        last_wave = self._make_partial_kill_last_wave(session, 2, 2)
+
+        last_wave["result"]["remainingMonsterIds"] = [
+            last_wave["result"]["remainingMonsterIds"][0]
+        ]
+
+        request_data = {
+            "sessionId": str(session.id),
+            "nickname": "MismatchTester",
+            "lastWave": last_wave,
+        }
+
+        response = api_client.post(
+            "/api/game/sessions/end",
+            data=request_data,
+            format="json",
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert data["verified"] is False
+        assert "remainingMonsterIds" in data["error"]["message"]
+
+    @pytest.mark.django_db
+    def test_end_session_remaining_monster_ids_invalid_uuid(
+        self, api_client: APIClient, session_with_multi_monster_wave: GameSession
+    ):
+        """测试 remainingMonsterIds 包含无效 UUID 时失败."""
+        session = session_with_multi_monster_wave
+        last_wave = self._make_partial_kill_last_wave(session, 2, 2)
+
+        last_wave["result"]["remainingMonsterIds"] = [
+            "invalid-uuid-not-from-server",
+            last_wave["result"]["remainingMonsterIds"][1],
+        ]
+
+        request_data = {
+            "sessionId": str(session.id),
+            "nickname": "InvalidIdTester",
+            "lastWave": last_wave,
+        }
+
+        response = api_client.post(
+            "/api/game/sessions/end",
+            data=request_data,
+            format="json",
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert data["verified"] is False
+        assert "remainingMonsterId" in data["error"]["message"]
+
+    @pytest.mark.django_db
+    def test_end_session_remaining_monster_should_be_killed(
+        self, api_client: APIClient, session_with_multi_monster_wave: GameSession
+    ):
+        """测试 remainingMonsterIds 包含应被击杀的怪物时失败.
+
+        场景：声称怪物在场上（remaining），但攻击记录显示累计伤害 >= 生命值。
+        """
+        session = session_with_multi_monster_wave
+        monsters = session.next_wave["monsters"]
+        total_monsters = len(monsters)
+        building = self._make_valid_building()
+        building_damage = GAME_CONFIG["buildings"]["LMG"]["damage"]
+
+        first_monster = monsters[0]
+        second_monster = monsters[1] if len(monsters) > 1 else monsters[0]
+
+        hits_needed = (first_monster["life"] + building_damage - 1) // building_damage
+        attacks = []
+        frame = 100
+
+        for _ in range(hits_needed):
+            attacks.append({
+                "frame": frame,
+                "buildingId": building["id"],
+                "originalTargetId": first_monster["id"],
+                "originalTargetPosition": [4, 3],
+                "monsterId": first_monster["id"],
+                "monsterPosition": [4, 3],
+                "damage": building_damage,
+            })
+            frame += 3
+
+        total_damage = sum(a["damage"] for a in attacks)
+        score = sum(int(math.sqrt(a["damage"])) for a in attacks)
+
+        killed_count = 0
+        remaining_count = 2
+        passed_count = total_monsters - killed_count - remaining_count
+
+        result = {
+            "killed": killed_count,
+            "killedByType": {},
+            "passed": passed_count,
+            "remaining": remaining_count,
+            "remainingMonsterIds": [first_monster["id"], second_monster["id"]],
+            "scoreGained": score,
+            "moneyGained": 0,
+            "lifeLost": passed_count,
+            "totalDamageDealt": total_damage,
+            "totalLifeDestroyed": 0,
+            "waveDurationFrames": 1000,
+        }
+
+        building["damageDealt"] = total_damage
+        building["kills"] = killed_count
+
+        actions = [{
+            "type": "BUILD",
+            "frame": 10,
+            "buildingType": building["type"],
+            "buildingId": building["id"],
+            "position": building["position"],
+        }]
+
+        last_wave = {
+            "waveNumber": session.wave_count + 1,
+            "actions": actions,
+            "attacks": attacks,
+            "result": result,
+            "buildings": [building],
+        }
+
+        request_data = {
+            "sessionId": str(session.id),
+            "nickname": "FakeRemainingTester",
+            "lastWave": last_wave,
+        }
+
+        response = api_client.post(
+            "/api/game/sessions/end",
+            data=request_data,
+            format="json",
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert data["verified"] is False
+        assert "击杀" in data["error"]["message"] or "remaining" in data["error"]["message"].lower()
+
+    @pytest.mark.django_db
+    def test_end_session_remaining_monster_ids_duplicate(
+        self, api_client: APIClient, session_with_multi_monster_wave: GameSession
+    ):
+        """测试 remainingMonsterIds 包含重复 ID 时失败."""
+        session = session_with_multi_monster_wave
+        last_wave = self._make_partial_kill_last_wave(session, 2, 2)
+
+        first_remaining_id = last_wave["result"]["remainingMonsterIds"][0]
+        last_wave["result"]["remainingMonsterIds"] = [
+            first_remaining_id,
+            first_remaining_id,
+        ]
+
+        request_data = {
+            "sessionId": str(session.id),
+            "nickname": "DuplicateTester",
+            "lastWave": last_wave,
+        }
+
+        response = api_client.post(
+            "/api/game/sessions/end",
+            data=request_data,
+            format="json",
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert data["verified"] is False
+        assert "重复" in data["error"]["message"]
 
 
 class TestLeaderboardView:
