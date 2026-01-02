@@ -69,3 +69,41 @@ def process_actions(
             income += int(calc_total_cost(b["type"], b["level"], config) * 0.5) or 1
 
     return spent, income, list(buildings.values())
+
+
+def calc_new_difficulty(current: float, life_lost: int, wave: int) -> float:
+    """根据上一波受伤情况调整难度.
+
+    来源：旧实现 td-data-stage-1.js:264-288
+
+    Args:
+        current: 当前难度系数
+        life_lost: 上一波损失的生命值
+        wave: 当前波次号
+
+    Returns:
+        新的难度系数（最小为 1.0）
+    """
+    # Wave 1 不调整难度（教学波）
+    if wave == 1:
+        return current
+
+    if life_lost == 0:
+        if wave < 5:
+            factor = 1.05
+        elif current > 30:
+            factor = 1.1  # 高难度时减缓增长
+        else:
+            factor = 1.2
+    elif life_lost >= 50:
+        factor = 0.6
+    elif life_lost >= 30:
+        factor = 0.7
+    elif life_lost >= 20:
+        factor = 0.8
+    elif life_lost >= 10:
+        factor = 0.9
+    else:
+        factor = 1.05 if wave >= 10 else 1.0
+
+    return max(current * factor, 1.0)
