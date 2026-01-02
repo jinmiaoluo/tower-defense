@@ -250,12 +250,17 @@ class SubmitWaveView(APIView):
 
 
 class EndSessionView(APIView):
-    """POST /api/game/sessions/end - 结束游戏会话"""
+    """POST /api/game/sessions/end - 结束游戏会话
+
+    支持两种模式：
+    1. 带 lastWave: 提交最后一波数据并结束
+    2. 不带 lastWave: 直接结束游戏（提前结束），使用已提交的波次数据
+    """
 
     def post(self, request: Request) -> Response:
         data = request.data
 
-        ok, msg = _require_fields(data, "sessionId", "nickname", "lastWave")
+        ok, msg = _require_fields(data, "sessionId", "nickname")
         if not ok:
             return Response(
                 {"error": {"code": "INVALID_REQUEST", "message": msg}},
@@ -277,6 +282,15 @@ class EndSessionView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        if "lastWave" in data:
+            return self._end_with_last_wave(session, data)
+        else:
+            return self._end_without_last_wave(session, data)
+
+    def _end_with_last_wave(
+        self, session: GameSession, data: dict
+    ) -> Response:
+        """处理带 lastWave 的结束请求（原有逻辑）."""
         last_wave_data = data["lastWave"]
         wave_number = last_wave_data["waveNumber"]
         actions = last_wave_data["actions"]
@@ -297,14 +311,12 @@ class EndSessionView(APIView):
         if not ok:
             return self._validation_error(msg)
 
-        # Level 2 伤害验证
         ok, msg = validate_damage(
             result, submitted_buildings, wave_config, GAME_CONFIG["buildings"]
         )
         if not ok:
             return self._validation_error(msg)
 
-        # Level 2+ 攻击事件验证
         monsters_config = _get_monsters_config(session.next_wave)
         ok, msg = validate_attacks(
             attacks,
@@ -369,7 +381,6 @@ class EndSessionView(APIView):
                 session.buildings = calculated_buildings
                 session.save()
 
-                # Level 4 统计分析（只记录日志不影响验证结果）
                 analyze_statistics(session, result, spent)
 
                 ok, msg = validate_game_end(session)
@@ -388,6 +399,51 @@ class EndSessionView(APIView):
                     nickname=data["nickname"],
                     score=final_score,
                     waves_completed=wave_number,
+                )
+
+                rank = LeaderboardEntry.objects.filter(score__gt=final_score).count() + 1
+                total = LeaderboardEntry.objects.count()
+                is_new_record = rank == 1
+
+                session.delete()
+        except ValueError as e:
+            return self._validation_error(str(e))
+
+        return Response({
+            "verified": True,
+            "ranking": {
+                "rank": rank,
+                "total": total,
+                "isNewRecord": is_new_record,
+            },
+        })
+
+    def _end_without_last_wave(
+        self, session: GameSession, data: dict
+    ) -> Response:
+        """处理不带 lastWave 的提前结束请求.
+
+        使用当前会话状态计算最终得分，适用于：
+        - 用户在波次完成后主动选择结束游戏
+        - 必须至少完成一波才能使用此模式
+        """
+        if session.wave_count < 1:
+            return self._validation_error("提前结束需要至少完成一波")
+
+        try:
+            with transaction.atomic():
+                final_score = calc_final_score(
+                    accumulated_score=session.score,
+                    waves_completed=session.wave_count,
+                    remaining_life=session.life,
+                    remaining_money=session.money,
+                    score_config=SCORE_CONFIG,
+                )
+
+                entry = LeaderboardEntry.objects.create(
+                    nickname=data["nickname"],
+                    score=final_score,
+                    waves_completed=session.wave_count,
                 )
 
                 rank = LeaderboardEntry.objects.filter(score__gt=final_score).count() + 1
