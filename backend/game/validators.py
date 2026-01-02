@@ -157,3 +157,47 @@ def validate_buildings_consistency(
         return False, "建筑列表不一致"
 
     return True, ""
+
+
+def validate_game_end(session: GameSession) -> tuple[bool, str]:
+    """验证累计状态一致性.
+
+    来源：SPEC.md L1326-1341
+
+    验证项目：
+    1. 波次记录连续性
+    2. 分数累计一致性
+
+    Args:
+        session: 游戏会话
+
+    Returns:
+        (成功标志, 错误信息)
+    """
+    wave_records = list(session.waves.order_by("wave_number"))
+
+    for i, record in enumerate(wave_records):
+        if record.wave_number != i + 1:
+            return False, f"波次记录不连续: 缺少波次 {i + 1}"
+
+    expected_score = sum(r.score_gained for r in wave_records)
+    if session.score != expected_score:
+        return False, f"分数累计不一致: 期望 {expected_score}, 实际 {session.score}"
+
+    return True, ""
+
+
+def validate_nickname(nickname: str) -> tuple[bool, str]:
+    """验证昵称.
+
+    Args:
+        nickname: 玩家昵称
+
+    Returns:
+        (成功标志, 错误信息)
+    """
+    if not nickname:
+        return False, "昵称不能为空"
+    if len(nickname) > 32:
+        return False, "昵称长度不能超过 32 个字符"
+    return True, ""
