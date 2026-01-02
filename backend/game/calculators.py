@@ -3,6 +3,7 @@
 包含游戏核心计算逻辑，如建筑成本、伤害计算、得分计算等。
 """
 
+import math
 from typing import Any
 
 
@@ -107,3 +108,94 @@ def calc_new_difficulty(current: float, life_lost: int, wave: int) -> float:
         factor = 1.05 if wave >= 10 else 1.0
 
     return max(current * factor, 1.0)
+
+
+def calc_monster_attrs(base: dict[str, Any], difficulty: float) -> dict[str, Any]:
+    """基于难度系数计算怪物实际属性.
+
+    公式来源：
+    - 旧实现 td-obj-monster.js:24-35（去除随机因子）
+    - SPEC.md L880-899
+
+    约束条件（来源：td-obj-monster.js:27-36）：
+    - speed: 最小值 1，最大值 max_speed（如有）
+    - life: 最小值 1
+    - shield: 最小值 0
+
+    Args:
+        base: 怪物基础属性字典
+        difficulty: 当前难度系数
+
+    Returns:
+        计算后的怪物属性（不修改原字典）
+    """
+    speed = base["speed"] + difficulty / 2
+    max_speed = base.get("max_speed", float("inf"))
+
+    return {
+        **base,
+        "speed": min(max(speed, 1), max_speed),
+        "life": max(int(base["life"] * (difficulty + 1) * 0.5), 1),
+        "shield": max(int(base["shield"] + difficulty / 2), 0),
+    }
+
+
+def calc_actual_damage(raw_damage: int, shield: int) -> int:
+    """计算实际伤害.
+
+    公式：actual = max(raw - shield, ceil(raw * 0.1))
+    最低伤害为原始伤害的 10%（向上取整），保证高攻武器对高护盾怪有效。
+
+    来源：旧实现 td-obj-monster.js:78-83
+
+    Args:
+        raw_damage: 原始伤害值（建筑攻击力）
+        shield: 怪物护盾值
+
+    Returns:
+        实际造成的伤害
+    """
+    min_damage = math.ceil(raw_damage * 0.1)
+    return max(raw_damage - shield, min_damage)
+
+
+def calc_life_reward(wave: int) -> int:
+    """计算波次生命奖励.
+
+    规则：
+    - 每 10 波: +10 生命
+    - 每 5 波（非 10 的倍数）: +5 生命
+    - 其他波次: 0
+
+    注意：生命上限 100 的约束在应用奖励时处理，此函数只计算应得奖励值。
+
+    来源：旧实现 td-data-stage-1.js:62-73
+
+    Args:
+        wave: 当前波次号
+
+    Returns:
+        生命奖励值
+    """
+    if wave % 10 == 0:
+        return 10
+    elif wave % 5 == 0:
+        return 5
+    return 0
+
+
+def calc_hit_score(actual_damage: int) -> int:
+    """计算命中得分.
+
+    公式：score = floor(√actual_damage)
+    每次攻击命中时立即加分，而非击杀时加分。
+
+    来源：旧实现 td-obj-monster.js:85
+
+    Args:
+        actual_damage: 实际造成的伤害
+
+    Returns:
+        本次命中获得的分数
+    """
+    return int(math.sqrt(actual_damage))
