@@ -18,8 +18,11 @@ from game.config import GAME_CONFIG, INITIAL, SCORE_CONFIG
 from game.generators import generate_first_wave, generate_wave
 from game.models import GameSession, LeaderboardEntry, WaveRecord
 from game.validators import (
+    analyze_statistics,
+    validate_attacks,
     validate_basic,
     validate_buildings_consistency,
+    validate_damage,
     validate_game_end,
     validate_money_balance,
     validate_nickname,
@@ -50,20 +53,26 @@ def _convert_keys_to_snake_case(result: dict[str, Any]) -> dict[str, Any]:
     return {mapping.get(k, k): v for k, v in result.items()}
 
 
-def _build_wave_config_for_validation(next_wave: dict) -> dict:
-    """构建用于验证的波次配置."""
-    monsters_by_type: dict[int, dict] = {}
-    for m in next_wave["monsters"]:
-        t = m["type"]
-        if t not in monsters_by_type:
-            monsters_by_type[t] = {
-                "type": t,
-                "count": 0,
-                "life": m["life"],
-                "money": m["money"],
-            }
-        monsters_by_type[t]["count"] += 1
-    return {"monsters": list(monsters_by_type.values())}
+def _get_wave_config(next_wave: dict) -> dict:
+    """获取用于验证的波次配置."""
+    return {"monsters": next_wave["waveConfig"]}
+
+
+def _get_monsters_config(next_wave: dict) -> dict[str, dict]:
+    """构建怪物配置字典，用于 Level 2+ 验证.
+
+    Args:
+        next_wave: 波次数据，包含 monsters 列表
+
+    Returns:
+        {monster_id: {type, life, ...}} 格式的字典
+    """
+    return {m["id"]: m for m in next_wave["monsters"]}
+
+
+def _strip_wave_config(wave_data: dict) -> dict:
+    """移除波次数据中的 waveConfig，用于 API 响应."""
+    return {k: v for k, v in wave_data.items() if k != "waveConfig"}
 
 
 class CreateSessionView(APIView):
@@ -85,7 +94,7 @@ class CreateSessionView(APIView):
         return Response({
             "sessionId": str(session.id),
             "config": GAME_CONFIG,
-            "firstWave": first_wave,
+            "firstWave": _strip_wave_config(first_wave),
         })
 
 
@@ -122,12 +131,32 @@ class SubmitWaveView(APIView):
         if not ok:
             return self._validation_error(msg)
 
-        wave_config = _build_wave_config_for_validation(session.next_wave)
+        wave_config = _get_wave_config(session.next_wave)
         ok, msg = validate_basic(result, wave_config)
         if not ok:
             return self._validation_error(msg)
 
         ok, msg = validate_score(attacks, result)
+        if not ok:
+            return self._validation_error(msg)
+
+        # Level 2 伤害验证
+        ok, msg = validate_damage(
+            result, submitted_buildings, wave_config, GAME_CONFIG["buildings"]
+        )
+        if not ok:
+            return self._validation_error(msg)
+
+        # Level 2+ 攻击事件验证
+        monsters_config = _get_monsters_config(session.next_wave)
+        ok, msg = validate_attacks(
+            attacks,
+            submitted_buildings,
+            result,
+            GAME_CONFIG["buildings"],
+            GAME_CONFIG["map"],
+            monsters_config,
+        )
         if not ok:
             return self._validation_error(msg)
 
@@ -191,6 +220,9 @@ class SubmitWaveView(APIView):
             session.buildings = calculated_buildings
             session.save()
 
+        # Level 4 统计分析（在事务提交后执行，只记录日志不影响验证结果）
+        analyze_statistics(session, result, spent)
+
         response_data: dict[str, Any] = {
             "valid": True,
             "serverState": {
@@ -202,7 +234,7 @@ class SubmitWaveView(APIView):
         }
 
         if next_wave_data:
-            response_data["nextWave"] = next_wave_data
+            response_data["nextWave"] = _strip_wave_config(next_wave_data)
 
         return Response(response_data)
 
@@ -256,12 +288,32 @@ class EndSessionView(APIView):
         if not ok:
             return self._validation_error(msg)
 
-        wave_config = _build_wave_config_for_validation(session.next_wave)
+        wave_config = _get_wave_config(session.next_wave)
         ok, msg = validate_basic(result, wave_config)
         if not ok:
             return self._validation_error(msg)
 
         ok, msg = validate_score(attacks, result)
+        if not ok:
+            return self._validation_error(msg)
+
+        # Level 2 伤害验证
+        ok, msg = validate_damage(
+            result, submitted_buildings, wave_config, GAME_CONFIG["buildings"]
+        )
+        if not ok:
+            return self._validation_error(msg)
+
+        # Level 2+ 攻击事件验证
+        monsters_config = _get_monsters_config(session.next_wave)
+        ok, msg = validate_attacks(
+            attacks,
+            submitted_buildings,
+            result,
+            GAME_CONFIG["buildings"],
+            GAME_CONFIG["map"],
+            monsters_config,
+        )
         if not ok:
             return self._validation_error(msg)
 
@@ -316,6 +368,9 @@ class EndSessionView(APIView):
                 session.wave_count = wave_number
                 session.buildings = calculated_buildings
                 session.save()
+
+                # Level 4 统计分析（只记录日志不影响验证结果）
+                analyze_statistics(session, result, spent)
 
                 ok, msg = validate_game_end(session)
                 if not ok:

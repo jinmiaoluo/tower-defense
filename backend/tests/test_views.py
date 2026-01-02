@@ -178,12 +178,81 @@ class TestSubmitWaveView:
         """构建怪物 ID 到怪物数据的映射."""
         return {m["id"]: m for m in wave_config["monsters"]}
 
-    def _make_valid_wave_result(self, wave_config: dict) -> dict:
-        """根据波次配置生成有效的波次结果."""
+    def _make_valid_building(
+        self,
+        building_id: str = "b-001",
+        building_type: str = "LMG",
+    ) -> dict:
+        """创建有效的建筑数据.
+
+        默认使用 LMG（成本 100，伤害 5，射程 5-10）。
+        位置 [0, 0] 在入口，射程可以覆盖怪物路径。
+        """
+        return {
+            "id": building_id,
+            "type": building_type,
+            "position": [0, 0],
+            "level": 1,
+            "damageDealt": 0,
+            "kills": 0,
+        }
+
+    def _make_valid_wave_result(
+        self,
+        wave_config: dict,
+        building_type: str = "LMG",
+    ) -> dict:
+        """根据波次配置生成有效的波次结果.
+
+        内部生成攻击事件并计算匹配的得分。
+        """
+        attacks = self._make_valid_attacks(wave_config, building_type=building_type)
+        return self._make_valid_wave_result_with_attacks(wave_config, attacks)
+
+    def _make_valid_attacks(
+        self,
+        wave_config: dict,
+        building_id: str = "b-001",
+        building_type: str = "LMG",
+    ) -> list[dict]:
+        """根据波次配置生成有效的攻击事件.
+
+        位置 [7, 7] 在射程内（距离 [0,0] 约 9.9）。
+        每次攻击造成建筑的固定伤害，多次攻击累计击杀怪物。
+        """
+        attacks = []
+        frame = 100
+        building_damage = GAME_CONFIG["buildings"][building_type]["damage"]
+
+        for m in wave_config["monsters"]:
+            monster_life = m["life"]
+            hits_needed = (monster_life + building_damage - 1) // building_damage
+
+            for _ in range(hits_needed):
+                attacks.append({
+                    "frame": frame,
+                    "buildingId": building_id,
+                    "originalTargetId": m["id"],
+                    "originalTargetPosition": [7, 7],
+                    "monsterId": m["id"],
+                    "monsterPosition": [7, 7],
+                    "damage": building_damage,
+                })
+                frame += 3
+
+        return attacks
+
+    def _make_valid_wave_result_with_attacks(
+        self, wave_config: dict, attacks: list[dict]
+    ) -> dict:
+        """根据攻击事件生成匹配的波次结果."""
         monsters = wave_config["monsters"]
+        monsters_map = {m["id"]: m for m in monsters}
+
         killed_by_type: dict[int, int] = {}
         total_life = 0
         total_money = 0
+        total_damage = sum(a["damage"] for a in attacks)
 
         for m in monsters:
             t = m["type"]
@@ -191,37 +260,19 @@ class TestSubmitWaveView:
             total_life += m["life"]
             total_money += m["money"]
 
-        total_killed = len(monsters)
-        score = sum(int(math.sqrt(m["life"])) for m in monsters)
+        score = sum(int(math.sqrt(a["damage"])) for a in attacks)
 
         return {
-            "killed": total_killed,
+            "killed": len(monsters),
             "killedByType": killed_by_type,
             "passed": 0,
             "scoreGained": score,
             "moneyGained": total_money,
             "lifeLost": 0,
-            "totalDamageDealt": total_life,
+            "totalDamageDealt": total_damage,
             "totalLifeDestroyed": total_life,
             "waveDurationFrames": 1000,
         }
-
-    def _make_valid_attacks(self, wave_config: dict) -> list[dict]:
-        """根据波次配置生成有效的攻击事件."""
-        attacks = []
-        frame = 100
-        for m in wave_config["monsters"]:
-            attacks.append({
-                "frame": frame,
-                "buildingId": "b-001",
-                "originalTargetId": m["id"],
-                "originalTargetPosition": [5, 5],
-                "monsterId": m["id"],
-                "monsterPosition": [5, 5],
-                "damage": m["life"],
-            })
-            frame += 10
-        return attacks
 
     @pytest.mark.django_db
     def test_submit_wave_success(
@@ -231,13 +282,29 @@ class TestSubmitWaveView:
         session = session_with_first_wave
         wave_config = session.next_wave
 
+        building = self._make_valid_building()
+        attacks = self._make_valid_attacks(wave_config)
+        result = self._make_valid_wave_result_with_attacks(wave_config, attacks)
+        building["damageDealt"] = result["totalDamageDealt"]
+        building["kills"] = result["killed"]
+
+        actions = [{
+            "type": "BUILD",
+            "frame": 10,
+            "buildingType": building["type"],
+            "buildingId": building["id"],
+            "position": building["position"],
+        }]
+
+        building_cost = GAME_CONFIG["buildings"][building["type"]]["cost"]
+
         request_data = {
             "sessionId": str(session.id),
             "waveNumber": 1,
-            "actions": [],
-            "attacks": self._make_valid_attacks(wave_config),
-            "result": self._make_valid_wave_result(wave_config),
-            "buildings": [],
+            "actions": actions,
+            "attacks": attacks,
+            "result": result,
+            "buildings": [building],
         }
 
         response = api_client.post(
@@ -253,8 +320,9 @@ class TestSubmitWaveView:
         assert "nextWave" in data
 
         server_state = data["serverState"]
-        assert server_state["money"] == INITIAL["money"] + request_data["result"]["moneyGained"]
-        assert server_state["score"] == request_data["result"]["scoreGained"]
+        expected_money = INITIAL["money"] - building_cost + result["moneyGained"]
+        assert server_state["money"] == expected_money
+        assert server_state["score"] == result["scoreGained"]
         assert server_state["life"] == INITIAL["life"]
 
         next_wave = data["nextWave"]
@@ -339,14 +407,15 @@ class TestSubmitWaveView:
         session = session_with_first_wave
         wave_config = session.next_wave
 
-        result = self._make_valid_wave_result(wave_config)
+        attacks = self._make_valid_attacks(wave_config)
+        result = self._make_valid_wave_result_with_attacks(wave_config, attacks)
         result["killed"] = 999
 
         request_data = {
             "sessionId": str(session.id),
             "waveNumber": 1,
             "actions": [],
-            "attacks": self._make_valid_attacks(wave_config),
+            "attacks": attacks,
             "result": result,
             "buildings": [],
         }
@@ -370,14 +439,15 @@ class TestSubmitWaveView:
         session = session_with_first_wave
         wave_config = session.next_wave
 
-        result = self._make_valid_wave_result(wave_config)
+        attacks = self._make_valid_attacks(wave_config)
+        result = self._make_valid_wave_result_with_attacks(wave_config, attacks)
         result["moneyGained"] = 9999
 
         request_data = {
             "sessionId": str(session.id),
             "waveNumber": 1,
             "actions": [],
-            "attacks": self._make_valid_attacks(wave_config),
+            "attacks": attacks,
             "result": result,
             "buildings": [],
         }
@@ -401,13 +471,27 @@ class TestSubmitWaveView:
         session = session_with_first_wave
         wave_config = session.next_wave
 
+        building = self._make_valid_building()
+        attacks = self._make_valid_attacks(wave_config)
+        result = self._make_valid_wave_result_with_attacks(wave_config, attacks)
+        building["damageDealt"] = result["totalDamageDealt"]
+        building["kills"] = result["killed"]
+
+        actions = [{
+            "type": "BUILD",
+            "frame": 10,
+            "buildingType": building["type"],
+            "buildingId": building["id"],
+            "position": building["position"],
+        }]
+
         request_data = {
             "sessionId": str(session.id),
             "waveNumber": 1,
-            "actions": [],
-            "attacks": self._make_valid_attacks(wave_config),
-            "result": self._make_valid_wave_result(wave_config),
-            "buildings": [],
+            "actions": actions,
+            "attacks": attacks,
+            "result": result,
+            "buildings": [building],
         }
 
         response = api_client.post(
@@ -432,15 +516,30 @@ class TestSubmitWaveView:
         """测试成功提交后更新 GameSession."""
         session = session_with_first_wave
         wave_config = session.next_wave
-        result = self._make_valid_wave_result(wave_config)
+
+        building = self._make_valid_building()
+        attacks = self._make_valid_attacks(wave_config)
+        result = self._make_valid_wave_result_with_attacks(wave_config, attacks)
+        building["damageDealt"] = result["totalDamageDealt"]
+        building["kills"] = result["killed"]
+
+        actions = [{
+            "type": "BUILD",
+            "frame": 10,
+            "buildingType": building["type"],
+            "buildingId": building["id"],
+            "position": building["position"],
+        }]
+
+        building_cost = GAME_CONFIG["buildings"][building["type"]]["cost"]
 
         request_data = {
             "sessionId": str(session.id),
             "waveNumber": 1,
-            "actions": [],
-            "attacks": self._make_valid_attacks(wave_config),
+            "actions": actions,
+            "attacks": attacks,
             "result": result,
-            "buildings": [],
+            "buildings": [building],
         }
 
         response = api_client.post(
@@ -453,7 +552,7 @@ class TestSubmitWaveView:
 
         session.refresh_from_db()
         assert session.wave_count == 1
-        assert session.money == INITIAL["money"] + result["moneyGained"]
+        assert session.money == INITIAL["money"] - building_cost + result["moneyGained"]
         assert session.score == result["scoreGained"]
         assert session.life == INITIAL["life"] - result["lifeLost"]
 
@@ -464,35 +563,28 @@ class TestSubmitWaveView:
         """测试带有建造操作的波次提交."""
         session = session_with_first_wave
         wave_config = session.next_wave
-        result = self._make_valid_wave_result(wave_config)
 
-        actions = [
-            {
-                "type": "BUILD",
-                "frame": 50,
-                "buildingType": "LMG",
-                "buildingId": "b-001",
-                "position": [5, 5],
-            }
-        ]
-        buildings = [
-            {
-                "id": "b-001",
-                "type": "LMG",
-                "position": [5, 5],
-                "level": 1,
-                "damageDealt": result["totalDamageDealt"],
-                "kills": result["killed"],
-            }
-        ]
+        building = self._make_valid_building()
+        attacks = self._make_valid_attacks(wave_config)
+        result = self._make_valid_wave_result_with_attacks(wave_config, attacks)
+        building["damageDealt"] = result["totalDamageDealt"]
+        building["kills"] = result["killed"]
+
+        actions = [{
+            "type": "BUILD",
+            "frame": 10,
+            "buildingType": building["type"],
+            "buildingId": building["id"],
+            "position": building["position"],
+        }]
 
         request_data = {
             "sessionId": str(session.id),
             "waveNumber": 1,
             "actions": actions,
-            "attacks": self._make_valid_attacks(wave_config),
+            "attacks": attacks,
             "result": result,
-            "buildings": buildings,
+            "buildings": [building],
         }
 
         response = api_client.post(
@@ -515,7 +607,26 @@ class TestSubmitWaveView:
         """测试金钱不足."""
         session = session_with_first_wave
         wave_config = session.next_wave
-        result = self._make_valid_wave_result(wave_config)
+        monsters = wave_config["monsters"]
+
+        total_money = sum(m["money"] for m in monsters)
+        total_life = sum(m["life"] for m in monsters)
+        killed_by_type: dict[int, int] = {}
+        for m in monsters:
+            t = m["type"]
+            killed_by_type[t] = killed_by_type.get(t, 0) + 1
+
+        result = {
+            "killed": 0,
+            "killedByType": {},
+            "passed": len(monsters),
+            "scoreGained": 0,
+            "moneyGained": 0,
+            "lifeLost": len(monsters),
+            "totalDamageDealt": 0,
+            "totalLifeDestroyed": 0,
+            "waveDurationFrames": 1000,
+        }
 
         actions = [
             {
@@ -523,14 +634,14 @@ class TestSubmitWaveView:
                 "frame": 50,
                 "buildingType": "laser_gun",
                 "buildingId": "b-001",
-                "position": [5, 5],
+                "position": [0, 0],
             }
         ]
         buildings = [
             {
                 "id": "b-001",
                 "type": "laser_gun",
-                "position": [5, 5],
+                "position": [0, 0],
                 "level": 1,
                 "damageDealt": 0,
                 "kills": 0,
@@ -541,7 +652,7 @@ class TestSubmitWaveView:
             "sessionId": str(session.id),
             "waveNumber": 1,
             "actions": actions,
-            "attacks": self._make_valid_attacks(wave_config),
+            "attacks": [],
             "result": result,
             "buildings": buildings,
         }
@@ -602,15 +713,27 @@ class TestSubmitWaveView:
             next_wave=wave_5,
         )
 
-        result = self._make_valid_wave_result(wave_5)
+        building = self._make_valid_building()
+        attacks = self._make_valid_attacks(wave_5)
+        result = self._make_valid_wave_result_with_attacks(wave_5, attacks)
+        building["damageDealt"] = result["totalDamageDealt"]
+        building["kills"] = result["killed"]
+
+        actions = [{
+            "type": "BUILD",
+            "frame": 10,
+            "buildingType": building["type"],
+            "buildingId": building["id"],
+            "position": building["position"],
+        }]
 
         request_data = {
             "sessionId": str(session.id),
             "waveNumber": 5,
-            "actions": [],
-            "attacks": self._make_valid_attacks(wave_5),
+            "actions": actions,
+            "attacks": attacks,
             "result": result,
-            "buildings": [],
+            "buildings": [building],
         }
 
         response = api_client.post(
@@ -697,7 +820,19 @@ class TestSubmitWaveView:
         """测试建筑列表一致性验证."""
         session = session_with_first_wave
         wave_config = session.next_wave
-        result = self._make_valid_wave_result(wave_config)
+        monsters = wave_config["monsters"]
+
+        result = {
+            "killed": 0,
+            "killedByType": {},
+            "passed": len(monsters),
+            "scoreGained": 0,
+            "moneyGained": 0,
+            "lifeLost": len(monsters),
+            "totalDamageDealt": 0,
+            "totalLifeDestroyed": 0,
+            "waveDurationFrames": 1000,
+        }
 
         actions = [
             {
@@ -705,7 +840,7 @@ class TestSubmitWaveView:
                 "frame": 50,
                 "buildingType": "LMG",
                 "buildingId": "b-001",
-                "position": [5, 5],
+                "position": [0, 0],
             }
         ]
         buildings = []
@@ -714,7 +849,7 @@ class TestSubmitWaveView:
             "sessionId": str(session.id),
             "waveNumber": 1,
             "actions": actions,
-            "attacks": self._make_valid_attacks(wave_config),
+            "attacks": [],
             "result": result,
             "buildings": buildings,
         }
@@ -777,12 +912,62 @@ class TestEndSessionView:
         """构建怪物 ID 到怪物数据的映射."""
         return {m["id"]: m for m in wave_config["monsters"]}
 
-    def _make_valid_wave_result(self, wave_config: dict) -> dict:
-        """根据波次配置生成有效的波次结果."""
+    def _make_valid_building(
+        self,
+        building_id: str = "b-001",
+        building_type: str = "LMG",
+    ) -> dict:
+        """创建有效的建筑数据."""
+        return {
+            "id": building_id,
+            "type": building_type,
+            "position": [0, 0],
+            "level": 1,
+            "damageDealt": 0,
+            "kills": 0,
+        }
+
+    def _make_valid_attacks(
+        self,
+        wave_config: dict,
+        building_id: str = "b-001",
+        building_type: str = "LMG",
+    ) -> list[dict]:
+        """根据波次配置生成有效的攻击事件.
+
+        使用多击模式: 每次攻击造成建筑固定伤害。
+        """
+        attacks = []
+        frame = 100
+        building_damage = GAME_CONFIG["buildings"][building_type]["damage"]
+
+        for m in wave_config["monsters"]:
+            monster_life = m["life"]
+            hits_needed = (monster_life + building_damage - 1) // building_damage
+
+            for _ in range(hits_needed):
+                attacks.append({
+                    "frame": frame,
+                    "buildingId": building_id,
+                    "originalTargetId": m["id"],
+                    "originalTargetPosition": [7, 7],
+                    "monsterId": m["id"],
+                    "monsterPosition": [7, 7],
+                    "damage": building_damage,
+                })
+                frame += 3
+
+        return attacks
+
+    def _make_valid_wave_result(
+        self, wave_config: dict, attacks: list[dict]
+    ) -> dict:
+        """根据攻击事件生成匹配的波次结果."""
         monsters = wave_config["monsters"]
         killed_by_type: dict[int, int] = {}
         total_life = 0
         total_money = 0
+        total_damage = sum(a["damage"] for a in attacks)
 
         for m in monsters:
             t = m["type"]
@@ -790,47 +975,43 @@ class TestEndSessionView:
             total_life += m["life"]
             total_money += m["money"]
 
-        total_killed = len(monsters)
-        score = sum(int(math.sqrt(m["life"])) for m in monsters)
+        score = sum(int(math.sqrt(a["damage"])) for a in attacks)
 
         return {
-            "killed": total_killed,
+            "killed": len(monsters),
             "killedByType": killed_by_type,
             "passed": 0,
             "scoreGained": score,
             "moneyGained": total_money,
             "lifeLost": 0,
-            "totalDamageDealt": total_life,
+            "totalDamageDealt": total_damage,
             "totalLifeDestroyed": total_life,
             "waveDurationFrames": 1000,
         }
 
-    def _make_valid_attacks(self, wave_config: dict) -> list[dict]:
-        """根据波次配置生成有效的攻击事件."""
-        attacks = []
-        frame = 100
-        for m in wave_config["monsters"]:
-            attacks.append({
-                "frame": frame,
-                "buildingId": "b-001",
-                "originalTargetId": m["id"],
-                "originalTargetPosition": [5, 5],
-                "monsterId": m["id"],
-                "monsterPosition": [5, 5],
-                "damage": m["life"],
-            })
-            frame += 10
-        return attacks
-
     def _make_valid_last_wave(self, session: GameSession) -> dict:
         """生成有效的 lastWave 数据."""
         wave_config = session.next_wave
+        building = self._make_valid_building()
+        attacks = self._make_valid_attacks(wave_config)
+        result = self._make_valid_wave_result(wave_config, attacks)
+        building["damageDealt"] = result["totalDamageDealt"]
+        building["kills"] = result["killed"]
+
+        actions = [{
+            "type": "BUILD",
+            "frame": 10,
+            "buildingType": building["type"],
+            "buildingId": building["id"],
+            "position": building["position"],
+        }]
+
         return {
             "waveNumber": session.wave_count + 1,
-            "actions": [],
-            "attacks": self._make_valid_attacks(wave_config),
-            "result": self._make_valid_wave_result(wave_config),
-            "buildings": [],
+            "actions": actions,
+            "attacks": attacks,
+            "result": result,
+            "buildings": [building],
         }
 
     @pytest.mark.django_db
@@ -1107,7 +1288,8 @@ class TestEndSessionView:
         accumulated_score = session.score + last_wave_score
         waves_completed = 6
         remaining_life = 90
-        remaining_money = session.money + last_wave_money
+        building_cost = GAME_CONFIG["buildings"]["LMG"]["cost"]
+        remaining_money = session.money - building_cost + last_wave_money
 
         expected_score = (
             accumulated_score
@@ -1135,12 +1317,26 @@ class TestEndSessionView:
             next_wave=wave_1,
         )
 
+        building = self._make_valid_building()
+        attacks = self._make_valid_attacks(wave_1)
+        result = self._make_valid_wave_result(wave_1, attacks)
+        building["damageDealt"] = result["totalDamageDealt"]
+        building["kills"] = result["killed"]
+
+        actions = [{
+            "type": "BUILD",
+            "frame": 10,
+            "buildingType": building["type"],
+            "buildingId": building["id"],
+            "position": building["position"],
+        }]
+
         last_wave = {
             "waveNumber": 1,
-            "actions": [],
-            "attacks": self._make_valid_attacks(wave_1),
-            "result": self._make_valid_wave_result(wave_1),
-            "buildings": [],
+            "actions": actions,
+            "attacks": attacks,
+            "result": result,
+            "buildings": [building],
         }
 
         request_data = {
@@ -1195,6 +1391,30 @@ class TestEndSessionView:
         request_data = {
             "sessionId": str(session.id),
             "nickname": "",
+            "lastWave": last_wave,
+        }
+
+        response = api_client.post(
+            "/api/game/sessions/end",
+            data=request_data,
+            format="json",
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert data["error"]["code"] == "INVALID_REQUEST"
+
+    @pytest.mark.django_db
+    def test_end_session_nickname_whitespace_only(
+        self, api_client: APIClient, session_with_waves: GameSession
+    ):
+        """测试昵称为纯空白字符."""
+        session = session_with_waves
+        last_wave = self._make_valid_last_wave(session)
+
+        request_data = {
+            "sessionId": str(session.id),
+            "nickname": "   ",  # 纯空格
             "lastWave": last_wave,
         }
 
