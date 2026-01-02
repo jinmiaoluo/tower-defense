@@ -10,7 +10,7 @@ from game.calculators import (
     calc_total_cost,
     process_actions,
 )
-from game.config import GAME_CONFIG
+from game.config import GAME_CONFIG, SCORE_CONFIG
 
 
 class TestCalcTotalCost:
@@ -683,104 +683,67 @@ class TestCalcFinalScore:
     def test_basic_calculation(self):
         """基本计算测试.
 
-        累计 1000 分 + 10 波 × 10 + 50 生命 × 5 + 200 金币 × 0.1
-        = 1000 + 100 + 250 + 20 = 1370
+        公式：累计得分 + 波次奖励 + 生命奖励 + 金币奖励
         """
-        score_config = {
-            "wave_coefficient": 10,
-            "life_coefficient": 5,
-            "money_coefficient": 0.1,
-        }
-        result = calc_final_score(1000, 10, 50, 200, score_config)
-        assert result == 1370
+        result = calc_final_score(1000, 10, 50, 200, SCORE_CONFIG)
+        expected = (
+            1000
+            + 10 * SCORE_CONFIG["wave_coefficient"]
+            + 50 * SCORE_CONFIG["life_coefficient"]
+            + int(200 * SCORE_CONFIG["money_coefficient"])
+        )
+        assert result == expected
 
     def test_wave_bonus_only(self):
-        """仅波次奖励.
-
-        0 + 20 波 × 10 + 0 + 0 = 200
-        """
-        score_config = {
-            "wave_coefficient": 10,
-            "life_coefficient": 5,
-            "money_coefficient": 0.1,
-        }
-        result = calc_final_score(0, 20, 0, 0, score_config)
-        assert result == 200
+        """仅波次奖励."""
+        result = calc_final_score(0, 20, 0, 0, SCORE_CONFIG)
+        expected = 20 * SCORE_CONFIG["wave_coefficient"]
+        assert result == expected
 
     def test_life_bonus_only(self):
-        """仅生命奖励.
-
-        0 + 0 + 100 生命 × 5 = 500
-        """
-        score_config = {
-            "wave_coefficient": 10,
-            "life_coefficient": 5,
-            "money_coefficient": 0.1,
-        }
-        result = calc_final_score(0, 0, 100, 0, score_config)
-        assert result == 500
+        """仅生命奖励."""
+        result = calc_final_score(0, 0, 100, 0, SCORE_CONFIG)
+        expected = 100 * SCORE_CONFIG["life_coefficient"]
+        assert result == expected
 
     def test_money_bonus_only(self):
-        """仅金币奖励.
-
-        0 + 0 + 0 + 1000 金币 × 0.1 = 100
-        """
-        score_config = {
-            "wave_coefficient": 10,
-            "life_coefficient": 5,
-            "money_coefficient": 0.1,
-        }
-        result = calc_final_score(0, 0, 0, 1000, score_config)
-        assert result == 100
+        """仅金币奖励."""
+        result = calc_final_score(0, 0, 0, 1000, SCORE_CONFIG)
+        expected = int(1000 * SCORE_CONFIG["money_coefficient"])
+        assert result == expected
 
     def test_money_bonus_truncation(self):
         """金币奖励截断（取整）.
 
-        155 金币 × 0.1 = 15.5 -> int = 15
+        验证 int() 向下取整行为：155 × 0.1 = 15.5 -> 15
         """
-        score_config = {
-            "wave_coefficient": 10,
-            "life_coefficient": 5,
-            "money_coefficient": 0.1,
-        }
-        result = calc_final_score(0, 0, 0, 155, score_config)
-        assert result == 15
+        result = calc_final_score(0, 0, 0, 155, SCORE_CONFIG)
+        expected = int(155 * SCORE_CONFIG["money_coefficient"])
+        assert result == expected
 
     def test_accumulated_score_passthrough(self):
         """累计得分透传.
 
-        5000 + 0 + 0 + 0 = 5000
+        当其他参数为 0 时，结果应等于累计得分。
         """
-        score_config = {
-            "wave_coefficient": 10,
-            "life_coefficient": 5,
-            "money_coefficient": 0.1,
-        }
-        result = calc_final_score(5000, 0, 0, 0, score_config)
+        result = calc_final_score(5000, 0, 0, 0, SCORE_CONFIG)
         assert result == 5000
 
     def test_realistic_game_end(self):
         """真实游戏结束场景.
 
-        玩家通关 42 波，剩余 35 生命，剩余 2500 金币，累计命中得分 8000
-        = 8000 + 42 × 10 + 35 × 5 + int(2500 × 0.1)
-        = 8000 + 420 + 175 + 250
-        = 8845
+        玩家通关 42 波，剩余 35 生命，剩余 2500 金币，累计命中得分 8000。
         """
-        score_config = {
-            "wave_coefficient": 10,
-            "life_coefficient": 5,
-            "money_coefficient": 0.1,
-        }
-        result = calc_final_score(8000, 42, 35, 2500, score_config)
-        assert result == 8845
+        result = calc_final_score(8000, 42, 35, 2500, SCORE_CONFIG)
+        expected = (
+            8000
+            + 42 * SCORE_CONFIG["wave_coefficient"]
+            + 35 * SCORE_CONFIG["life_coefficient"]
+            + int(2500 * SCORE_CONFIG["money_coefficient"])
+        )
+        assert result == expected
 
     def test_zero_all(self):
         """全零输入."""
-        score_config = {
-            "wave_coefficient": 10,
-            "life_coefficient": 5,
-            "money_coefficient": 0.1,
-        }
-        result = calc_final_score(0, 0, 0, 0, score_config)
+        result = calc_final_score(0, 0, 0, 0, SCORE_CONFIG)
         assert result == 0
