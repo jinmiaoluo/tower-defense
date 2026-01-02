@@ -7,10 +7,13 @@
 - Level 4：统计分析（异常检测）
 """
 
+import logging
 import math
 from typing import Any
 
 from game.models import GameSession
+
+logger = logging.getLogger(__name__)
 
 
 def validate_wave_continuity(
@@ -168,6 +171,9 @@ def validate_game_end(session: GameSession) -> tuple[bool, str]:
     1. 波次记录连续性
     2. 分数累计一致性
 
+    边界情况：
+    - 波次记录为空时，期望分数为 0，若 session.score == 0 则验证通过
+
     Args:
         session: 游戏会话
 
@@ -190,16 +196,40 @@ def validate_game_end(session: GameSession) -> tuple[bool, str]:
 def validate_nickname(nickname: str) -> tuple[bool, str]:
     """验证昵称.
 
+    来源：SPEC.md 昵称验证规则
+
+    验证规则：
+    1. 昵称不能为空（包括纯空白字符）
+    2. 昵称长度不能超过 32 个字符
+    3. 不能包含控制字符（防止日志注入、显示异常）
+    4. 不能包含 HTML/脚本标签（防止 XSS）
+
     Args:
         nickname: 玩家昵称
 
     Returns:
         (成功标志, 错误信息)
     """
-    if not nickname:
+    if not nickname or not nickname.strip():
         return False, "昵称不能为空"
     if len(nickname) > 32:
         return False, "昵称长度不能超过 32 个字符"
+
+    # 检查控制字符（ASCII 0-31 和 127，除了常见空白字符）
+    for char in nickname:
+        code = ord(char)
+        # 允许空格(32)、普通可打印字符、以及多字节 Unicode 字符
+        # 禁止控制字符（0-31, 127）和部分 Unicode 控制字符
+        if code < 32 or code == 127 or (0x200B <= code <= 0x200F):
+            return False, "昵称包含非法字符"
+
+    # 检查危险的 HTML/脚本模式（大小写不敏感）
+    dangerous_patterns = ["<script", "</script", "<img", "<a ", "<style", "javascript:", "onerror", "onclick"]
+    nickname_lower = nickname.lower()
+    for pattern in dangerous_patterns:
+        if pattern in nickname_lower:
+            return False, "昵称包含非法字符"
+
     return True, ""
 
 
@@ -243,7 +273,8 @@ def validate_damage(
 
     # 3. DPS 容量验证
     max_dps = sum(
-        building_config[b["type"]]["damage"] * b["level"] / building_config[b["type"]]["speed"]
+        calc_building_damage(b["type"], building_config[b["type"]]["damage"], b["level"])
+        / building_config[b["type"]]["speed"]
         for b in buildings
         if building_config[b["type"]]["speed"] > 0
     )
@@ -271,9 +302,16 @@ def validate_monster_ids(
     attacks: list[dict[str, Any]],
     monsters_config: dict[str, Any],
 ) -> tuple[bool, str]:
-    """验证攻击事件中的 monsterId 是否是服务端下发的有效 UUID.
+    """验证攻击事件中的怪物 ID 是否是服务端下发的有效 UUID.
 
-    来源：SPEC.md L1121-1131
+    来源：SPEC.md L1106-1115, L620-622
+
+    验证项目：
+    1. monsterId: 实际命中的怪物 ID
+    2. originalTargetId: 发射时瞄准的怪物 ID（用于验证建筑有合法目标）
+
+    两者都必须是服务端下发的有效 UUID。由于存在"误伤"机制，
+    monsterId 可能与 originalTargetId 不同，但两者都必须有效。
 
     Args:
         attacks: 攻击事件列表
@@ -283,9 +321,16 @@ def validate_monster_ids(
         (成功标志, 错误信息)
     """
     for attack in attacks:
+        # 验证实际命中的怪物 ID
         mid = attack["monsterId"]
         if mid not in monsters_config:
             return False, f"未知的 monsterId: {mid}（不是服务端下发的 UUID）"
+
+        # 验证原始目标怪物 ID（发射时瞄准的目标）
+        original_tid = attack.get("originalTargetId")
+        if original_tid is not None and original_tid not in monsters_config:
+            return False, f"未知的 originalTargetId: {original_tid}（不是服务端下发的 UUID）"
+
     return True, ""
 
 
@@ -340,12 +385,12 @@ def validate_attack_range(
 ) -> tuple[bool, str]:
     """验证发射时的原始目标是否在建筑射程内.
 
-    来源：SPEC.md L1167-1198
+    来源：SPEC.md L1147-1172
 
     射程规则：
     - range: 最小射程（太近的目标无法攻击）
     - max_range: 最大射程（太远的目标无法攻击）
-    - 升级后射程略微增加（level ** 0.1）
+    - 升级后射程按默认规则增加（每级 x 1.2）
 
     Args:
         attack: 攻击事件
@@ -359,7 +404,8 @@ def validate_attack_range(
     tx, ty = attack["originalTargetPosition"]
 
     distance = math.sqrt((bx - tx) ** 2 + (by - ty) ** 2)
-    level_factor = building["level"] ** 0.1
+    # 射程按默认升级规则累积：每级 x 1.2
+    level_factor = 1.2 ** (building["level"] - 1)
     min_range = building_config[building["type"]]["range"] * level_factor
     max_range = building_config[building["type"]]["max_range"] * level_factor
 
@@ -370,6 +416,52 @@ def validate_attack_range(
         return False, f"目标太远: 建筑 {building['id']} 最大射程 {max_range:.1f}, 目标距离 {distance:.1f}"
 
     return True, ""
+
+
+def _get_damage_multiplier(building_type: str, current_level: int) -> float:
+    """获取建筑在指定等级的伤害升级系数.
+
+    来源：SPEC.md L120-122
+    - 默认：每级 × 1.2
+    - cannon（炮台）：1-10 级 × 1.2，11 级起 × 1.3
+    - HMG（重机枪）：每级 × 1.3
+
+    Args:
+        building_type: 建筑类型
+        current_level: 当前等级（升级前的等级）
+
+    Returns:
+        伤害升级系数
+    """
+    if building_type == "HMG":
+        return 1.3
+    if building_type == "cannon" and current_level > 10:
+        return 1.3
+    return 1.2
+
+
+def calc_building_damage(
+    building_type: str,
+    base_damage: int,
+    level: int,
+) -> int:
+    """计算建筑在指定等级的伤害.
+
+    来源：SPEC.md L120-122, 旧实现 td-cfg-buildings.js
+
+    Args:
+        building_type: 建筑类型
+        base_damage: 基础伤害
+        level: 目标等级
+
+    Returns:
+        计算后的伤害值
+    """
+    damage = base_damage
+    for current_level in range(1, level):
+        multiplier = _get_damage_multiplier(building_type, current_level)
+        damage = int(damage * multiplier)
+    return damage
 
 
 def validate_damage_value(
@@ -389,13 +481,11 @@ def validate_damage_value(
     Returns:
         (成功标志, 错误信息)
     """
-    base_damage = building_config[building["type"]]["damage"]
+    building_type = building["type"]
+    base_damage = building_config[building_type]["damage"]
     level = building["level"]
 
-    # 计算建筑在当前等级的伤害（升级规则：每级 x1.2）
-    expected_damage = base_damage
-    for _ in range(1, level):
-        expected_damage = int(expected_damage * 1.2)
+    expected_damage = calc_building_damage(building_type, base_damage, level)
 
     if attack["damage"] > expected_damage:
         return False, f"伤害值超过建筑上限: {attack['damage']} > {expected_damage}"
@@ -517,3 +607,69 @@ def validate_attacks(
         return False, err
 
     return True, ""
+
+
+def analyze_statistics(
+    session: GameSession,
+    result: dict[str, Any],
+    money_spent: int,
+) -> None:
+    """Level 4 统计分析：基于历史数据检测异常行为.
+
+    来源：SPEC.md L1254-1294
+
+    检测项目：
+    1. 击杀率异常突增：历史 < 0.5 且当前 > 0.95
+    2. 资源效率异常突增：当前效率 > 历史效率 × 3
+
+    只记录日志警告，不影响验证结果。
+
+    Args:
+        session: 游戏会话
+        result: 当前波次结果
+        money_spent: 当前波次花费
+    """
+    wave_records = list(session.waves.all())
+    if len(wave_records) < 3:
+        return  # 数据不足
+
+    # 历史平均击杀率
+    hist_killed = sum(r.killed for r in wave_records)
+    hist_total = sum(r.killed + r.passed for r in wave_records)
+    hist_kill_rate = hist_killed / max(hist_total, 1)
+
+    # 当前击杀率
+    curr_total = result["killed"] + result["passed"]
+    curr_kill_rate = result["killed"] / max(curr_total, 1)
+
+    # 击杀率突增检测
+    if hist_kill_rate < 0.5 and curr_kill_rate > 0.95:
+        logger.warning(
+            "击杀率异常突增",
+            extra={
+                "wave": session.wave_count + 1,
+                "session_id": str(session.id),
+                "hist_kill_rate": hist_kill_rate,
+                "curr_kill_rate": curr_kill_rate,
+            },
+        )
+
+    # 历史平均效率
+    hist_score = sum(r.score_gained for r in wave_records)
+    hist_cost = sum(r.money_spent for r in wave_records)
+    hist_efficiency = hist_score / max(hist_cost, 1)
+
+    # 当前效率
+    curr_efficiency = result["score_gained"] / max(money_spent, 1)
+
+    # 效率突增检测
+    if curr_efficiency > hist_efficiency * 3:
+        logger.warning(
+            "资源效率异常突增",
+            extra={
+                "wave": session.wave_count + 1,
+                "session_id": str(session.id),
+                "hist_efficiency": hist_efficiency,
+                "curr_efficiency": curr_efficiency,
+            },
+        )

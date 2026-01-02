@@ -1,8 +1,10 @@
 """验证器单元测试."""
 
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from game.validators import (
+    analyze_statistics,
+    calc_building_damage,
     position_distance,
     validate_attack_range,
     validate_attacks,
@@ -11,9 +13,11 @@ from game.validators import (
     validate_cumulative_damage,
     validate_damage,
     validate_damage_value,
+    validate_game_end,
     validate_money_balance,
     validate_monster_ids,
     validate_monster_paths,
+    validate_nickname,
     validate_score,
     validate_wave_continuity,
 )
@@ -505,13 +509,18 @@ class TestValidateDamage:
         assert ok is True
 
     def test_upgraded_building_dps(self):
-        """成功：升级建筑的 DPS 计算."""
-        # level 2 cannon: 12 * 2 / 2 = 12
-        # max_damage = 12 * 100 = 1200
+        """成功：升级建筑的 DPS 计算.
+
+        伤害使用指数增长规则（每级 x 1.2）：
+        - Level 2 cannon: int(12 * 1.2) = 14
+        - DPS = 14 / 2 = 7
+        - max_damage = 7 * 100 = 700
+        - 10% 容差内: 700 * 1.1 = 770
+        """
         result = {
             "killed_by_type": {0: 10},
             "total_life_destroyed": 500,
-            "total_damage_dealt": 1100,
+            "total_damage_dealt": 700,
             "wave_duration_frames": 100,
         }
         buildings = [
@@ -525,6 +534,138 @@ class TestValidateDamage:
         }
         ok, err = validate_damage(result, buildings, wave_config, building_config)
         assert ok is True
+
+    def test_high_level_building_dps(self):
+        """成功：高等级建筑的 DPS 计算（验证指数增长差异显著）.
+
+        HMG 每级 x 1.3：
+        - Level 5 HMG: 30 -> 39 -> 50 -> 65 -> 84
+        - DPS = 84 / 3 = 28
+        - max_damage = 28 * 100 = 2800
+        - 10% 容差内: 2800 * 1.1 = 3080
+
+        对比线性计算 30 * 5 / 3 = 50 DPS, max = 5000，差异显著
+        """
+        result = {
+            "killed_by_type": {0: 50},
+            "total_life_destroyed": 2500,
+            "total_damage_dealt": 2800,
+            "wave_duration_frames": 100,
+        }
+        buildings = [
+            {"id": "b-001", "type": "HMG", "level": 5, "position": [5, 5]},
+        ]
+        wave_config = {
+            "monsters": [{"type": 0, "count": 50, "life": 50, "money": 5}]
+        }
+        building_config = {
+            "HMG": {"damage": 30, "speed": 3},
+        }
+        ok, err = validate_damage(result, buildings, wave_config, building_config)
+        assert ok is True
+
+    def test_high_level_building_dps_exceeds_exponential_limit(self):
+        """失败：伤害超过指数增长计算的 DPS 上限.
+
+        使用线性计算的值会超过指数增长的上限：
+        - Level 5 HMG 指数: 84 伤害, DPS = 28, max = 2800
+        - Level 5 HMG 线性: 150 伤害, DPS = 50, max = 5000
+
+        测试使用 4000 伤害：在线性计算内但超过指数计算上限
+        """
+        result = {
+            "killed_by_type": {0: 50},
+            "total_life_destroyed": 2500,
+            "total_damage_dealt": 4000,
+            "wave_duration_frames": 100,
+        }
+        buildings = [
+            {"id": "b-001", "type": "HMG", "level": 5, "position": [5, 5]},
+        ]
+        wave_config = {
+            "monsters": [{"type": 0, "count": 50, "life": 50, "money": 5}]
+        }
+        building_config = {
+            "HMG": {"damage": 30, "speed": 3},
+        }
+        ok, err = validate_damage(result, buildings, wave_config, building_config)
+        assert ok is False
+        assert "DPS 容量超限" in err
+
+    def test_cannon_high_level_upgrade_rule_transition(self):
+        """成功：cannon level 10/11/12 的升级规则切换边界测试.
+
+        cannon 升级规则：1-10 级 x 1.2，11 级起 x 1.3
+
+        伤害计算（迭代累乘，每次取整）：
+        - Level 10: 52 (经过 9 次 x 1.2)
+        - Level 11: 62 (current_level=10 时仍用 1.2，因为 10 <= 10)
+        - Level 12: 80 (current_level=11 时开始用 1.3，因为 11 > 10)
+
+        对比线性计算的差异：
+        - Level 10 线性: 12 * 10 = 120，差异 130%
+        - Level 12 线性: 12 * 12 = 144，差异 80%
+        """
+        building_config = {
+            "cannon": {"damage": 12, "speed": 2},
+        }
+        wave_config = {
+            "monsters": [{"type": 0, "count": 100, "life": 50, "money": 5}]
+        }
+
+        # Level 10 cannon: damage = 52, DPS = 26, max = 2600, 10% 容差 = 2860
+        result_level_10 = {
+            "killed_by_type": {0: 50},
+            "total_life_destroyed": 2500,
+            "total_damage_dealt": 2600,
+            "wave_duration_frames": 100,
+        }
+        buildings_level_10 = [
+            {"id": "b-001", "type": "cannon", "level": 10, "position": [5, 5]},
+        ]
+        ok, err = validate_damage(result_level_10, buildings_level_10, wave_config, building_config)
+        assert ok is True, f"Level 10 应通过: {err}"
+
+        # Level 12 cannon: damage = 80, DPS = 40, max = 4000, 10% 容差 = 4400
+        result_level_12 = {
+            "killed_by_type": {0: 80},
+            "total_life_destroyed": 4000,
+            "total_damage_dealt": 4000,
+            "wave_duration_frames": 100,
+        }
+        buildings_level_12 = [
+            {"id": "b-001", "type": "cannon", "level": 12, "position": [5, 5]},
+        ]
+        ok, err = validate_damage(result_level_12, buildings_level_12, wave_config, building_config)
+        assert ok is True, f"Level 12 应通过: {err}"
+
+    def test_cannon_high_level_linear_damage_rejected(self):
+        """失败：cannon 高等级使用线性计算的伤害值被拒绝.
+
+        Level 10 cannon:
+        - 指数计算: damage = 52, DPS = 26, max_damage = 2600, 10% 容差 = 2860
+        - 线性计算: damage = 120, DPS = 60, max_damage = 6000
+
+        测试使用 5000 伤害：在线性计算内但超过指数计算上限
+        """
+        result = {
+            "killed_by_type": {0: 100},
+            "total_life_destroyed": 5000,
+            "total_damage_dealt": 5000,
+            "wave_duration_frames": 100,
+        }
+        buildings = [
+            {"id": "b-001", "type": "cannon", "level": 10, "position": [5, 5]},
+        ]
+        wave_config = {
+            "monsters": [{"type": 0, "count": 100, "life": 50, "money": 5}]
+        }
+        building_config = {
+            "cannon": {"damage": 12, "speed": 2},
+        }
+        ok, err = validate_damage(result, buildings, wave_config, building_config)
+        assert ok is False
+        assert "DPS 容量超限" in err
 
     def test_no_buildings(self):
         """成功：无建筑时 DPS 为 0."""
@@ -624,6 +765,73 @@ class TestValidateMonsterIds:
         assert ok is False
         assert "fake-id" in err
         assert "不是服务端下发的 UUID" in err
+
+    def test_valid_original_target_id(self):
+        """成功：originalTargetId 有效."""
+        attacks = [
+            {
+                "monsterId": "m-001",
+                "originalTargetId": "m-001",
+                "damage": 10,
+            },
+            {
+                "monsterId": "m-002",
+                "originalTargetId": "m-001",  # 误伤：瞄准 m-001 命中 m-002
+                "damage": 15,
+            },
+        ]
+        monsters_config = {
+            "m-001": {"type": 0, "life": 50},
+            "m-002": {"type": 0, "life": 50},
+        }
+        ok, err = validate_monster_ids(attacks, monsters_config)
+        assert ok is True
+        assert err == ""
+
+    def test_invalid_original_target_id(self):
+        """失败：originalTargetId 无效."""
+        attacks = [
+            {
+                "monsterId": "m-001",
+                "originalTargetId": "fake-target",  # 无效的原始目标
+                "damage": 10,
+            },
+        ]
+        monsters_config = {
+            "m-001": {"type": 0, "life": 50},
+        }
+        ok, err = validate_monster_ids(attacks, monsters_config)
+        assert ok is False
+        assert "fake-target" in err
+        assert "originalTargetId" in err
+        assert "不是服务端下发的 UUID" in err
+
+    def test_missing_original_target_id(self):
+        """成功：缺少 originalTargetId 时不验证（向后兼容）."""
+        attacks = [
+            {"monsterId": "m-001", "damage": 10},  # 无 originalTargetId
+        ]
+        monsters_config = {
+            "m-001": {"type": 0, "life": 50},
+        }
+        ok, err = validate_monster_ids(attacks, monsters_config)
+        assert ok is True
+
+    def test_friendly_fire_both_valid(self):
+        """成功：误伤场景下两个 ID 都有效."""
+        attacks = [
+            {
+                "monsterId": "m-002",  # 实际命中
+                "originalTargetId": "m-001",  # 原本瞄准
+                "damage": 10,
+            },
+        ]
+        monsters_config = {
+            "m-001": {"type": 0, "life": 50},
+            "m-002": {"type": 1, "life": 100},
+        }
+        ok, err = validate_monster_ids(attacks, monsters_config)
+        assert ok is True
 
 
 class TestValidateCumulativeDamage:
@@ -788,8 +996,8 @@ class TestValidateAttackRange:
 
     def test_upgraded_building_range(self):
         """成功：升级建筑射程增加."""
-        # level 3: range * 3^0.1 = 4 * 1.116 = 4.46
-        # max_range * 3^0.1 = 8 * 1.116 = 8.93
+        # level 3: range * 1.2^2 = 4 * 1.44 = 5.76
+        # max_range * 1.2^2 = 8 * 1.44 = 11.52
         attack = {
             "originalTargetPosition": [14, 5],  # 距离 9，在升级后射程内
         }
@@ -876,6 +1084,100 @@ class TestValidateDamageValue:
         ok, err = validate_damage_value(attack, building, building_config)
         assert ok is False
         assert "伤害值不能小于 1" in err
+
+    def test_hmg_upgrade_rule(self):
+        """成功：HMG 使用 1.3 倍升级规则.
+
+        HMG 基础伤害 30，每级 × 1.3
+        level 2: 30 × 1.3 = 39
+        level 3: 39 × 1.3 = 50.7 -> 50
+        """
+        building_config = {"HMG": {"damage": 30}}
+
+        attack_lv2 = {"damage": 39}
+        building_lv2 = {"id": "b-001", "type": "HMG", "level": 2}
+        ok, _ = validate_damage_value(attack_lv2, building_lv2, building_config)
+        assert ok is True
+
+        attack_lv3 = {"damage": 50}
+        building_lv3 = {"id": "b-001", "type": "HMG", "level": 3}
+        ok, _ = validate_damage_value(attack_lv3, building_lv3, building_config)
+        assert ok is True
+
+    def test_cannon_upgrade_rule_high_level(self):
+        """成功：cannon 11 级及以上使用 1.3 倍.
+
+        cannon 基础伤害 12
+        level 1-10: × 1.2
+        level 11+: × 1.3
+
+        level 10: calc_building_damage("cannon", 12, 10)
+        level 11: level_10_damage × 1.2（升级到 11 级时，current_level=10，还未超过 10）
+        level 12: level_11_damage × 1.3（升级到 12 级时，current_level=11，超过 10）
+        """
+        level_10_damage = calc_building_damage("cannon", 12, 10)
+        level_11_damage = calc_building_damage("cannon", 12, 11)
+        level_12_damage = calc_building_damage("cannon", 12, 12)
+
+        # 验证 11 级使用 1.2（因为从 10 升到 11 时 current_level=10）
+        assert level_11_damage == int(level_10_damage * 1.2)
+        # 验证 12 级使用 1.3（因为从 11 升到 12 时 current_level=11 > 10）
+        assert level_12_damage == int(level_11_damage * 1.3)
+
+        building_config = {"cannon": {"damage": 12}}
+        attack = {"damage": level_12_damage}
+        building = {"id": "b-001", "type": "cannon", "level": 12}
+        ok, _ = validate_damage_value(attack, building, building_config)
+        assert ok is True
+
+    def test_lmg_default_upgrade_rule(self):
+        """成功：LMG 使用默认 1.2 倍升级规则.
+
+        LMG 基础伤害 5
+        level 2: 5 × 1.2 = 6
+        level 3: 6 × 1.2 = 7.2 -> 7
+        """
+        building_config = {"LMG": {"damage": 5}}
+
+        attack_lv3 = {"damage": 7}
+        building_lv3 = {"id": "b-001", "type": "LMG", "level": 3}
+        ok, _ = validate_damage_value(attack_lv3, building_lv3, building_config)
+        assert ok is True
+
+
+class TestCalcBuildingDamage:
+    """建筑伤害计算测试."""
+
+    def test_default_upgrade_rule(self):
+        """默认升级规则：每级 × 1.2."""
+        # level 1: 10
+        # level 2: 10 × 1.2 = 12
+        # level 3: 12 × 1.2 = 14.4 -> 14
+        assert calc_building_damage("LMG", 10, 1) == 10
+        assert calc_building_damage("LMG", 10, 2) == 12
+        assert calc_building_damage("LMG", 10, 3) == 14
+
+    def test_hmg_always_1_3(self):
+        """HMG 始终使用 1.3 倍."""
+        # level 1: 30
+        # level 2: 30 × 1.3 = 39
+        # level 3: 39 × 1.3 = 50.7 -> 50
+        assert calc_building_damage("HMG", 30, 1) == 30
+        assert calc_building_damage("HMG", 30, 2) == 39
+        assert calc_building_damage("HMG", 30, 3) == 50
+
+    def test_cannon_upgrade_transition(self):
+        """cannon 在 10 级后切换到 1.3 倍."""
+        base = 12
+        # 验证 1-10 级使用 1.2
+        damage_10 = calc_building_damage("cannon", base, 10)
+        damage_11 = calc_building_damage("cannon", base, 11)
+        # 从 level 10 升到 11 时，current_level=10，还是用 1.2
+        assert damage_11 == int(damage_10 * 1.2)
+
+        # 从 level 11 升到 12 时，current_level=11 > 10，用 1.3
+        damage_12 = calc_building_damage("cannon", base, 12)
+        assert damage_12 == int(damage_11 * 1.3)
 
 
 class TestValidateMonsterPaths:
@@ -1101,3 +1403,425 @@ class TestValidateAttacks:
             attacks, buildings, result, building_config, map_config, monsters_config
         )
         assert ok is True
+
+
+class TestAnalyzeStatistics:
+    """Level 4 统计分析测试."""
+
+    def _create_wave_record(self, killed, passed, score_gained, money_spent):
+        """创建模拟的波次记录."""
+        record = Mock()
+        record.killed = killed
+        record.passed = passed
+        record.score_gained = score_gained
+        record.money_spent = money_spent
+        return record
+
+    def test_insufficient_data(self):
+        """数据不足时不进行分析（少于 3 条记录）."""
+        session = Mock()
+        session.waves.all.return_value = [
+            self._create_wave_record(5, 0, 50, 100),
+            self._create_wave_record(5, 0, 50, 100),
+        ]
+        result = {"killed": 10, "passed": 0, "score_gained": 100}
+
+        with patch("game.validators.logger") as mock_logger:
+            analyze_statistics(session, result, 100)
+            mock_logger.warning.assert_not_called()
+
+    def test_no_warning_normal_kill_rate(self):
+        """正常击杀率不触发警告."""
+        session = Mock()
+        session.waves.all.return_value = [
+            self._create_wave_record(8, 2, 50, 100),  # 80%
+            self._create_wave_record(7, 3, 50, 100),  # 70%
+            self._create_wave_record(9, 1, 50, 100),  # 90%
+        ]
+        session.wave_count = 3
+        session.id = "test-session-id"
+        result = {"killed": 9, "passed": 1, "score_gained": 50}  # 90%
+
+        with patch("game.validators.logger") as mock_logger:
+            analyze_statistics(session, result, 100)
+            mock_logger.warning.assert_not_called()
+
+    def test_kill_rate_spike_warning(self):
+        """击杀率突增触发警告：历史 < 0.5 且当前 > 0.95."""
+        session = Mock()
+        session.waves.all.return_value = [
+            self._create_wave_record(3, 7, 30, 100),  # 30%
+            self._create_wave_record(4, 6, 40, 100),  # 40%
+            self._create_wave_record(5, 5, 50, 100),  # 50%
+        ]
+        session.wave_count = 3
+        session.id = "test-session-id"
+        # 当前波次：96% 击杀率
+        result = {"killed": 24, "passed": 1, "score_gained": 100}
+
+        with patch("game.validators.logger") as mock_logger:
+            analyze_statistics(session, result, 100)
+            # 检查是否记录了击杀率突增警告
+            warning_calls = [
+                call for call in mock_logger.warning.call_args_list
+                if "击杀率异常突增" in str(call)
+            ]
+            assert len(warning_calls) == 1
+
+    def test_efficiency_spike_warning(self):
+        """资源效率突增触发警告：当前效率 > 历史 × 3."""
+        session = Mock()
+        session.waves.all.return_value = [
+            self._create_wave_record(10, 0, 50, 100),  # 效率 0.5
+            self._create_wave_record(10, 0, 60, 100),  # 效率 0.6
+            self._create_wave_record(10, 0, 40, 100),  # 效率 0.4
+        ]
+        session.wave_count = 3
+        session.id = "test-session-id"
+        # 历史平均效率 = 150/300 = 0.5
+        # 当前效率 = 200/100 = 2.0 > 0.5 × 3 = 1.5
+        result = {"killed": 10, "passed": 0, "score_gained": 200}
+
+        with patch("game.validators.logger") as mock_logger:
+            analyze_statistics(session, result, 100)
+            # 检查是否记录了效率突增警告
+            warning_calls = [
+                call for call in mock_logger.warning.call_args_list
+                if "资源效率异常突增" in str(call)
+            ]
+            assert len(warning_calls) == 1
+
+    def test_no_efficiency_warning_within_threshold(self):
+        """效率在阈值内不触发警告."""
+        session = Mock()
+        session.waves.all.return_value = [
+            self._create_wave_record(10, 0, 50, 100),  # 效率 0.5
+            self._create_wave_record(10, 0, 60, 100),  # 效率 0.6
+            self._create_wave_record(10, 0, 40, 100),  # 效率 0.4
+        ]
+        session.wave_count = 3
+        session.id = "test-session-id"
+        # 历史平均效率 = 150/300 = 0.5
+        # 当前效率 = 100/100 = 1.0 < 0.5 × 3 = 1.5
+        result = {"killed": 10, "passed": 0, "score_gained": 100}
+
+        with patch("game.validators.logger") as mock_logger:
+            analyze_statistics(session, result, 100)
+            # 检查没有效率突增警告
+            warning_calls = [
+                call for call in mock_logger.warning.call_args_list
+                if "资源效率异常突增" in str(call)
+            ]
+            assert len(warning_calls) == 0
+
+    def test_both_warnings(self):
+        """同时触发两种警告."""
+        session = Mock()
+        session.waves.all.return_value = [
+            self._create_wave_record(3, 7, 30, 100),  # 击杀率 30%，效率 0.3
+            self._create_wave_record(4, 6, 40, 100),  # 击杀率 40%，效率 0.4
+            self._create_wave_record(5, 5, 50, 100),  # 击杀率 50%，效率 0.5
+        ]
+        session.wave_count = 3
+        session.id = "test-session-id"
+        # 历史击杀率 = 12/30 = 0.4 < 0.5
+        # 历史效率 = 120/300 = 0.4
+        # 当前击杀率 = 24/25 = 0.96 > 0.95
+        # 当前效率 = 200/100 = 2.0 > 0.4 × 3 = 1.2
+        result = {"killed": 24, "passed": 1, "score_gained": 200}
+
+        with patch("game.validators.logger") as mock_logger:
+            analyze_statistics(session, result, 100)
+            assert mock_logger.warning.call_count == 2
+
+    def test_zero_money_spent_no_crash(self):
+        """花费为 0 时不崩溃."""
+        session = Mock()
+        session.waves.all.return_value = [
+            self._create_wave_record(5, 0, 50, 0),
+            self._create_wave_record(5, 0, 50, 0),
+            self._create_wave_record(5, 0, 50, 0),
+        ]
+        session.wave_count = 3
+        session.id = "test-session-id"
+        result = {"killed": 5, "passed": 0, "score_gained": 50}
+
+        # 不应该崩溃
+        analyze_statistics(session, result, 0)
+
+    def test_zero_total_monsters_no_crash(self):
+        """怪物总数为 0 时不崩溃."""
+        session = Mock()
+        session.waves.all.return_value = [
+            self._create_wave_record(0, 0, 0, 100),
+            self._create_wave_record(0, 0, 0, 100),
+            self._create_wave_record(0, 0, 0, 100),
+        ]
+        session.wave_count = 3
+        session.id = "test-session-id"
+        result = {"killed": 0, "passed": 0, "score_gained": 0}
+
+        # 不应该崩溃
+        analyze_statistics(session, result, 100)
+
+
+class TestValidateGameEnd:
+    """游戏结束验证测试."""
+
+    def _create_wave_record(self, wave_number: int, score_gained: int):
+        """创建模拟的波次记录."""
+        record = Mock()
+        record.wave_number = wave_number
+        record.score_gained = score_gained
+        return record
+
+    def test_empty_waves_zero_score(self):
+        """成功：无波次记录且分数为 0."""
+        session = Mock()
+        session.waves.order_by.return_value = []
+        session.score = 0
+        ok, err = validate_game_end(session)
+        assert ok is True
+        assert err == ""
+
+    def test_empty_waves_nonzero_score(self):
+        """失败：无波次记录但分数不为 0."""
+        session = Mock()
+        session.waves.order_by.return_value = []
+        session.score = 100
+        ok, err = validate_game_end(session)
+        assert ok is False
+        assert "分数累计不一致" in err
+        assert "期望 0" in err
+
+    def test_single_wave_success(self):
+        """成功：单波次记录，分数一致."""
+        session = Mock()
+        session.waves.order_by.return_value = [
+            self._create_wave_record(1, 50)
+        ]
+        session.score = 50
+        ok, err = validate_game_end(session)
+        assert ok is True
+        assert err == ""
+
+    def test_multiple_waves_success(self):
+        """成功：多波次记录，分数累计一致."""
+        session = Mock()
+        session.waves.order_by.return_value = [
+            self._create_wave_record(1, 30),
+            self._create_wave_record(2, 40),
+            self._create_wave_record(3, 50),
+        ]
+        session.score = 120  # 30 + 40 + 50 = 120
+        ok, err = validate_game_end(session)
+        assert ok is True
+        assert err == ""
+
+    def test_score_mismatch(self):
+        """失败：分数累计不一致."""
+        session = Mock()
+        session.waves.order_by.return_value = [
+            self._create_wave_record(1, 30),
+            self._create_wave_record(2, 40),
+        ]
+        session.score = 100  # 实际应为 70
+        ok, err = validate_game_end(session)
+        assert ok is False
+        assert "分数累计不一致" in err
+        assert "期望 70" in err
+        assert "实际 100" in err
+
+    def test_wave_continuity_gap(self):
+        """失败：波次记录有间断（跳波）."""
+        session = Mock()
+        session.waves.order_by.return_value = [
+            self._create_wave_record(1, 30),
+            self._create_wave_record(3, 50),  # 缺少波次 2
+        ]
+        session.score = 80
+        ok, err = validate_game_end(session)
+        assert ok is False
+        assert "波次记录不连续" in err
+        assert "缺少波次 2" in err
+
+    def test_wave_continuity_start_wrong(self):
+        """失败：波次记录不从 1 开始."""
+        session = Mock()
+        session.waves.order_by.return_value = [
+            self._create_wave_record(2, 30),  # 应从 1 开始
+        ]
+        session.score = 30
+        ok, err = validate_game_end(session)
+        assert ok is False
+        assert "波次记录不连续" in err
+        assert "缺少波次 1" in err
+
+    def test_wave_continuity_duplicate(self):
+        """失败：波次记录重复."""
+        session = Mock()
+        session.waves.order_by.return_value = [
+            self._create_wave_record(1, 30),
+            self._create_wave_record(1, 40),  # 重复波次 1
+        ]
+        session.score = 70
+        ok, err = validate_game_end(session)
+        assert ok is False
+        assert "波次记录不连续" in err
+        assert "缺少波次 2" in err
+
+
+class TestValidateNickname:
+    """昵称验证测试."""
+
+    def test_valid_nickname(self):
+        """成功：有效昵称."""
+        ok, err = validate_nickname("Player1")
+        assert ok is True
+        assert err == ""
+
+    def test_valid_nickname_with_spaces(self):
+        """成功：昵称包含空格."""
+        ok, err = validate_nickname("Player One")
+        assert ok is True
+        assert err == ""
+
+    def test_valid_nickname_unicode(self):
+        """成功：Unicode 昵称."""
+        ok, err = validate_nickname("玩家一号")
+        assert ok is True
+        assert err == ""
+
+    def test_valid_nickname_max_length(self):
+        """成功：昵称长度正好 32 字符."""
+        nickname = "A" * 32
+        ok, err = validate_nickname(nickname)
+        assert ok is True
+        assert err == ""
+
+    def test_empty_nickname(self):
+        """失败：空昵称."""
+        ok, err = validate_nickname("")
+        assert ok is False
+        assert "昵称不能为空" in err
+
+    def test_whitespace_only_nickname(self):
+        """失败：纯空白字符昵称."""
+        ok, err = validate_nickname("   ")
+        assert ok is False
+        assert "昵称不能为空" in err
+
+    def test_whitespace_only_tabs(self):
+        """失败：纯 tab 字符昵称."""
+        ok, err = validate_nickname("\t\t\t")
+        assert ok is False
+        assert "昵称不能为空" in err
+
+    def test_whitespace_mixed(self):
+        """失败：混合空白字符昵称."""
+        ok, err = validate_nickname(" \t \n ")
+        assert ok is False
+        assert "昵称不能为空" in err
+
+    def test_nickname_too_long(self):
+        """失败：昵称超过 32 字符."""
+        nickname = "A" * 33
+        ok, err = validate_nickname(nickname)
+        assert ok is False
+        assert "昵称长度不能超过 32 个字符" in err
+
+    def test_nickname_with_leading_trailing_spaces(self):
+        """成功：昵称两端有空格但中间有内容."""
+        ok, err = validate_nickname("  Player  ")
+        assert ok is True
+        assert err == ""
+
+    def test_xss_script_tag(self):
+        """失败：包含 script 标签（XSS 攻击）."""
+        ok, err = validate_nickname("<script>alert('XSS')</script>")
+        assert ok is False
+        assert "昵称包含非法字符" in err
+
+    def test_xss_img_tag(self):
+        """失败：包含 img 标签（XSS 攻击）."""
+        ok, err = validate_nickname("<img src=x onerror=alert(1)>")
+        assert ok is False
+        assert "昵称包含非法字符" in err
+
+    def test_xss_javascript_protocol(self):
+        """失败：包含 javascript: 协议."""
+        ok, err = validate_nickname("javascript:alert(1)")
+        assert ok is False
+        assert "昵称包含非法字符" in err
+
+    def test_xss_event_handler(self):
+        """失败：包含事件处理器."""
+        ok, err = validate_nickname("Player onclick=hack")
+        assert ok is False
+        assert "昵称包含非法字符" in err
+
+    def test_xss_case_insensitive(self):
+        """失败：大小写混合的 XSS 尝试."""
+        ok, err = validate_nickname("<SCRIPT>alert(1)</SCRIPT>")
+        assert ok is False
+        assert "昵称包含非法字符" in err
+
+    def test_html_link_injection(self):
+        """失败：HTML 链接注入."""
+        ok, err = validate_nickname("<a href='x'>Click</a>")
+        assert ok is False
+        assert "昵称包含非法字符" in err
+
+    def test_html_style_injection(self):
+        """失败：CSS 注入."""
+        ok, err = validate_nickname("<style>*{}</style>")
+        assert ok is False
+        assert "昵称包含非法字符" in err
+
+    def test_control_char_null(self):
+        """失败：包含空字符."""
+        ok, err = validate_nickname("Player\x00Name")
+        assert ok is False
+        assert "昵称包含非法字符" in err
+
+    def test_control_char_escape(self):
+        """失败：包含 ANSI 转义序列."""
+        ok, err = validate_nickname("\x1b[31mRed\x1b[0m")
+        assert ok is False
+        assert "昵称包含非法字符" in err
+
+    def test_control_char_delete(self):
+        """失败：包含 DEL 字符."""
+        ok, err = validate_nickname("Player\x7fName")
+        assert ok is False
+        assert "昵称包含非法字符" in err
+
+    def test_unicode_zero_width_space(self):
+        """失败：包含零宽空格."""
+        ok, err = validate_nickname("P\u200Blayer")  # U+200B Zero Width Space
+        assert ok is False
+        assert "昵称包含非法字符" in err
+
+    def test_unicode_zero_width_joiner(self):
+        """失败：包含零宽连接符."""
+        ok, err = validate_nickname("Play\u200Der")  # U+200D Zero Width Joiner
+        assert ok is False
+        assert "昵称包含非法字符" in err
+
+    def test_valid_special_chars(self):
+        """成功：允许的特殊字符."""
+        ok, err = validate_nickname("Player_123-XYZ")
+        assert ok is True
+        assert err == ""
+
+    def test_valid_emoji(self):
+        """成功：允许 emoji."""
+        ok, err = validate_nickname("Player123")
+        assert ok is True
+        assert err == ""
+
+    def test_valid_angle_brackets_without_tag(self):
+        """成功：单独的尖括号（不构成标签）."""
+        ok, err = validate_nickname("1 < 2 > 0")
+        assert ok is True
+        assert err == ""
