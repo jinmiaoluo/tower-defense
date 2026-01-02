@@ -2,7 +2,6 @@
 
 from game.calculators import (
     calc_actual_damage,
-    calc_final_score,
     calc_hit_score,
     calc_life_reward,
     calc_monster_attrs,
@@ -10,7 +9,7 @@ from game.calculators import (
     calc_total_cost,
     process_actions,
 )
-from game.config import GAME_CONFIG, SCORE_CONFIG
+from game.config import GAME_CONFIG
 
 
 class TestCalcTotalCost:
@@ -669,97 +668,3 @@ class TestCalcHitScore:
 
         assert laser_total == 100
         assert hmg_total == 15
-
-
-class TestCalcFinalScore:
-    """calc_final_score 测试.
-
-    最终得分公式：
-    最终得分 = 累计命中得分 + 波次奖励 + 剩余生命奖励 + 剩余金币奖励
-
-    得分系数（SCORE_CONFIG）：
-    - wave_coefficient: 10
-    - life_coefficient: 5
-    - money_coefficient: 0.1
-
-    来源：SPEC.md L168-176, BACKEND_GUIDE.md L408-443
-
-    注意：所有期望值均为手工计算的硬编码值，确保测试独立于实现。
-    """
-
-    def test_basic_calculation(self):
-        """基本计算测试.
-
-        输入：累计 1000 分，10 波，50 生命，200 金币
-        计算：1000 + 10×10 + 50×5 + int(200×0.1)
-             = 1000 + 100 + 250 + 20 = 1370
-        """
-        result = calc_final_score(1000, 10, 50, 200, SCORE_CONFIG)
-        assert result == 1370
-
-    def test_wave_bonus_only(self):
-        """仅波次奖励.
-
-        输入：0 分，20 波，0 生命，0 金币
-        计算：0 + 20×10 + 0 + 0 = 200
-        """
-        result = calc_final_score(0, 20, 0, 0, SCORE_CONFIG)
-        assert result == 200
-
-    def test_life_bonus_only(self):
-        """仅生命奖励.
-
-        输入：0 分，0 波，100 生命，0 金币
-        计算：0 + 0 + 100×5 + 0 = 500
-        """
-        result = calc_final_score(0, 0, 100, 0, SCORE_CONFIG)
-        assert result == 500
-
-    def test_money_bonus_only(self):
-        """仅金币奖励.
-
-        输入：0 分，0 波，0 生命，1000 金币
-        计算：0 + 0 + 0 + int(1000×0.1) = 100
-        """
-        result = calc_final_score(0, 0, 0, 1000, SCORE_CONFIG)
-        assert result == 100
-
-    def test_money_bonus_truncation(self):
-        """金币奖励截断（向下取整）.
-
-        输入：0 分，0 波，0 生命，155 金币
-        计算：int(155×0.1) = int(15.5) = 15
-
-        注意：此测试验证使用 int() 而非 round()。
-        如果实现错误使用 round()，结果会是 16，测试将失败。
-        """
-        result = calc_final_score(0, 0, 0, 155, SCORE_CONFIG)
-        assert result == 15
-
-    def test_accumulated_score_passthrough(self):
-        """累计得分透传.
-
-        输入：5000 分，0 波，0 生命，0 金币
-        计算：5000 + 0 + 0 + 0 = 5000
-        """
-        result = calc_final_score(5000, 0, 0, 0, SCORE_CONFIG)
-        assert result == 5000
-
-    def test_realistic_game_end(self):
-        """真实游戏结束场景.
-
-        输入：8000 分，42 波，35 生命，2500 金币
-        计算：8000 + 42×10 + 35×5 + int(2500×0.1)
-             = 8000 + 420 + 175 + 250 = 8845
-        """
-        result = calc_final_score(8000, 42, 35, 2500, SCORE_CONFIG)
-        assert result == 8845
-
-    def test_zero_all(self):
-        """全零输入.
-
-        输入：0 分，0 波，0 生命，0 金币
-        计算：0 + 0 + 0 + 0 = 0
-        """
-        result = calc_final_score(0, 0, 0, 0, SCORE_CONFIG)
-        assert result == 0

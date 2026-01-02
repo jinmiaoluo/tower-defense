@@ -9,12 +9,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from game.calculators import (
-    calc_final_score,
     calc_life_reward,
     calc_new_difficulty,
     process_actions,
 )
-from game.config import GAME_CONFIG, INITIAL, SCORE_CONFIG
+from game.config import GAME_CONFIG, INITIAL
 from game.generators import generate_first_wave, generate_wave
 from game.models import GameSession, LeaderboardEntry, WaveRecord
 from game.validators import (
@@ -400,21 +399,13 @@ class EndSessionView(APIView):
                 if not ok:
                     raise ValueError(msg)
 
-                final_score = calc_final_score(
-                    accumulated_score=new_score,
-                    waves_completed=wave_number,
-                    remaining_life=new_life,
-                    remaining_money=new_money,
-                    score_config=SCORE_CONFIG,
-                )
-
                 entry = LeaderboardEntry.objects.create(
                     nickname=data["nickname"],
-                    score=final_score,
+                    score=new_score,
                     waves_completed=wave_number,
                 )
 
-                rank = LeaderboardEntry.objects.filter(score__gt=final_score).count() + 1
+                rank = LeaderboardEntry.objects.filter(score__gt=new_score).count() + 1
                 total = LeaderboardEntry.objects.count()
                 is_new_record = rank == 1
 
@@ -436,7 +427,7 @@ class EndSessionView(APIView):
     ) -> Response:
         """处理不带 lastWave 的提前结束请求.
 
-        使用当前会话状态计算最终得分，适用于：
+        使用当前会话状态的积分作为最终得分，适用于：
         - 用户在波次完成后主动选择结束游戏
         - 必须至少完成一波才能使用此模式
         """
@@ -445,21 +436,17 @@ class EndSessionView(APIView):
 
         try:
             with transaction.atomic():
-                final_score = calc_final_score(
-                    accumulated_score=session.score,
-                    waves_completed=session.wave_count,
-                    remaining_life=session.life,
-                    remaining_money=session.money,
-                    score_config=SCORE_CONFIG,
-                )
+                ok, msg = validate_game_end(session)
+                if not ok:
+                    raise ValueError(msg)
 
                 entry = LeaderboardEntry.objects.create(
                     nickname=data["nickname"],
-                    score=final_score,
+                    score=session.score,
                     waves_completed=session.wave_count,
                 )
 
-                rank = LeaderboardEntry.objects.filter(score__gt=final_score).count() + 1
+                rank = LeaderboardEntry.objects.filter(score__gt=session.score).count() + 1
                 total = LeaderboardEntry.objects.count()
                 is_new_record = rank == 1
 

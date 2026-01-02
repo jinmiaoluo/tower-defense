@@ -233,15 +233,6 @@ INITIAL: InitialConfig = {
     "difficulty": 1.0,
 }
 
-# 最终得分配置
-# 参考 SPEC.md 第 168-174 行（新设计，旧实现无此功能）
-# 最终得分 = 累计命中得分 + 波次奖励 + 剩余生命奖励 + 剩余金币奖励
-SCORE_CONFIG = {
-    "wave_coefficient": 10,    # 波次奖励 = 完成波次数 × 系数
-    "life_coefficient": 5,     # 生命奖励 = 剩余生命 × 系数
-    "money_coefficient": 0.1,  # 金币奖励 = 剩余金币 × 系数
-}
-
 # 波次生成配置
 WAVE_CONFIG = {
     "max_monsters_per_wave": 100,

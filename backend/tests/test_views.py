@@ -6,7 +6,7 @@ import uuid
 import pytest
 from rest_framework.test import APIClient
 
-from game.config import GAME_CONFIG, INITIAL, SCORE_CONFIG
+from game.config import GAME_CONFIG, INITIAL
 from game.generators import generate_wave
 from game.models import GameSession, LeaderboardEntry, WaveRecord
 
@@ -1481,18 +1481,8 @@ class TestEndSessionView:
 
         entry = LeaderboardEntry.objects.get(nickname="TestPlayer")
 
-        accumulated_score = session.score + last_wave_score
-        waves_completed = 6
-        remaining_life = 90
-        building_cost = GAME_CONFIG["buildings"]["LMG"]["cost"]
-        remaining_money = session.money - building_cost + last_wave_money
-
-        expected_score = (
-            accumulated_score
-            + waves_completed * SCORE_CONFIG["wave_coefficient"]
-            + remaining_life * SCORE_CONFIG["life_coefficient"]
-            + int(remaining_money * SCORE_CONFIG["money_coefficient"])
-        )
+        # 最终得分 = 累计积分（没有额外奖励）
+        expected_score = session.score + last_wave_score
 
         assert entry.score == expected_score
 
@@ -1705,12 +1695,8 @@ class TestEndSessionView:
 
         entry = LeaderboardEntry.objects.get(nickname="ScoreChecker")
 
-        expected_score = (
-            session.score
-            + session.wave_count * SCORE_CONFIG["wave_coefficient"]
-            + session.life * SCORE_CONFIG["life_coefficient"]
-            + int(session.money * SCORE_CONFIG["money_coefficient"])
-        )
+        # 最终得分 = 累计积分（没有额外奖励）
+        expected_score = session.score
 
         assert entry.score == expected_score
 
@@ -1735,6 +1721,67 @@ class TestEndSessionView:
 
         assert response.status_code == 200
         assert not GameSession.objects.filter(id=session_id).exists()
+
+    @pytest.mark.django_db
+    def test_end_session_without_last_wave_validate_game_end_score_mismatch(
+        self, api_client: APIClient, db
+    ):
+        """测试不带 lastWave 时也应验证分数累计一致性.
+
+        这个测试验证 _end_without_last_wave 也调用 validate_game_end。
+        当 session.score 与 WaveRecord 累计分数不一致时，应返回错误。
+        """
+        wave_6 = generate_wave(6, 1.0)
+        session = GameSession.objects.create(
+            money=500,
+            life=100,
+            score=9999,  # 故意设置错误的分数（与 WaveRecord 累计不一致）
+            difficulty=1.0,
+            wave_count=5,
+            buildings=[],
+            config=GAME_CONFIG,
+            next_wave=wave_6,
+        )
+
+        # 创建 5 波记录，每波 30 分，累计 150 分
+        for i in range(1, 6):
+            WaveRecord.objects.create(
+                session=session,
+                wave_number=i,
+                killed=3,
+                killed_by_type={0: 3},
+                passed=0,
+                score_gained=30,
+                money_gained=15,
+                life_lost=0,
+                total_damage_dealt=100,
+                total_life_destroyed=100,
+                wave_duration_frames=1000,
+                money_spent=0,
+                money_income=0,
+                building_count=0,
+                end_money=500 + i * 15,
+                end_score=i * 30,
+                end_life=100,
+                end_difficulty=1.0,
+            )
+
+        request_data = {
+            "sessionId": str(session.id),
+            "nickname": "ScoreMismatchPlayer",
+        }
+
+        response = api_client.post(
+            "/api/game/sessions/end",
+            data=request_data,
+            format="json",
+        )
+
+        # session.score=9999，但 WaveRecord 累计只有 150，应验证失败
+        assert response.status_code == 400
+        data = response.json()
+        assert data["verified"] is False
+        assert "分数累计不一致" in data["error"]["message"]
 
     # ========== 带 remainingMonsterIds 的提前结束集成测试 ==========
 
