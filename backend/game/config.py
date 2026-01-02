@@ -8,13 +8,20 @@ from typing import TypedDict
 
 
 class BuildingConfig(TypedDict):
-    """建筑配置类型."""
+    """建筑配置类型.
+
+    来源：旧实现 td-cfg-buildings.js
+    """
 
     name: str
     cost: int
     damage: int
-    range: int
+    range: int  # 最小攻击范围（格子数）
+    max_range: int  # 最大攻击范围（格子数）
     speed: int  # 攻击间隔（帧），0 表示不攻击
+    bullet_speed: int  # 子弹速度，0 表示无子弹（如 wall）或瞬发（如 laser_gun）
+    life: int  # 建筑生命值
+    shield: int  # 建筑护盾值
     upgradeCostRatio: float
     sellRatio: float
 
@@ -51,12 +58,17 @@ class InitialConfig(TypedDict):
 
 
 BUILDINGS: dict[str, BuildingConfig] = {
+    # 来源：旧实现 td-cfg-buildings.js:29-94
     "wall": {
         "name": "路障",
         "cost": 5,
         "damage": 0,
         "range": 0,
+        "max_range": 0,
         "speed": 0,
+        "bullet_speed": 0,
+        "life": 100,
+        "shield": 500,
         "upgradeCostRatio": 0.75,
         "sellRatio": 0.5,
     },
@@ -64,8 +76,12 @@ BUILDINGS: dict[str, BuildingConfig] = {
         "name": "炮台",
         "cost": 300,
         "damage": 12,
-        "range": 8,  # max_range from old impl
+        "range": 4,
+        "max_range": 8,
         "speed": 2,
+        "bullet_speed": 6,
+        "life": 100,
+        "shield": 100,
         "upgradeCostRatio": 0.75,
         "sellRatio": 0.5,
     },
@@ -73,8 +89,12 @@ BUILDINGS: dict[str, BuildingConfig] = {
         "name": "轻机枪",
         "cost": 100,
         "damage": 5,
-        "range": 10,  # max_range from old impl
+        "range": 5,
+        "max_range": 10,
         "speed": 3,
+        "bullet_speed": 6,
+        "life": 100,
+        "shield": 50,
         "upgradeCostRatio": 0.75,
         "sellRatio": 0.5,
     },
@@ -82,8 +102,12 @@ BUILDINGS: dict[str, BuildingConfig] = {
         "name": "重机枪",
         "cost": 800,
         "damage": 30,
-        "range": 5,  # max_range from old impl
+        "range": 3,
+        "max_range": 5,
         "speed": 3,
+        "bullet_speed": 5,
+        "life": 100,
+        "shield": 200,
         "upgradeCostRatio": 0.75,
         "sellRatio": 0.5,
     },
@@ -91,8 +115,12 @@ BUILDINGS: dict[str, BuildingConfig] = {
         "name": "激光枪",
         "cost": 2000,
         "damage": 25,
-        "range": 10,  # max_range from old impl
+        "range": 6,
+        "max_range": 10,
         "speed": 20,
+        "bullet_speed": 0,  # 激光瞬发，无子弹速度
+        "life": 100,
+        "shield": 100,
         "upgradeCostRatio": 0.75,
         "sellRatio": 0.5,
     },
