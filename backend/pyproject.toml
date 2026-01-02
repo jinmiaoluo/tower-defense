@@ -1,0 +1,62 @@
+[project]
+name = "tower-defense-backend"
+version = "0.1.0"
+description = "Tower Defense Game Backend API"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "django>=5.2",
+    "djangorestframework>=3.16",
+    "psycopg[binary]>=3.2",
+    "python-dotenv>=1.0",
+    "gunicorn>=23.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-django>=4.9",
+    "pytest-cov>=6.0",
+    "pytest-env>=1.1",
+    "ruff>=0.8",
+    "mypy>=1.14",
+    "django-stubs>=5.1",
+    "djangorestframework-stubs>=3.15",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["config", "game"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+python_files = ["test_*.py", "*_test.py"]
+addopts = "-v --tb=short"
+testpaths = ["tests"]
+
+[tool.pytest_env]
+USE_SQLITE = "true"
+
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.13"
+plugins = ["mypy_django_plugin.main", "mypy_drf_plugin.main"]
+strict = true
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+
+[tool.django-stubs]
+django_settings_module = "config.settings"
