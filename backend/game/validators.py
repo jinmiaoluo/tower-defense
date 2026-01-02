@@ -55,7 +55,8 @@ def validate_basic(
     Returns:
         (成功标志, 错误信息)
     """
-    killed_by_type = result["killed_by_type"]
+    # JSON 反序列化后键可能是字符串，统一转换为整数
+    killed_by_type = {int(k): v for k, v in result["killed_by_type"].items()}
     wave_monsters = {m["type"]: m for m in wave_config["monsters"]}
 
     # 1. killed_by_type 一致性验证

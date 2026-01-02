@@ -1,9 +1,6 @@
 """验证器单元测试."""
 
-import math
 from unittest.mock import Mock
-
-import pytest
 
 from game.validators import (
     validate_basic,
