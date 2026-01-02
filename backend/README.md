@@ -12,8 +12,17 @@
 ## 开发环境设置
 
 ```bash
+# 来到后端目录
+cd backend
+
 # 安装依赖
 uv sync --all-extras
+
+# 激活虚拟环境
+source .venv/bin/activate
+
+# 创建环境配置文件
+cp .env.example .env
 
 # 运行数据库迁移
 python manage.py migrate
