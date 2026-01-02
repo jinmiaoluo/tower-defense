@@ -2,6 +2,7 @@
 
 from game.calculators import (
     calc_actual_damage,
+    calc_final_score,
     calc_hit_score,
     calc_life_reward,
     calc_monster_attrs,
@@ -668,3 +669,118 @@ class TestCalcHitScore:
 
         assert laser_total == 100
         assert hmg_total == 15
+
+
+class TestCalcFinalScore:
+    """calc_final_score 测试.
+
+    最终得分公式：
+    最终得分 = 累计命中得分 + 波次奖励 + 剩余生命奖励 + 剩余金币奖励
+
+    来源：SPEC.md L168-176, BACKEND_GUIDE.md L408-443
+    """
+
+    def test_basic_calculation(self):
+        """基本计算测试.
+
+        累计 1000 分 + 10 波 × 10 + 50 生命 × 5 + 200 金币 × 0.1
+        = 1000 + 100 + 250 + 20 = 1370
+        """
+        score_config = {
+            "wave_coefficient": 10,
+            "life_coefficient": 5,
+            "money_coefficient": 0.1,
+        }
+        result = calc_final_score(1000, 10, 50, 200, score_config)
+        assert result == 1370
+
+    def test_wave_bonus_only(self):
+        """仅波次奖励.
+
+        0 + 20 波 × 10 + 0 + 0 = 200
+        """
+        score_config = {
+            "wave_coefficient": 10,
+            "life_coefficient": 5,
+            "money_coefficient": 0.1,
+        }
+        result = calc_final_score(0, 20, 0, 0, score_config)
+        assert result == 200
+
+    def test_life_bonus_only(self):
+        """仅生命奖励.
+
+        0 + 0 + 100 生命 × 5 = 500
+        """
+        score_config = {
+            "wave_coefficient": 10,
+            "life_coefficient": 5,
+            "money_coefficient": 0.1,
+        }
+        result = calc_final_score(0, 0, 100, 0, score_config)
+        assert result == 500
+
+    def test_money_bonus_only(self):
+        """仅金币奖励.
+
+        0 + 0 + 0 + 1000 金币 × 0.1 = 100
+        """
+        score_config = {
+            "wave_coefficient": 10,
+            "life_coefficient": 5,
+            "money_coefficient": 0.1,
+        }
+        result = calc_final_score(0, 0, 0, 1000, score_config)
+        assert result == 100
+
+    def test_money_bonus_truncation(self):
+        """金币奖励截断（取整）.
+
+        155 金币 × 0.1 = 15.5 -> int = 15
+        """
+        score_config = {
+            "wave_coefficient": 10,
+            "life_coefficient": 5,
+            "money_coefficient": 0.1,
+        }
+        result = calc_final_score(0, 0, 0, 155, score_config)
+        assert result == 15
+
+    def test_accumulated_score_passthrough(self):
+        """累计得分透传.
+
+        5000 + 0 + 0 + 0 = 5000
+        """
+        score_config = {
+            "wave_coefficient": 10,
+            "life_coefficient": 5,
+            "money_coefficient": 0.1,
+        }
+        result = calc_final_score(5000, 0, 0, 0, score_config)
+        assert result == 5000
+
+    def test_realistic_game_end(self):
+        """真实游戏结束场景.
+
+        玩家通关 42 波，剩余 35 生命，剩余 2500 金币，累计命中得分 8000
+        = 8000 + 42 × 10 + 35 × 5 + int(2500 × 0.1)
+        = 8000 + 420 + 175 + 250
+        = 8845
+        """
+        score_config = {
+            "wave_coefficient": 10,
+            "life_coefficient": 5,
+            "money_coefficient": 0.1,
+        }
+        result = calc_final_score(8000, 42, 35, 2500, score_config)
+        assert result == 8845
+
+    def test_zero_all(self):
+        """全零输入."""
+        score_config = {
+            "wave_coefficient": 10,
+            "life_coefficient": 5,
+            "money_coefficient": 0.1,
+        }
+        result = calc_final_score(0, 0, 0, 0, score_config)
+        assert result == 0

@@ -199,3 +199,32 @@ def calc_hit_score(actual_damage: int) -> int:
         本次命中获得的分数
     """
     return int(math.sqrt(actual_damage))
+
+
+def calc_final_score(
+    accumulated_score: int,
+    waves_completed: int,
+    remaining_life: int,
+    remaining_money: int,
+    score_config: dict,
+) -> int:
+    """计算游戏结束时的最终得分.
+
+    公式：最终得分 = 累计命中得分 + 波次奖励 + 剩余生命奖励 + 剩余金币奖励
+
+    来源：SPEC.md L168-176
+
+    Args:
+        accumulated_score: 累计命中得分（游戏过程中通过 calc_hit_score 累加）
+        waves_completed: 完成的波次数
+        remaining_life: 剩余生命值
+        remaining_money: 剩余金币数
+        score_config: 得分配置字典，包含 wave_coefficient, life_coefficient, money_coefficient
+
+    Returns:
+        最终得分
+    """
+    wave_bonus = waves_completed * score_config["wave_coefficient"]
+    life_bonus = remaining_life * score_config["life_coefficient"]
+    money_bonus = int(remaining_money * score_config["money_coefficient"])
+    return accumulated_score + wave_bonus + life_bonus + money_bonus
