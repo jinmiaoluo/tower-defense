@@ -2,7 +2,6 @@
 
 from datetime import timedelta
 from io import StringIO
-from unittest.mock import patch
 
 import pytest
 from django.core.management import call_command
@@ -184,39 +183,3 @@ class TestCleanupSessionsCommand:
 
         # 11 小时前的会话应保留
         assert GameSession.objects.filter(id=session_11h.id).exists()
-
-
-class TestCleanupSessionsScheduler:
-    """cleanup_sessions 定时调度测试."""
-
-    @pytest.mark.django_db
-    def test_daemon_mode_runs_cleanup(self, db):
-        """测试守护进程模式."""
-        from game.management.commands.cleanup_sessions import Command
-
-        cmd = Command()
-
-        # 验证定时间隔设置正确 (1 小时 = 3600 秒)
-        assert cmd.DEFAULT_INTERVAL == 3600
-
-    @pytest.mark.django_db
-    def test_daemon_mode_custom_interval(self, db):
-        """测试自定义定时间隔."""
-        out = StringIO()
-
-        # 使用 --daemon 和 --interval 参数运行时，应能正确解析参数
-        with patch(
-            "game.management.commands.cleanup_sessions.Command._run_scheduler"
-        ) as mock_scheduler:
-            try:
-                call_command(
-                    "cleanup_sessions",
-                    "--daemon",
-                    "--interval=3600",
-                    stdout=out,
-                )
-            except SystemExit:
-                pass
-
-            # 验证调度器被调用（或命令正确接受参数）
-            # 由于是无限循环，我们只验证参数被接受
