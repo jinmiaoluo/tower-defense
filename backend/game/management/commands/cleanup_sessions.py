@@ -25,7 +25,7 @@ class Command(BaseCommand):
     help = "清理过期的游戏会话"
 
     DEFAULT_HOURS = 24
-    DEFAULT_INTERVAL = 7200  # 2 小时 = 7200 秒
+    DEFAULT_INTERVAL = 3600  # 1 小时 = 3600 秒
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
