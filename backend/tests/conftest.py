@@ -3,6 +3,7 @@
 import pytest
 from django.test import Client
 
+from game.config import GAME_CONFIG, INITIAL, MONSTERS
 from game.models import GameSession, LeaderboardEntry, WaveRecord
 
 
@@ -14,84 +15,26 @@ def client() -> Client:
 
 @pytest.fixture
 def game_config() -> dict:
-    """基础游戏配置."""
-    return {
-        "buildings": {
-            "wall": {
-                "name": "路障",
-                "cost": 5,
-                "damage": 0,
-                "range": 0,
-                "speed": 0,
-                "upgradeCostRatio": 0.75,
-                "sellRatio": 0.5,
-            },
-            "cannon": {
-                "name": "炮台",
-                "cost": 300,
-                "damage": 12,
-                "range": 8,
-                "speed": 30,
-                "upgradeCostRatio": 0.75,
-                "sellRatio": 0.5,
-            },
-        },
-        "monsters": {
-            0: {
-                "name": "普通怪",
-                "life": 50,
-                "speed": 3,
-                "shield": 0,
-                "damage": 1,
-                "money": 10,
-                "color": "#00ff00",
-            },
-        },
-        "map": {
-            "width": 16,
-            "height": 16,
-            "entrance": [0, 0],
-            "exit": [15, 15],
-            "obstacles": [],
-        },
-        "initial": {
-            "money": 500,
-            "life": 100,
-            "difficulty": 1.0,
-        },
-    }
+    """游戏配置."""
+    return GAME_CONFIG
 
 
 @pytest.fixture
 def first_wave() -> dict:
     """第一波怪物配置."""
+    monster = MONSTERS[0]
     return {
         "waveNumber": 1,
         "monsters": [
             {
-                "id": "m-001",
+                "id": f"m-00{i}",
                 "type": 0,
-                "life": 50,
-                "speed": 3,
-                "shield": 0,
-                "money": 10,
-            },
-            {
-                "id": "m-002",
-                "type": 0,
-                "life": 50,
-                "speed": 3,
-                "shield": 0,
-                "money": 10,
-            },
-            {
-                "id": "m-003",
-                "type": 0,
-                "life": 50,
-                "speed": 3,
-                "shield": 0,
-                "money": 10,
-            },
+                "life": monster["life"],
+                "speed": monster["speed"],
+                "shield": monster["shield"],
+                "money": monster["money"],
+            }
+            for i in range(1, 4)
         ],
     }
 
@@ -100,9 +43,9 @@ def first_wave() -> dict:
 def game_session(db, game_config: dict, first_wave: dict) -> GameSession:
     """创建测试用游戏会话."""
     return GameSession.objects.create(
-        money=500,
-        life=100,
-        difficulty=1.0,
+        money=INITIAL["money"],
+        life=INITIAL["life"],
+        difficulty=INITIAL["difficulty"],
         wave_count=0,
         buildings=[],
         config=game_config,
@@ -113,6 +56,9 @@ def game_session(db, game_config: dict, first_wave: dict) -> GameSession:
 @pytest.fixture
 def game_session_with_waves(game_session: GameSession) -> GameSession:
     """创建带有波次记录的游戏会话."""
+    monster = MONSTERS[0]
+    money_per_wave = monster["money"] * 3
+
     for i in range(1, 6):
         WaveRecord.objects.create(
             session=game_session,
@@ -121,7 +67,7 @@ def game_session_with_waves(game_session: GameSession) -> GameSession:
             killed_by_type={0: 3},
             passed=0,
             score_gained=30,
-            money_gained=30,
+            money_gained=money_per_wave,
             life_lost=0,
             total_damage_dealt=150,
             total_life_destroyed=150,
@@ -129,10 +75,10 @@ def game_session_with_waves(game_session: GameSession) -> GameSession:
             money_spent=0,
             money_income=0,
             building_count=0,
-            end_money=500 + i * 30,
+            end_money=INITIAL["money"] + i * money_per_wave,
             end_score=i * 30,
-            end_life=100,
-            end_difficulty=1.0,
+            end_life=INITIAL["life"],
+            end_difficulty=INITIAL["difficulty"],
         )
     game_session.wave_count = 5
     game_session.score = 150
