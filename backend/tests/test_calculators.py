@@ -677,54 +677,70 @@ class TestCalcFinalScore:
     最终得分公式：
     最终得分 = 累计命中得分 + 波次奖励 + 剩余生命奖励 + 剩余金币奖励
 
+    得分系数（SCORE_CONFIG）：
+    - wave_coefficient: 10
+    - life_coefficient: 5
+    - money_coefficient: 0.1
+
     来源：SPEC.md L168-176, BACKEND_GUIDE.md L408-443
+
+    注意：所有期望值均为手工计算的硬编码值，确保测试独立于实现。
     """
 
     def test_basic_calculation(self):
         """基本计算测试.
 
-        公式：累计得分 + 波次奖励 + 生命奖励 + 金币奖励
+        输入：累计 1000 分，10 波，50 生命，200 金币
+        计算：1000 + 10×10 + 50×5 + int(200×0.1)
+             = 1000 + 100 + 250 + 20 = 1370
         """
         result = calc_final_score(1000, 10, 50, 200, SCORE_CONFIG)
-        expected = (
-            1000
-            + 10 * SCORE_CONFIG["wave_coefficient"]
-            + 50 * SCORE_CONFIG["life_coefficient"]
-            + int(200 * SCORE_CONFIG["money_coefficient"])
-        )
-        assert result == expected
+        assert result == 1370
 
     def test_wave_bonus_only(self):
-        """仅波次奖励."""
+        """仅波次奖励.
+
+        输入：0 分，20 波，0 生命，0 金币
+        计算：0 + 20×10 + 0 + 0 = 200
+        """
         result = calc_final_score(0, 20, 0, 0, SCORE_CONFIG)
-        expected = 20 * SCORE_CONFIG["wave_coefficient"]
-        assert result == expected
+        assert result == 200
 
     def test_life_bonus_only(self):
-        """仅生命奖励."""
+        """仅生命奖励.
+
+        输入：0 分，0 波，100 生命，0 金币
+        计算：0 + 0 + 100×5 + 0 = 500
+        """
         result = calc_final_score(0, 0, 100, 0, SCORE_CONFIG)
-        expected = 100 * SCORE_CONFIG["life_coefficient"]
-        assert result == expected
+        assert result == 500
 
     def test_money_bonus_only(self):
-        """仅金币奖励."""
+        """仅金币奖励.
+
+        输入：0 分，0 波，0 生命，1000 金币
+        计算：0 + 0 + 0 + int(1000×0.1) = 100
+        """
         result = calc_final_score(0, 0, 0, 1000, SCORE_CONFIG)
-        expected = int(1000 * SCORE_CONFIG["money_coefficient"])
-        assert result == expected
+        assert result == 100
 
     def test_money_bonus_truncation(self):
-        """金币奖励截断（取整）.
+        """金币奖励截断（向下取整）.
 
-        验证 int() 向下取整行为：155 × 0.1 = 15.5 -> 15
+        输入：0 分，0 波，0 生命，155 金币
+        计算：int(155×0.1) = int(15.5) = 15
+
+        注意：此测试验证使用 int() 而非 round()。
+        如果实现错误使用 round()，结果会是 16，测试将失败。
         """
         result = calc_final_score(0, 0, 0, 155, SCORE_CONFIG)
-        expected = int(155 * SCORE_CONFIG["money_coefficient"])
-        assert result == expected
+        assert result == 15
 
     def test_accumulated_score_passthrough(self):
         """累计得分透传.
 
-        当其他参数为 0 时，结果应等于累计得分。
+        输入：5000 分，0 波，0 生命，0 金币
+        计算：5000 + 0 + 0 + 0 = 5000
         """
         result = calc_final_score(5000, 0, 0, 0, SCORE_CONFIG)
         assert result == 5000
@@ -732,18 +748,18 @@ class TestCalcFinalScore:
     def test_realistic_game_end(self):
         """真实游戏结束场景.
 
-        玩家通关 42 波，剩余 35 生命，剩余 2500 金币，累计命中得分 8000。
+        输入：8000 分，42 波，35 生命，2500 金币
+        计算：8000 + 42×10 + 35×5 + int(2500×0.1)
+             = 8000 + 420 + 175 + 250 = 8845
         """
         result = calc_final_score(8000, 42, 35, 2500, SCORE_CONFIG)
-        expected = (
-            8000
-            + 42 * SCORE_CONFIG["wave_coefficient"]
-            + 35 * SCORE_CONFIG["life_coefficient"]
-            + int(2500 * SCORE_CONFIG["money_coefficient"])
-        )
-        assert result == expected
+        assert result == 8845
 
     def test_zero_all(self):
-        """全零输入."""
+        """全零输入.
+
+        输入：0 分，0 波，0 生命，0 金币
+        计算：0 + 0 + 0 + 0 = 0
+        """
         result = calc_final_score(0, 0, 0, 0, SCORE_CONFIG)
         assert result == 0
