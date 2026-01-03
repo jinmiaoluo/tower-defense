@@ -21,21 +21,6 @@ export interface DamageSystem {
   calculate(rawDamage: number, shield: number): number
 
   /**
-   * 计算命中得分
-   * 公式: score = floor(√actualDamage)
-   * @param actualDamage 实际伤害值
-   * @returns 得分
-   */
-  calculateScore(actualDamage: number): number
-
-  /**
-   * 计算多次攻击的总得分
-   * @param damages 每次攻击的实际伤害数组
-   * @returns 总得分
-   */
-  calculateTotalScore(damages: number[]): number
-
-  /**
    * 判断伤害是否足以击杀怪物
    * @param monster 怪物实例
    * @param damage 伤害值（已扣除护盾后的实际伤害）
@@ -87,21 +72,6 @@ export function createDamageSystem(): DamageSystem {
   }
 
   /**
-   * 计算命中得分
-   * 公式: score = floor(√actualDamage)
-   */
-  function calculateScore(actualDamage: number): number {
-    return Math.floor(Math.sqrt(actualDamage))
-  }
-
-  /**
-   * 计算多次攻击的总得分
-   */
-  function calculateTotalScore(damages: number[]): number {
-    return damages.reduce((total, damage) => total + calculateScore(damage), 0)
-  }
-
-  /**
    * 判断伤害是否足以击杀怪物
    */
   function isKilled(monster: IMonster, damage: number): boolean {
@@ -133,8 +103,6 @@ export function createDamageSystem(): DamageSystem {
 
   return {
     calculate,
-    calculateScore,
-    calculateTotalScore,
     isKilled,
     wouldKill,
     getEffectiveDamage,

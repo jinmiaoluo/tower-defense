@@ -1,11 +1,12 @@
 /**
  * DamageSystem 测试用例
- * 测试伤害计算、得分计算等核心逻辑
+ * 测试伤害计算核心逻辑（得分计算已移至 ScoreSystem）
  * 参考旧实现：html5-tower-defense/src/js/td-obj-monster.js:beHit
  */
 
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createDamageSystem, type DamageSystem } from './DamageSystem'
+import { createScoreSystem, type ScoreSystem } from './ScoreSystem'
 import type { IMonster } from '@/types/entities'
 
 /** 创建 Mock Monster */
@@ -35,9 +36,11 @@ function createMockMonster(overrides: Partial<IMonster> = {}): IMonster {
 
 describe('DamageSystem', () => {
   let system: DamageSystem
+  let scoreSystem: ScoreSystem
 
   beforeEach(() => {
     system = createDamageSystem()
+    scoreSystem = createScoreSystem()
   })
 
   // ============================================================================
@@ -107,62 +110,6 @@ describe('DamageSystem', () => {
       // 减免后 = 50，最低伤害 = ceil(100 * 0.1) = 10
       // 应该取较大值 = 50
       expect(system.calculate(100, 50)).toBe(50)
-    })
-  })
-
-  // ============================================================================
-  // calculateScore - 命中得分计算
-  // ============================================================================
-
-  describe('calculateScore', () => {
-    it('得分 = floor(sqrt(actualDamage))', () => {
-      expect(system.calculateScore(1)).toBe(1) // sqrt(1) = 1
-      expect(system.calculateScore(4)).toBe(2) // sqrt(4) = 2
-      expect(system.calculateScore(9)).toBe(3) // sqrt(9) = 3
-      expect(system.calculateScore(16)).toBe(4) // sqrt(16) = 4
-      expect(system.calculateScore(100)).toBe(10) // sqrt(100) = 10
-    })
-
-    it('非完全平方数向下取整', () => {
-      expect(system.calculateScore(2)).toBe(1) // sqrt(2) ≈ 1.41 -> 1
-      expect(system.calculateScore(3)).toBe(1) // sqrt(3) ≈ 1.73 -> 1
-      expect(system.calculateScore(5)).toBe(2) // sqrt(5) ≈ 2.24 -> 2
-      expect(system.calculateScore(10)).toBe(3) // sqrt(10) ≈ 3.16 -> 3
-      expect(system.calculateScore(15)).toBe(3) // sqrt(15) ≈ 3.87 -> 3
-    })
-
-    it('高伤害得分更高', () => {
-      // 单次高伤害 vs 多次低伤害的得分比较
-      // HMG 单次 30 伤害：floor(sqrt(30)) = 5
-      expect(system.calculateScore(30)).toBe(5)
-      // LMG 单次 5 伤害：floor(sqrt(5)) = 2
-      // 需要打 3 次才能达到同等得分
-      expect(system.calculateScore(5)).toBe(2)
-    })
-
-    it('伤害为 0 时得分为 0', () => {
-      expect(system.calculateScore(0)).toBe(0)
-    })
-  })
-
-  // ============================================================================
-  // calculateTotalScore - 批量计算攻击得分
-  // ============================================================================
-
-  describe('calculateTotalScore', () => {
-    it('计算多次攻击的总得分', () => {
-      // 三次攻击：伤害 10, 20, 30
-      // 得分：3 + 4 + 5 = 12
-      const damages = [10, 20, 30]
-      expect(system.calculateTotalScore(damages)).toBe(12)
-    })
-
-    it('空数组返回 0', () => {
-      expect(system.calculateTotalScore([])).toBe(0)
-    })
-
-    it('单次攻击', () => {
-      expect(system.calculateTotalScore([25])).toBe(5)
     })
   })
 
@@ -247,7 +194,7 @@ describe('DamageSystem', () => {
   })
 
   // ============================================================================
-  // 集成场景测试
+  // 集成场景测试（与 ScoreSystem 配合）
   // ============================================================================
 
   describe('Integration scenarios', () => {
@@ -255,12 +202,12 @@ describe('DamageSystem', () => {
       // 激光枪：伤害 25，速度 20（每秒 20 次）
       // 1 秒内攻击 20 次，每次得分 5，总得分 100
       const laserDamages = Array(20).fill(25)
-      const laserScore = system.calculateTotalScore(laserDamages)
+      const laserScore = scoreSystem.calculateTotalHitScore(laserDamages)
 
       // HMG：伤害 30，速度 3（每秒 3 次）
       // 1 秒内攻击 3 次，每次得分 5，总得分 15
       const hmgDamages = Array(3).fill(30)
-      const hmgScore = system.calculateTotalScore(hmgDamages)
+      const hmgScore = scoreSystem.calculateTotalHitScore(hmgDamages)
 
       expect(laserScore).toBeGreaterThan(hmgScore)
       expect(laserScore).toBe(100)
