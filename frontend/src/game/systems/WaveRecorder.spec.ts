@@ -404,9 +404,11 @@ describe('WaveRecorder', () => {
   // ============================================================================
 
   describe('setDuration', () => {
-    it('设置波次持续帧数', () => {
-      recorder.setDuration(1000)
+    it('传入当前帧号，计算相对于起始帧的持续时间', () => {
+      // recorder 初始化时 startFrame = 0
+      recorder.setDuration(1000) // currentFrame = 1000
 
+      // waveDurationFrames = 1000 - 0 = 1000
       expect(recorder.getResult().waveDurationFrames).toBe(1000)
     })
 
@@ -415,6 +417,25 @@ describe('WaveRecorder', () => {
       recorder.setDuration(1000)
 
       expect(recorder.getResult().waveDurationFrames).toBe(1000)
+    })
+
+    it('非零起始帧时正确计算相对持续时间', () => {
+      const r = createWaveRecorder(1, 500) // startFrame = 500
+      r.setDuration(1500) // currentFrame = 1500
+
+      // waveDurationFrames = 1500 - 500 = 1000
+      expect(r.getResult().waveDurationFrames).toBe(1000)
+    })
+
+    it('reset 后使用新的起始帧计算', () => {
+      recorder.setDuration(100)
+      expect(recorder.getResult().waveDurationFrames).toBe(100) // 100 - 0
+
+      recorder.reset(2, 1000) // 新的 startFrame = 1000
+      recorder.setDuration(1500) // currentFrame = 1500
+
+      // waveDurationFrames = 1500 - 1000 = 500
+      expect(recorder.getResult().waveDurationFrames).toBe(500)
     })
   })
 

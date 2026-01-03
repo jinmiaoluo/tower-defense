@@ -122,9 +122,10 @@ export function createWaveRecorder(waveNumber: number, startFrame: number): Wave
 
   /**
    * 设置波次持续帧数
+   * @param currentFrame 当前绝对帧号，内部会计算相对于波次开始的持续时间
    */
-  function setDuration(frames: number): void {
-    waveDurationFrames = frames
+  function setDuration(currentFrame: number): void {
+    waveDurationFrames = currentFrame - currentStartFrame
   }
 
   /**

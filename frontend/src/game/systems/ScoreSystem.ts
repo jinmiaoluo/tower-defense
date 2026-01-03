@@ -1,8 +1,13 @@
 /**
  * ScoreSystem - 得分计算系统
- * 负责命中得分和最终得分的计算
- * 参考文档：docs/SPEC.md 得分计算章节
- * 参考旧实现：html5-tower-defense/src/js/td-obj-monster.js:85
+ * 负责命中得分和游戏结束时的最终得分计算
+ *
+ * 注意区分：
+ * - ScoreSystem.calculateLifeBonus(): 游戏结束时的得分计算（剩余生命转换为分数）
+ * - EconomySystem.getLifeReward(): 游戏过程中的资源恢复（每 5/10 波恢复生命值）
+ *
+ * 命中得分参考旧实现：html5-tower-defense/src/js/td-obj-monster.js:85
+ * 最终得分奖励（波次/生命/金币）是新增功能，参考文档：docs/SPEC.md 得分计算章节
  */
 
 import { GAME_CONSTANTS } from '@/types'
@@ -59,7 +64,11 @@ export interface ScoreSystem {
   calculateWaveBonus(wavesCompleted: number): number
 
   /**
-   * 计算剩余生命奖励
+   * 计算剩余生命得分奖励（游戏结束时的得分计算，非资源恢复）
+   *
+   * 这是游戏结束时将剩余生命转换为分数的计算。
+   * 与 EconomySystem.getLifeReward() 不同，后者是游戏过程中的生命恢复。
+   *
    * 公式: lifeBonus = remainingLife x SCORE_LIFE_COEFFICIENT
    * @param remainingLife 剩余生命值
    * @returns 生命奖励分数
