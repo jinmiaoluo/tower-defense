@@ -13,3 +13,4 @@ export {
   type BulletCreateParams,
   type Rect,
 } from './BulletSystem'
+export { createEconomySystem, type EconomySystem } from './EconomySystem'
