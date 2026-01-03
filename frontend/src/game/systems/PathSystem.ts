@@ -48,7 +48,6 @@ class PathFinder {
 
   private currentWave: Position[] = []
   private distance = 0
-  private isArrived = false
   private isBlocked = false
 
   constructor(mapConfig: MapConfig) {
@@ -118,7 +117,6 @@ class PathFinder {
 
           // 检查是否到达终点
           if (nx === this.endX && ny === this.endY) {
-            this.isArrived = true
             this.currentWave = []
             return false
           }

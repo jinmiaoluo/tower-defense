@@ -5,7 +5,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest'
 import { createMonster, type MonsterDependencies } from './Monster'
-import type { MonsterCreateParams, MapState, Path } from '@/types/entities'
+import type { MonsterCreateParams, Path } from '@/types/entities'
 import type { MonsterTypeId, Position } from '@/types'
 
 // ============================================================================
@@ -36,16 +36,6 @@ function createTestPath(): Path {
     [3, 0],
     [4, 0],
   ] as Position[]
-}
-
-/** 创建测试用的地图状态 */
-function createTestMapState(): MapState {
-  return {
-    width: 16,
-    height: 16,
-    cells: [],
-    cachedPath: createTestPath(),
-  }
 }
 
 /** 创建测试用的依赖 */
@@ -353,7 +343,6 @@ describe('Monster', () => {
   describe('update', () => {
     it('每帧应根据 speed 更新 progress', () => {
       const monster = createMonster(createTestMonsterParams({ speed: 3 }), dependencies)
-      const path = createTestPath()
 
       // 速度 3 表示每帧移动 3 格，路径 5 个点共 4 段
       // progress 增量 = speed / (路径段数 * 32)

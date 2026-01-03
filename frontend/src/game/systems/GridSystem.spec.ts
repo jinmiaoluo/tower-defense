@@ -5,8 +5,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest'
 import { GridSystem, createGridSystem } from './GridSystem'
-import type { MapConfig, Position } from '@/types'
-import type { GridCell, MapState } from '@/types/entities'
+import type { MapConfig } from '@/types'
 
 describe('GridSystem', () => {
   let gridSystem: GridSystem

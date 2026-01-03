@@ -7,12 +7,10 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
   createBulletSystem,
   type BulletSystem,
-  type Bullet,
-  type BulletCreateParams,
   type Rect,
 } from './BulletSystem'
 import type { IBuilding, IMonster } from '@/types/entities'
-import type { IWaveRecorder, AttackRecordData } from '@/types/recorder'
+import type { IWaveRecorder } from '@/types/recorder'
 import type { Position } from '@/types'
 
 // ============================================================================
@@ -505,8 +503,9 @@ describe('BulletSystem', () => {
       })
 
       const bullets = bulletSystem.getBullets()
-      bullets.length = 0 // 尝试清空
-
+      // 返回的是只读数组的副本，无法修改
+      expect(bullets).toHaveLength(1)
+      // 再次获取应该仍然有1个子弹（证明是不可变的）
       expect(bulletSystem.getBullets()).toHaveLength(1)
     })
   })

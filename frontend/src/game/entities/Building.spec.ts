@@ -450,11 +450,12 @@ describe('Building', () => {
 
       const params = building.getBulletParams(monster)
 
-      expect(params.building).toBe(building)
-      expect(params.damage).toBe(12) // cannon level 1 damage
-      expect(params.speed).toBe(10) // cannon bullet speed
-      expect(params.originalTargetId).toBe('monster-1')
-      expect(params.originalTargetPosition).toEqual([6, 6])
+      expect(params).not.toBeNull()
+      expect(params!.building).toBe(building)
+      expect(params!.damage).toBe(12) // cannon level 1 damage
+      expect(params!.speed).toBe(10) // cannon bullet speed
+      expect(params!.originalTargetId).toBe('monster-1')
+      expect(params!.originalTargetPosition).toEqual([6, 6])
     })
 
     it('laser_gun 应该返回 null（不使用子弹）', () => {
@@ -484,7 +485,7 @@ describe('Building', () => {
       const building = createBuilding(defaultParams, deps)
 
       building.upgrade()
-      const damage = building.getDamage()
+      building.getDamage()
 
       expect(deps.getDamageAtLevel).toHaveBeenCalledWith('cannon', 2)
     })

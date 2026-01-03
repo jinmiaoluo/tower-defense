@@ -18,12 +18,6 @@ const { GRID_SIZE } = GAME_CONSTANTS
  */
 const BULLET_SPEED_FACTOR = 20
 
-/** 子弹默认半径 */
-const DEFAULT_BULLET_RADIUS = 3
-
-/** 碰撞检测宽松因子（√2，避免子弹穿过怪物） */
-const COLLISION_TOLERANCE = Math.SQRT2
-
 /** 矩形区域 */
 export interface Rect {
   x: number
