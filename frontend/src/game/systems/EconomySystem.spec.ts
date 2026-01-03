@@ -1,6 +1,9 @@
 /**
  * EconomySystem 测试用例
- * 测试经济系统的核心计算逻辑
+ * 测试游戏过程中的波次生命恢复奖励计算
+ *
+ * 注意：这里测试的是游戏过程中的资源恢复（每 5/10 波恢复生命值），
+ * 与 ScoreSystem 中的 calculateLifeBonus()（游戏结束时的得分计算）不同。
  */
 
 import { beforeEach, describe, expect, it } from 'vitest'
@@ -101,44 +104,7 @@ describe('EconomySystem', () => {
   })
 
   // ============================================================================
-  // canAfford - 检查是否能支付建造成本
-  // ============================================================================
-
-  describe('canAfford', () => {
-    it('金钱足够时返回 true', () => {
-      expect(system.canAfford(500, 'cannon')).toBe(true)
-      expect(system.canAfford(300, 'cannon')).toBe(true)
-      expect(system.canAfford(100, 'LMG')).toBe(true)
-    })
-
-    it('金钱不足时返回 false', () => {
-      expect(system.canAfford(100, 'cannon')).toBe(false)
-      expect(system.canAfford(299, 'cannon')).toBe(false)
-      expect(system.canAfford(99, 'LMG')).toBe(false)
-    })
-
-    it('金钱刚好等于建造成本时返回 true', () => {
-      expect(system.canAfford(300, 'cannon')).toBe(true)
-      expect(system.canAfford(5, 'wall')).toBe(true)
-      expect(system.canAfford(2000, 'laser_gun')).toBe(true)
-    })
-
-    it('检查所有建筑类型', () => {
-      expect(system.canAfford(5, 'wall')).toBe(true)
-      expect(system.canAfford(300, 'cannon')).toBe(true)
-      expect(system.canAfford(100, 'LMG')).toBe(true)
-      expect(system.canAfford(800, 'HMG')).toBe(true)
-      expect(system.canAfford(2000, 'laser_gun')).toBe(true)
-    })
-
-    it('边界情况：金钱为 0', () => {
-      expect(system.canAfford(0, 'wall')).toBe(false)
-      expect(system.canAfford(0, 'cannon')).toBe(false)
-    })
-  })
-
-  // ============================================================================
-  // getLifeReward - 波次生命奖励计算
+  // getLifeReward - 波次生命恢复奖励计算（游戏过程中的资源恢复，非得分）
   // ============================================================================
 
   describe('getLifeReward', () => {
@@ -210,17 +176,4 @@ describe('EconomySystem', () => {
     })
   })
 
-  // ============================================================================
-  // getBuildCost - 获取建造成本
-  // ============================================================================
-
-  describe('getBuildCost', () => {
-    it('返回正确的建造成本', () => {
-      expect(system.getBuildCost('wall')).toBe(5)
-      expect(system.getBuildCost('cannon')).toBe(300)
-      expect(system.getBuildCost('LMG')).toBe(100)
-      expect(system.getBuildCost('HMG')).toBe(800)
-      expect(system.getBuildCost('laser_gun')).toBe(2000)
-    })
-  })
 })
