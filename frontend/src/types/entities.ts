@@ -31,6 +31,8 @@ export interface IMonster {
   readonly money: number
   /** 到达终点造成的伤害（从 config.monsters[type].damage 获取） */
   readonly damage: number
+  /** 颜色（用于渲染，从 MonsterDisplayConfig 获取或随机生成） */
+  readonly color: string
   /** 路径进度 (0-1) */
   progress: number
   /** 是否有效（未被击杀且未到达终点） */
