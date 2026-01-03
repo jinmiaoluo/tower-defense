@@ -13,7 +13,7 @@ import type { MonsterTypeId } from '@/types'
 import type { Path } from '@/types/entities'
 import { GAME_CONSTANTS } from '@/types'
 
-const { GRID_SIZE } = GAME_CONSTANTS
+const { GRID_SIZE, GLOBAL_SPEED } = GAME_CONSTANTS
 
 /** 颜色常量 */
 const COLORS = {
@@ -263,7 +263,8 @@ export class Game extends Scene {
     if (delayFrames > 0) {
       const path = this.gridSystem.getCurrentPath()
       const totalPathLength = (path.length - 1) * GRID_SIZE
-      const delayProgress = -(delayFrames * baseStats.speed) / totalPathLength
+      const actualSpeed = baseStats.speed * GLOBAL_SPEED
+      const delayProgress = -(delayFrames * actualSpeed) / totalPathLength
       monster.progress = delayProgress
     }
 
@@ -395,7 +396,8 @@ export class Game extends Scene {
         // 等待生成的怪物，增加进度
         const path = this.gridSystem.getCurrentPath()
         const totalPathLength = (path.length - 1) * GRID_SIZE
-        monster.progress += monster.speed / totalPathLength
+        const actualSpeed = monster.speed * GLOBAL_SPEED
+        monster.progress += actualSpeed / totalPathLength
       }
     }
 

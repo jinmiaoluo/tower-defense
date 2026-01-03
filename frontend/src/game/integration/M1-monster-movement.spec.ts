@@ -11,7 +11,7 @@ import type { MapConfig, MonsterTypeId } from '@/types'
 import type { MonsterCreateParams, Path } from '@/types/entities'
 import { GAME_CONSTANTS } from '@/types'
 
-const { GRID_SIZE } = GAME_CONSTANTS
+const { GRID_SIZE, GLOBAL_SPEED } = GAME_CONSTANTS
 
 // ============================================================================
 // 测试配置
@@ -139,12 +139,13 @@ describe('M1: 怪物从入口走到出口', () => {
     })
 
     it('到达出口的帧数应符合预期', () => {
-      const speed = 32 // 每帧 32 像素（1 格）
+      const speed = 32 // 配置速度值
       const monster = createMonster(createMonsterParams({ speed }), dependencies)
 
       const path = gridSystem.getCurrentPath()
       const pathLength = path.length - 1 // 段数
-      const expectedFrames = (pathLength * GRID_SIZE) / speed // 预期帧数
+      const actualSpeed = speed * GLOBAL_SPEED // 实际每帧移动像素数
+      const expectedFrames = (pathLength * GRID_SIZE) / actualSpeed // 预期帧数
 
       let frameCount = 0
       while (monster.isValid && frameCount < 1000) {

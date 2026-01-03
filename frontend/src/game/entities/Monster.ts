@@ -8,7 +8,7 @@ import type { IMonster, MonsterCreateParams, Path } from '@/types/entities'
 import type { MonsterTypeId, Position } from '@/types'
 import { GAME_CONSTANTS } from '@/types'
 
-const { GRID_SIZE } = GAME_CONSTANTS
+const { GRID_SIZE, GLOBAL_SPEED } = GAME_CONSTANTS
 
 /** 最低伤害比例（保证高伤害武器对护盾怪的优势） */
 const MIN_DAMAGE_RATIO = 0.1
@@ -157,10 +157,11 @@ class Monster implements IMonster {
     }
 
     // 计算每帧移动的 progress 增量
-    // speed 是每帧移动的像素数
+    // 实际速度 = speed * GLOBAL_SPEED（参考旧实现）
     // 总路径像素长度 = (path.length - 1) * GRID_SIZE
     const totalPathLength = (path.length - 1) * GRID_SIZE
-    const progressPerFrame = this.speed / totalPathLength
+    const actualSpeed = this.speed * GLOBAL_SPEED
+    const progressPerFrame = actualSpeed / totalPathLength
 
     this.progress += progressPerFrame
 

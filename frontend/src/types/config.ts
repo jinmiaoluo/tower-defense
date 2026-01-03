@@ -96,6 +96,8 @@ export const GAME_CONSTANTS = {
   MAX_MONSTERS_PER_TYPE_PER_WAVE: 3,
   /** 怪物生成间隔帧数（怪物逐个从入口出现的间隔） */
   MONSTER_SPAWN_INTERVAL_FRAMES: 30,
+  /** 全局速度系数（参考旧实现 TD.global_speed = 0.1） */
+  GLOBAL_SPEED: 0.1,
 } as const
 
 /** 建筑类型数组（用于 UI 展示顺序） */
