@@ -14,3 +14,4 @@ export {
   type Rect,
 } from './BulletSystem'
 export { createEconomySystem, type EconomySystem } from './EconomySystem'
+export { createWaveRecorder, type WaveRecorder } from './WaveRecorder'
