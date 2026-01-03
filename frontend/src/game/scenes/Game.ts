@@ -339,6 +339,8 @@ export class Game extends Scene {
     this.t = getTranslator()
     // 更新建筑面板文字
     this.updateBuildingPanelTexts()
+    // 更新控制面板文字
+    this.updateControlPanelTexts()
     // 更新 UI 文字
     this.updateUI()
   }
@@ -355,6 +357,20 @@ export class Game extends Scene {
         this.buildingPanelTexts[index].setText(`${buildingName}\n$${config.cost}`)
       }
     })
+  }
+
+  /** 更新控制面板文字 */
+  private updateControlPanelTexts() {
+    if (!this.pauseButtonText || !this.restartButtonText) return
+
+    const state = this.logic?.getState()
+    const isPaused = state?.isPaused ?? false
+
+    // 根据当前状态设置暂停按钮文字
+    this.pauseButtonText.setText(
+      isPaused ? this.t('button_continue_text') : this.t('button_pause_text'),
+    )
+    this.restartButtonText.setText(this.t('button_restart_text'))
   }
 
   /** 屏幕坐标转格子坐标 */
