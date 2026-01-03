@@ -8,8 +8,9 @@ import { EventBus } from '../EventBus'
 import { createPathSystem, type PathSystem } from '../systems/PathSystem'
 import { createGridSystem, type GridSystem } from '../systems/GridSystem'
 import { createMonster, type MonsterDependencies, type IMonsterRuntime } from '../entities/Monster'
-import { MOCK_GAME_CONFIG, MOCK_MONSTERS, MOCK_MONSTER_BASE_STATS } from '@/mocks'
-import type { MonsterTypeId } from '@/types'
+import { MOCK_MONSTERS } from '@/mocks'
+import { mockStartGame, mockSubmitWave } from '@/mocks/api'
+import type { GameConfig, MonsterConfig, WaveConfig, MonsterTypeId } from '@/types'
 import type { Path } from '@/types/entities'
 import { GAME_CONSTANTS } from '@/types'
 
@@ -28,6 +29,22 @@ const COLORS = {
   UI_TEXT: '#ffffff',
 }
 
+/** 波次间隔帧数 (60 FPS x 3 秒 = 180 帧) */
+const WAVE_INTERVAL_FRAMES = 180
+
+/** 波次结果追踪 */
+interface WaveResult {
+  killed: number
+  killedByType: Record<number, number>
+  passed: number
+  scoreGained: number
+  moneyGained: number
+  lifeLost: number
+  totalDamageDealt: number
+  totalLifeDestroyed: number
+  startFrame: number
+}
+
 /** 游戏状态 */
 interface GameState {
   money: number
@@ -35,8 +52,12 @@ interface GameState {
   score: number
   wave: number
   frame: number
+  difficulty: number
   isPlaying: boolean
   isPaused: boolean
+  isLoading: boolean
+  waveIntervalCounter: number
+  isSubmittingWave: boolean
 }
 
 export class Game extends Scene {
@@ -46,6 +67,12 @@ export class Game extends Scene {
 
   // 游戏状态
   private gameState!: GameState
+
+  // 会话状态
+  private sessionId: string = ''
+  private gameConfig!: GameConfig
+  private currentWaveConfig!: WaveConfig
+  private waveResult!: WaveResult
 
   // 怪物列表
   private monsters: IMonsterRuntime[] = []
@@ -65,53 +92,85 @@ export class Game extends Scene {
   }
 
   create() {
-    const { width, height } = this.scale
-
-    // 计算地图偏移（居中显示）
-    const mapWidth = MOCK_GAME_CONFIG.map.width * GRID_SIZE
-    const mapHeight = MOCK_GAME_CONFIG.map.height * GRID_SIZE
-    this.mapOffsetX = Math.floor((width - mapWidth) / 2)
-    this.mapOffsetY = Math.floor((height - mapHeight) / 2) + 30 // 留出顶部 UI 空间
-
-    // 初始化游戏系统
-    this.initSystems()
-
-    // 初始化游戏状态
+    // 初始化游戏状态（加载中）
     this.initGameState()
 
     // 创建渲染对象
     this.createRenderObjects()
 
-    // 渲染静态元素
-    this.renderMap()
-    this.renderPath()
-
     // 创建 UI
     this.createUI()
 
-    // 生成初始怪物
-    this.spawnWave()
+    // 异步初始化游戏会话
+    mockStartGame().then((response) => {
+      this.sessionId = response.sessionId
+      this.gameConfig = response.config
+      this.currentWaveConfig = response.firstWave
 
-    // 通知 Vue 场景已就绪
-    EventBus.emit('current-scene-ready', this)
+      // 计算地图偏移（居中显示）
+      const { width, height } = this.scale
+      const mapWidth = this.gameConfig.map.width * GRID_SIZE
+      const mapHeight = this.gameConfig.map.height * GRID_SIZE
+      this.mapOffsetX = Math.floor((width - mapWidth) / 2)
+      this.mapOffsetY = Math.floor((height - mapHeight) / 2) + 30
+
+      // 初始化游戏系统
+      this.initSystems()
+
+      // 使用服务端配置更新游戏状态
+      this.gameState.money = this.gameConfig.initial.money
+      this.gameState.life = this.gameConfig.initial.life
+      this.gameState.difficulty = this.gameConfig.initial.difficulty
+      this.gameState.isLoading = false
+
+      // 渲染静态元素
+      this.renderMap()
+      this.renderPath()
+
+      // 初始化波次结果并生成怪物
+      this.resetWaveResult()
+      this.spawnWaveFromConfig()
+
+      // 通知 Vue 场景已就绪
+      EventBus.emit('current-scene-ready', this)
+    })
   }
 
   /** 初始化游戏系统 */
   private initSystems() {
     this.pathSystem = createPathSystem()
-    this.gridSystem = createGridSystem(MOCK_GAME_CONFIG.map)
+    this.gridSystem = createGridSystem(this.gameConfig.map)
   }
 
   /** 初始化游戏状态 */
   private initGameState() {
     this.gameState = {
-      money: MOCK_GAME_CONFIG.initial.money,
-      life: MOCK_GAME_CONFIG.initial.life,
+      money: 0,
+      life: 0,
       score: 0,
       wave: 1,
       frame: 0,
+      difficulty: 1,
       isPlaying: true,
       isPaused: false,
+      isLoading: true,
+      waveIntervalCounter: 0,
+      isSubmittingWave: false,
+    }
+  }
+
+  /** 重置波次结果追踪 */
+  private resetWaveResult() {
+    this.waveResult = {
+      killed: 0,
+      killedByType: {},
+      passed: 0,
+      scoreGained: 0,
+      moneyGained: 0,
+      lifeLost: 0,
+      totalDamageDealt: 0,
+      totalLifeDestroyed: 0,
+      startFrame: this.gameState.frame,
     }
   }
 
@@ -126,7 +185,7 @@ export class Game extends Scene {
 
   /** 渲染地图 */
   private renderMap() {
-    const { width, height } = MOCK_GAME_CONFIG.map
+    const { width, height } = this.gameConfig.map
     const g = this.mapGraphics
 
     g.clear()
@@ -213,33 +272,32 @@ export class Game extends Scene {
 
   /** 更新 UI 显示 */
   private updateUI() {
-    const { money, life, score, wave, frame } = this.gameState
+    const { money, life, score, wave, frame, waveIntervalCounter } = this.gameState
     const aliveMonsters = this.monsters.filter(m => m.isValid).length
 
-    this.uiText.setText(
-      `Wave: ${wave} | Money: ${money} | Life: ${life} | Score: ${score} | Monsters: ${aliveMonsters} | Frame: ${frame}`
-    )
+    let statusText = `Wave: ${wave} | Money: ${money} | Life: ${life} | Score: ${score} | Monsters: ${aliveMonsters} | Frame: ${frame}`
+
+    // 显示波次间隔倒计时
+    if (waveIntervalCounter > 0) {
+      const secondsLeft = Math.ceil(waveIntervalCounter / 60)
+      statusText += ` | Next wave in: ${secondsLeft}s`
+    }
+
+    this.uiText.setText(statusText)
   }
 
-  /** 生成一波怪物 */
-  private spawnWave() {
-    const monsterTypes: MonsterTypeId[] = [0, 1, 2]
-    const spawnCount = Math.min(3 + this.gameState.wave, 10)
-
-    for (let i = 0; i < spawnCount; i++) {
-      const typeId = monsterTypes[i % monsterTypes.length]
-      this.spawnMonster(typeId, i * 30) // 每隔 30 帧生成一个
+  /** 从服务端配置生成一波怪物 */
+  private spawnWaveFromConfig() {
+    for (let i = 0; i < this.currentWaveConfig.monsters.length; i++) {
+      const monsterConfig = this.currentWaveConfig.monsters[i]
+      this.spawnMonster(monsterConfig, i * 30)
     }
   }
 
   /** 生成单个怪物 */
-  private spawnMonster(typeId: MonsterTypeId, delayFrames: number = 0) {
-    const baseStats = MOCK_MONSTER_BASE_STATS[typeId]
-    const displayConfig = MOCK_MONSTERS[typeId]
+  private spawnMonster(config: MonsterConfig, delayFrames: number = 0) {
+    const displayConfig = MOCK_MONSTERS[config.type]
 
-    const monsterId = `m-${this.gameState.wave}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-
-    // 创建依赖
     const deps: MonsterDependencies = {
       getPath: () => this.gridSystem.getCurrentPath(),
       getPositionAtProgress: (path: Path, progress: number) => {
@@ -247,32 +305,29 @@ export class Game extends Scene {
       },
     }
 
-    // 创建怪物
     const monster = createMonster({
-      id: monsterId,
-      type: typeId,
-      life: baseStats.life,
-      speed: baseStats.speed,
-      shield: baseStats.shield,
-      money: baseStats.money,
+      id: config.id,
+      type: config.type,
+      life: config.life,
+      speed: config.speed,
+      shield: config.shield,
+      money: config.money,
       color: displayConfig.color,
       damage: displayConfig.damage,
     }, deps)
 
-    // 设置初始延迟（通过负进度模拟）
     if (delayFrames > 0) {
       const path = this.gridSystem.getCurrentPath()
       const totalPathLength = (path.length - 1) * GRID_SIZE
-      const actualSpeed = baseStats.speed * GLOBAL_SPEED
+      const actualSpeed = config.speed * GLOBAL_SPEED
       const delayProgress = -(delayFrames * actualSpeed) / totalPathLength
       monster.progress = delayProgress
     }
 
     this.monsters.push(monster)
 
-    // 创建怪物图形
     const graphics = this.add.graphics()
-    this.monsterGraphics.set(monsterId, graphics)
+    this.monsterGraphics.set(config.id, graphics)
   }
 
   /** 渲染单个怪物 */
@@ -315,21 +370,30 @@ export class Game extends Scene {
     graphics.fillRect(x - healthBarWidth / 2, healthBarY, healthBarWidth * healthPercent, healthBarHeight)
   }
 
-  /** 清理无效怪物 */
+  /** 清理无效怪物并追踪波次结果 */
   private cleanupMonsters() {
     const invalidMonsters = this.monsters.filter(m => !m.isValid)
 
     for (const monster of invalidMonsters) {
-      // 处理到达终点的怪物
       if (monster.reachedExit()) {
+        // 怪物到达终点：记录 passed 和 lifeLost
+        this.waveResult.passed++
+        this.waveResult.lifeLost += monster.damage
         this.gameState.life -= monster.damage
         if (this.gameState.life <= 0) {
           this.gameState.life = 0
           this.gameOver()
         }
+      } else {
+        // 怪物被击杀：记录 killed、moneyGained、killedByType
+        this.waveResult.killed++
+        this.waveResult.moneyGained += monster.money
+        this.waveResult.totalLifeDestroyed += monster.maxLife
+        const typeId = monster.type as MonsterTypeId
+        this.waveResult.killedByType[typeId] = (this.waveResult.killedByType[typeId] || 0) + 1
+        this.gameState.money += monster.money
       }
 
-      // 清理图形
       const graphics = this.monsterGraphics.get(monster.id)
       if (graphics) {
         graphics.destroy()
@@ -337,7 +401,6 @@ export class Game extends Scene {
       }
     }
 
-    // 移除无效怪物
     this.monsters = this.monsters.filter(m => m.isValid)
   }
 
@@ -345,12 +408,78 @@ export class Game extends Scene {
   private checkWaveComplete() {
     const hasActiveMonsters = this.monsters.some(m => m.isValid || m.progress < 0)
 
-    if (!hasActiveMonsters && this.gameState.isPlaying) {
-      // 波次结束，生成下一波
+    if (!hasActiveMonsters && this.gameState.isPlaying && !this.gameState.isSubmittingWave) {
+      // 波次刚结束时，提交波次结果到服务端
+      if (this.gameState.waveIntervalCounter === 0) {
+        this.gameState.isSubmittingWave = true
+        this.submitWaveResult()
+        return
+      }
+
+      // 波次间隔倒计时
+      if (this.gameState.waveIntervalCounter > 0) {
+        this.gameState.waveIntervalCounter--
+        return
+      }
+
+      // 倒计时结束，生成下一波
       this.gameState.wave++
-      this.gameState.money += 50 // 波次奖励
-      this.spawnWave()
+      this.resetWaveResult()
+      this.spawnWaveFromConfig()
     }
+  }
+
+  /** 提交波次结果到服务端 */
+  private submitWaveResult() {
+    const waveDurationFrames = this.gameState.frame - this.waveResult.startFrame
+
+    mockSubmitWave({
+      sessionId: this.sessionId,
+      waveNumber: this.gameState.wave,
+      actions: [],
+      attacks: [],
+      result: {
+        killed: this.waveResult.killed,
+        killedByType: this.waveResult.killedByType,
+        passed: this.waveResult.passed,
+        scoreGained: this.waveResult.scoreGained,
+        moneyGained: this.waveResult.moneyGained,
+        lifeLost: this.waveResult.lifeLost,
+        totalDamageDealt: this.waveResult.totalDamageDealt,
+        totalLifeDestroyed: this.waveResult.totalLifeDestroyed,
+        waveDurationFrames,
+      },
+      buildings: [],
+    }).then((response) => {
+      if (!response.valid) {
+        console.error('Wave validation failed:', response.error)
+        return
+      }
+
+      // 同步服务端状态
+      this.gameState.money = response.serverState.money
+      this.gameState.score = response.serverState.score
+      this.gameState.life = response.serverState.life
+      this.gameState.difficulty = response.serverState.difficulty
+
+      // 检查游戏是否结束
+      if (this.gameState.life <= 0 || !response.nextWave) {
+        this.gameOver()
+        return
+      }
+
+      // 应用生命奖励
+      if (response.nextWave.lifeReward) {
+        this.gameState.life = Math.min(this.gameState.life + response.nextWave.lifeReward, 100)
+      }
+
+      // 保存下一波配置
+      this.currentWaveConfig = response.nextWave
+
+      // 开始波次间隔倒计时
+      this.gameState.waveIntervalCounter = WAVE_INTERVAL_FRAMES
+      this.gameState.isSubmittingWave = false
+    })
   }
 
   /** 游戏结束 */
@@ -382,7 +511,7 @@ export class Game extends Scene {
 
   /** 游戏主循环 */
   update() {
-    if (!this.gameState.isPlaying || this.gameState.isPaused) {
+    if (!this.gameState.isPlaying || this.gameState.isPaused || this.gameState.isLoading) {
       return
     }
 
