@@ -152,12 +152,16 @@ export class Game extends Scene {
       this.gameConfig = response.config
       this.currentWaveConfig = response.firstWave
 
-      // 计算地图偏移（居中显示）
+      // 计算地图偏移（居中显示，考虑 UI 元素）
       const { width, height } = this.scale
       const mapWidth = this.gameConfig.map.width * GRID_SIZE
       const mapHeight = this.gameConfig.map.height * GRID_SIZE
+      // 预留顶部状态栏和底部按钮面板的空间
+      const topReserve = 50
+      const bottomReserve = 90
+      const availableHeight = height - topReserve - bottomReserve
       this.mapOffsetX = Math.floor((width - mapWidth) / 2)
-      this.mapOffsetY = Math.floor((height - mapHeight) / 2) + 50
+      this.mapOffsetY = topReserve + Math.floor((availableHeight - mapHeight) / 2)
 
       // 创建核心逻辑
       this.logic = createGameSceneLogic(this.gameConfig)
@@ -735,10 +739,12 @@ export class Game extends Scene {
     const { width } = this.scale
 
     this.uiText = this.add
-      .text(width / 2, 20, '', {
+      .text(width / 2, 10, '', {
         fontFamily: 'Arial',
-        fontSize: '18px',
+        fontSize: '14px',
         color: this.getColors().uiText,
+        wordWrap: { width: width - 20 },
+        align: 'center',
       })
       .setOrigin(0.5, 0)
 
@@ -863,22 +869,37 @@ export class Game extends Scene {
   private createBuildingPanel() {
     const { width, height } = this.scale
 
-    this.buildingPanel = this.add.container(width / 2, height - 40)
+    this.buildingPanel = this.add.container(width / 2, height - 50)
     this.buildingPanelTexts = []
 
     const buildingTypes: BuildingType[] = ['LMG', 'cannon', 'HMG', 'laser_gun', 'wall']
-    const buttonWidth = 80
-    const buttonHeight = 30
-    const gap = 10
-    const startX = -((buildingTypes.length * (buttonWidth + gap) - gap) / 2)
+    const buttonWidth = 70
+    const buttonHeight = 28
+    const gapX = 8
+    const gapY = 6
+
+    // 计算每行能放多少个按钮
+    const availableWidth = width - 20
+    const buttonsPerRow = Math.max(2, Math.floor(availableWidth / (buttonWidth + gapX)))
+    const rows = Math.ceil(buildingTypes.length / buttonsPerRow)
 
     buildingTypes.forEach((type, index) => {
-      const x = startX + index * (buttonWidth + gap) + buttonWidth / 2
+      const row = Math.floor(index / buttonsPerRow)
+      const col = index % buttonsPerRow
+      const buttonsInThisRow = Math.min(buttonsPerRow, buildingTypes.length - row * buttonsPerRow)
+
+      // 计算该行的起始 X 位置（居中）
+      const rowWidth = buttonsInThisRow * buttonWidth + (buttonsInThisRow - 1) * gapX
+      const rowStartX = -rowWidth / 2
+
+      const x = rowStartX + col * (buttonWidth + gapX) + buttonWidth / 2
+      const y = (row - (rows - 1) / 2) * (buttonHeight + gapY)
+
       const config = this.gameConfig.buildings[type]
 
       // 按钮背景
       const buttonColor = BUILDING_COLORS[type].primary
-      const button = this.add.rectangle(x, 0, buttonWidth, buttonHeight, buttonColor, 0.8)
+      const button = this.add.rectangle(x, y, buttonWidth, buttonHeight, buttonColor, 0.8)
       button.setStrokeStyle(2, 0xffffff)
       button.setInteractive({ useHandCursor: true })
 
@@ -899,9 +920,9 @@ export class Game extends Scene {
           ])
         }
         const panelX = width / 2
-        const panelY = height - 40
+        const panelY = height - 50
         const buttonScreenX = panelX + x
-        const buttonScreenY = panelY - buttonHeight / 2
+        const buttonScreenY = panelY + y - buttonHeight / 2
         this.showTooltip(tooltipText, buttonScreenX, buttonScreenY, 'panel')
       })
 
@@ -917,9 +938,9 @@ export class Game extends Scene {
 
       // 按钮文字（使用 i18n 翻译）
       const buildingName = this.t(`building_name_${type}`)
-      const text = this.add.text(x, 0, `${buildingName}\n$${config.cost}`, {
+      const text = this.add.text(x, y, `${buildingName}\n$${config.cost}`, {
         fontFamily: 'Arial',
-        fontSize: '10px',
+        fontSize: '9px',
         color: '#ffffff',
         align: 'center',
       })
@@ -935,7 +956,7 @@ export class Game extends Scene {
     const { width, height } = this.scale
 
     // 控制面板位于建筑面板下方
-    this.controlPanel = this.add.container(width / 2, height - 8)
+    this.controlPanel = this.add.container(width / 2, height - 10)
 
     const buttonWidth = 70
     const buttonHeight = 20

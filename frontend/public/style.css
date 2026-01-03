@@ -35,6 +35,11 @@
   --color-selected: #00ffff;
 }
 
+html {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
 body {
   margin: 0;
   padding: 0;
@@ -62,4 +67,34 @@ body {
 #game-container canvas {
   image-rendering: -webkit-optimize-contrast;
   image-rendering: crisp-edges;
+}
+
+#rotate-screen {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: var(--color-background);
+  z-index: 9999;
+  justify-content: center;
+  align-items: center;
+}
+
+#rotate-screen p {
+  color: var(--color-text);
+  font-size: 18px;
+  text-align: center;
+  padding: 20px;
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  #rotate-screen {
+    display: flex;
+  }
+
+  #app {
+    display: none;
+  }
 }

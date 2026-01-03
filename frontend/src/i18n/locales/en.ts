@@ -98,4 +98,7 @@ export const en: Record<MessageKey, string> = {
   toolbar_switch_to_english: 'Switch to English',
   toolbar_switch_to_chinese: '切换到中文',
   toolbar_view_leaderboard: 'View Leaderboard',
+
+  // 横屏提示
+  rotate_screen: 'Please rotate to portrait mode',
 } as const

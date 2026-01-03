@@ -96,6 +96,9 @@ export const zh = {
   toolbar_switch_to_english: 'Switch to English',
   toolbar_switch_to_chinese: '切换到中文',
   toolbar_view_leaderboard: '查看排行榜',
+
+  // 横屏提示
+  rotate_screen: '请旋转设备至竖屏模式',
 } as const
 
 export type MessageKey = keyof typeof zh
