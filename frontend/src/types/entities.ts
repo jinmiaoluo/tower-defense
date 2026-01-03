@@ -23,14 +23,14 @@ export interface IMonster {
   currentLife: number
   /** 移动速度（格子/帧） */
   readonly speed: number
-  /** 初始护盾值（每次攻击减少的伤害量） */
+  /** 护盾值（每次攻击减少的伤害量，静态值不递减） */
   readonly shield: number
-  /** 当前护盾值（随受击逐渐降低） */
-  currentShield: number
   /** 击杀奖励金钱 */
   readonly money: number
   /** 到达终点造成的伤害（从 config.monsters[type].damage 获取） */
   readonly damage: number
+  /** 碰撞半径（基于 damage 计算: floor(damage * 1.2)，范围 4-12） */
+  readonly radius: number
   /** 颜色（用于渲染，从 MonsterDisplayConfig 获取或随机生成） */
   readonly color: string
   /** 路径进度 (0-1) */
@@ -40,9 +40,9 @@ export interface IMonster {
 
   /**
    * 受到伤害，返回实际造成的伤害值
-   * 伤害计算: actualDamage = max(rawDamage - currentShield, rawDamage × 0.1)
+   * 伤害计算: actualDamage = max(rawDamage - shield, rawDamage × 0.1)
    * 最低伤害为原始伤害的 10%，保证高伤害武器打护盾怪更有效
-   * 每次受击后护盾值降低: currentShield = max(0, currentShield - 1)
+   * 与旧实现一致，shield 是静态值，不会随受击递减
    */
   takeDamage(rawDamage: number): number
 
