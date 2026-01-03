@@ -54,4 +54,16 @@ function handleClick(): void {
 .toggle-button:active {
   transform: scale(0.95);
 }
+
+@media (max-width: 480px) {
+  .toggle-button {
+    width: 44px;
+    height: 44px;
+  }
+
+  .toggle-button svg {
+    width: 20px;
+    height: 20px;
+  }
+}
 </style>

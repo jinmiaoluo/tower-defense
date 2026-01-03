@@ -161,8 +161,8 @@ defineExpose({
   border: 2px solid var(--color-border);
   border-radius: 12px;
   padding: 32px;
-  min-width: 360px;
-  max-width: 90%;
+  width: 90%;
+  max-width: 400px;
   text-align: center;
 }
 
@@ -320,5 +320,41 @@ defineExpose({
 
 .btn-secondary:hover:not(:disabled) {
   background: var(--color-border-light);
+}
+
+@media (max-width: 480px) {
+  .modal-content {
+    padding: 24px 16px;
+    border-radius: 8px;
+  }
+
+  .modal-title {
+    font-size: 28px;
+    margin-bottom: 16px;
+  }
+
+  .game-stats {
+    gap: 24px;
+    margin-bottom: 16px;
+  }
+
+  .stat-value {
+    font-size: 24px;
+  }
+
+  .button-group {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .btn {
+    width: 100%;
+    min-height: 44px;
+    padding: 12px 16px;
+  }
+
+  .input-group input {
+    min-height: 44px;
+  }
 }
 </style>

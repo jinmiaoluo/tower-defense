@@ -54,4 +54,15 @@ function handleToggle(): void {
   font-size: 14px;
   font-weight: bold;
 }
+
+@media (max-width: 480px) {
+  .toggle-button {
+    width: 44px;
+    height: 44px;
+  }
+
+  .locale-text {
+    font-size: 16px;
+  }
+}
 </style>

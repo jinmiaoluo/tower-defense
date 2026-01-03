@@ -161,4 +161,12 @@ onUnmounted(() => {
   display: flex;
   gap: 8px;
 }
+
+@media (max-width: 480px) {
+  .toolbar-container {
+    top: max(8px, env(safe-area-inset-top, 8px));
+    right: max(8px, env(safe-area-inset-right, 8px));
+    gap: 6px;
+  }
+}
 </style>

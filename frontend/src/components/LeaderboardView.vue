@@ -132,8 +132,8 @@ defineExpose({
   border: 2px solid var(--color-border);
   border-radius: 12px;
   padding: 24px;
-  min-width: 600px;
-  max-width: 90%;
+  width: 90%;
+  max-width: 600px;
   max-height: 80vh;
   display: flex;
   flex-direction: column;
@@ -320,5 +320,54 @@ defineExpose({
 .modal-leave-to .modal-content {
   opacity: 0;
   transform: scale(0.9) translateY(-20px);
+}
+
+@media (max-width: 480px) {
+  .modal-content {
+    padding: 16px;
+    border-radius: 8px;
+    max-height: 85vh;
+  }
+
+  .modal-title {
+    font-size: 22px;
+  }
+
+  .close-btn {
+    font-size: 28px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .list-header,
+  .list-item {
+    grid-template-columns: 40px 1fr 80px 50px;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .col-date {
+    display: none;
+  }
+
+  .col-score,
+  .col-waves {
+    font-size: 14px;
+  }
+
+  .medal {
+    width: 24px;
+    height: 24px;
+    font-size: 12px;
+  }
+
+  .btn {
+    min-height: 44px;
+    padding: 10px 20px;
+  }
+
+  .modal-footer {
+    margin-top: 16px;
+  }
 }
 </style>
