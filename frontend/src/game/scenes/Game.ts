@@ -1035,10 +1035,6 @@ export class Game extends Scene {
 
     let statusText = `${this.t('wave_info', [state.wave])} | ${this.t('panel_money_title')}${state.money} | ${this.t('panel_life_title')}${state.life} | ${this.t('panel_score_title')}${state.score} | ${this.t('panel_monster_title')}${aliveMonsters}`
 
-    if (state.isPaused) {
-      statusText += ` | ${this.t('paused')}`
-    }
-
     if (this.uiState.waveIntervalCounter > 0) {
       const secondsLeft = Math.ceil(this.uiState.waveIntervalCounter / 60)
       statusText += ` | ${this.t('next_wave_in', [secondsLeft])}`
