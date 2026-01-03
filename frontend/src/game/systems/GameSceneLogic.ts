@@ -21,8 +21,9 @@ import { createWaveManager, type WaveManager } from './WaveManager'
 import { createWaveRecorder, type WaveRecorder } from './WaveRecorder'
 import { createBuildingSystem, type BuildingSystem } from './BuildingSystem'
 import { createBulletSystem, type BulletSystem, type Rect } from './BulletSystem'
-import { createDamageSystem, type DamageSystem } from './DamageSystem'
-import { createEconomySystem, type EconomySystem } from './EconomySystem'
+// 注意: DamageSystem 的伤害计算在 Monster 实体的 takeDamage 方法中完成
+// 注意: EconomySystem 的生命奖励功能由服务端计算并通过 API 返回
+// 客户端在 Game.ts 中根据服务端响应的 lifeReward 应用奖励
 import { createMonster, type MonsterDependencies, type IMonsterRuntime } from '../entities/Monster'
 import { createBuilding, type BuildingDependencies, type IBuildingRuntime } from '../entities/Building'
 
@@ -88,11 +89,12 @@ export function createGameSceneLogic(config: GameConfig): GameSceneLogic {
   const waveManager = createWaveManager()
   const buildingSystem = createBuildingSystem(config)
   const bulletSystem = createBulletSystem()
-  const damageSystem = createDamageSystem()
-  const economySystem = createEconomySystem(config)
 
   // 波次记录器
   let waveRecorder = createWaveRecorder(0, 0)
+
+  // 累计分数（跨波次保持）
+  let accumulatedScore = 0
 
   // 游戏状态
   const state: GameState = {
@@ -309,6 +311,9 @@ export function createGameSceneLogic(config: GameConfig): GameSceneLogic {
     },
 
     startWave(waveConfig: WaveConfig): void {
+      // 保存之前波次的累计分数
+      accumulatedScore += waveRecorder.getResult().scoreGained
+
       state.wave = waveConfig.waveNumber
       waveRecorder = createWaveRecorder(waveConfig.waveNumber, state.frame)
       waveManager.reset()
@@ -446,8 +451,8 @@ export function createGameSceneLogic(config: GameConfig): GameSceneLogic {
       // 更新波次记录器的持续时间
       waveRecorder.setDuration(state.frame)
 
-      // 累计分数
-      state.score = waveRecorder.getResult().scoreGained
+      // 累计分数（之前波次 + 当前波次）
+      state.score = accumulatedScore + waveRecorder.getResult().scoreGained
     },
 
     togglePause(): void {
@@ -469,6 +474,9 @@ export function createGameSceneLogic(config: GameConfig): GameSceneLogic {
       monsters.length = 0
       buildings.length = 0
       buildingIdCounter = 0
+
+      // 重置累计分数
+      accumulatedScore = 0
 
       // 重置系统
       waveManager.reset()

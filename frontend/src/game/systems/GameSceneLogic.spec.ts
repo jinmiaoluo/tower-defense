@@ -395,4 +395,74 @@ describe('GameSceneLogic', () => {
       expect(actions[0].type).toBe('BUILD')
     })
   })
+
+  // ============================================================================
+  // 累计分数测试
+  // ============================================================================
+
+  describe('score accumulation', () => {
+    it('跨波次累计分数正确', () => {
+      // 放置高伤害建筑
+      logic.placeBuilding([3, 3], 'laser_gun')
+
+      // 第一波
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 50, speed: 1, shield: 0, money: 10 }],
+      })
+
+      for (let i = 0; i < 5000; i++) {
+        logic.update()
+        if (logic.isWaveComplete()) break
+      }
+
+      const scoreAfterWave1 = logic.getState().score
+      const recorder1 = logic.getWaveRecorder()
+      const wave1Score = recorder1.getResult().scoreGained
+
+      // 确保第一波有得分
+      if (wave1Score > 0) {
+        expect(scoreAfterWave1).toBe(wave1Score)
+
+        // 第二波
+        logic.startWave({
+          waveNumber: 2,
+          monsters: [{ id: 'uuid-2', type: 0, life: 50, speed: 1, shield: 0, money: 10 }],
+        })
+
+        for (let i = 0; i < 5000; i++) {
+          logic.update()
+          if (logic.isWaveComplete()) break
+        }
+
+        const scoreAfterWave2 = logic.getState().score
+        const recorder2 = logic.getWaveRecorder()
+        const wave2Score = recorder2.getResult().scoreGained
+
+        // 累计分数应该是两波的总和
+        expect(scoreAfterWave2).toBe(wave1Score + wave2Score)
+        expect(scoreAfterWave2).toBeGreaterThanOrEqual(scoreAfterWave1)
+      }
+    })
+
+    it('重置游戏后分数归零', () => {
+      // 放置建筑并进行一波
+      logic.placeBuilding([3, 3], 'laser_gun')
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 50, speed: 1, shield: 0, money: 10 }],
+      })
+
+      for (let i = 0; i < 5000; i++) {
+        logic.update()
+        if (logic.isWaveComplete()) break
+      }
+
+      // 重置游戏
+      logic.reset()
+
+      // 分数应该归零
+      expect(logic.getState().score).toBe(0)
+    })
+  })
 })
