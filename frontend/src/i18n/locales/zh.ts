@@ -48,6 +48,7 @@ export const zh = {
 
   // 怪物信息
   monster_info: '怪物: 生命 ${0}，防御 ${1}，速度 ${2}，伤害 ${3}',
+  monster_tooltip: '生命: ${0}/${1}\n护盾: ${2}\n速度: ${3}\n伤害: ${4}\n金币: ${5}',
 
   // 按钮文本
   button_upgrade_text: '升级',

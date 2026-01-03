@@ -50,6 +50,7 @@ export const en: Record<MessageKey, string> = {
 
   // 怪物信息
   monster_info: 'Monster: Life ${0}, Shield ${1}, Speed ${2}, Damage ${3}',
+  monster_tooltip: 'Life: ${0}/${1}\nShield: ${2}\nSpeed: ${3}\nDamage: ${4}\nGold: ${5}',
 
   // 按钮文本
   button_upgrade_text: 'Upgrade',

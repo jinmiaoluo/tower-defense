@@ -394,7 +394,7 @@ export class Game extends Scene {
       return
     }
 
-    // 检查怪物
+    // 检查怪物（包含血条区域）
     const monsters = this.logic.getMonsters()
     for (const monster of monsters) {
       if (!monster.isValid || monster.progress < 0) continue
@@ -402,16 +402,31 @@ export class Game extends Scene {
       const pos = monster.getPixelPosition()
       const monsterX = this.mapOffsetX + pos.x
       const monsterY = this.mapOffsetY + pos.y
+
+      // 检测怪物身体（圆形）
       const distance = Math.sqrt(
         Math.pow(screenX - monsterX, 2) + Math.pow(screenY - monsterY, 2),
       )
+      const isOverBody = distance <= monster.radius
 
-      if (distance <= monster.radius) {
-        const tooltipText = this.t('monster_info', [
+      // 检测血条区域（矩形：宽 22px，高约 20px，包含血条和可能的护盾条）
+      const healthBarWidth = 22
+      const healthBarHeight = 20
+      const healthBarY = monsterY - monster.radius - 12
+      const isOverHealthBar =
+        screenX >= monsterX - healthBarWidth / 2 &&
+        screenX <= monsterX + healthBarWidth / 2 &&
+        screenY >= healthBarY - healthBarHeight &&
+        screenY <= healthBarY + 4
+
+      if (isOverBody || isOverHealthBar) {
+        const tooltipText = this.t('monster_tooltip', [
           Math.ceil(monster.currentLife),
+          monster.maxLife,
           monster.shield ?? 0,
           monster.speed.toFixed(1),
           monster.damage,
+          monster.money,
         ])
         this.showTooltip(tooltipText, monsterX, monsterY - monster.radius)
         return
