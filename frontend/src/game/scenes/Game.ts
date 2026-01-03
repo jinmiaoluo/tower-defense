@@ -96,6 +96,13 @@ export class Game extends Scene {
   // 建筑面板按钮文字（用于语言切换时更新）
   private buildingPanelTexts: Phaser.GameObjects.Text[] = []
 
+  // 控制面板（暂停/重启按钮）
+  private controlPanel!: Phaser.GameObjects.Container
+  private pauseButton!: Phaser.GameObjects.Rectangle
+  private pauseButtonText!: Phaser.GameObjects.Text
+  private restartButton!: Phaser.GameObjects.Rectangle
+  private restartButtonText!: Phaser.GameObjects.Text
+
   constructor() {
     super('Game')
   }
@@ -164,6 +171,7 @@ export class Game extends Scene {
       this.renderMap()
       this.renderPath()
       this.createBuildingPanel()
+      this.createControlPanel()
 
       // 通知 Vue 场景已就绪
       EventBus.emit('current-scene-ready', this)
@@ -291,7 +299,7 @@ export class Game extends Scene {
 
     this.input.keyboard?.on('keydown-SPACE', () => {
       if (this.logic) {
-        this.logic.togglePause()
+        this.handlePauseClick()
       }
     })
 
@@ -891,6 +899,98 @@ export class Game extends Scene {
     })
   }
 
+  /** 创建控制面板（暂停/重启按钮） */
+  private createControlPanel() {
+    const { width, height } = this.scale
+
+    // 控制面板位于建筑面板下方
+    this.controlPanel = this.add.container(width / 2, height - 8)
+
+    const buttonWidth = 70
+    const buttonHeight = 20
+    const gap = 10
+
+    // 暂停按钮
+    const pauseX = -(buttonWidth + gap) / 2
+    this.pauseButton = this.add.rectangle(pauseX, 0, buttonWidth, buttonHeight, 0x4488ff, 0.8)
+    this.pauseButton.setStrokeStyle(1, 0xffffff)
+    this.pauseButton.setInteractive({ useHandCursor: true })
+
+    this.pauseButtonText = this.add.text(pauseX, 0, this.t('button_pause_text'), {
+      fontFamily: 'Arial',
+      fontSize: '11px',
+      color: '#ffffff',
+    })
+    this.pauseButtonText.setOrigin(0.5, 0.5)
+
+    this.pauseButton.on('pointerover', () => {
+      this.pauseButton.setFillStyle(0x4488ff, 1)
+    })
+
+    this.pauseButton.on('pointerout', () => {
+      this.pauseButton.setFillStyle(0x4488ff, 0.8)
+    })
+
+    this.pauseButton.on('pointerdown', () => {
+      this.handlePauseClick()
+    })
+
+    // 重启按钮（初始隐藏，仅在暂停时显示）
+    const restartX = (buttonWidth + gap) / 2
+    this.restartButton = this.add.rectangle(restartX, 0, buttonWidth, buttonHeight, 0xff6644, 0.8)
+    this.restartButton.setStrokeStyle(1, 0xffffff)
+    this.restartButton.setInteractive({ useHandCursor: true })
+    this.restartButton.setVisible(false)
+
+    this.restartButtonText = this.add.text(restartX, 0, this.t('button_restart_text'), {
+      fontFamily: 'Arial',
+      fontSize: '11px',
+      color: '#ffffff',
+    })
+    this.restartButtonText.setOrigin(0.5, 0.5)
+    this.restartButtonText.setVisible(false)
+
+    this.restartButton.on('pointerover', () => {
+      this.restartButton.setFillStyle(0xff6644, 1)
+    })
+
+    this.restartButton.on('pointerout', () => {
+      this.restartButton.setFillStyle(0xff6644, 0.8)
+    })
+
+    this.restartButton.on('pointerdown', () => {
+      this.restart()
+    })
+
+    this.controlPanel.add([
+      this.pauseButton,
+      this.pauseButtonText,
+      this.restartButton,
+      this.restartButtonText,
+    ])
+  }
+
+  /** 处理暂停按钮点击 */
+  private handlePauseClick() {
+    const state = this.logic.getState()
+
+    if (state.isPaused) {
+      // 当前是暂停状态，点击继续游戏
+      this.logic.togglePause()
+      this.pauseButtonText.setText(this.t('button_pause_text'))
+      this.restartButton.setVisible(false)
+      this.restartButtonText.setVisible(false)
+    } else {
+      // 当前是运行状态，点击暂停游戏
+      this.logic.togglePause()
+      this.pauseButtonText.setText(this.t('button_continue_text'))
+      this.restartButton.setVisible(true)
+      this.restartButtonText.setVisible(true)
+    }
+
+    EventBus.emit('game-paused', this.logic.getState().isPaused)
+  }
+
   /** 更新 UI 显示 */
   private updateUI() {
     if (this.uiState.isLoading) {
@@ -1056,6 +1156,11 @@ export class Game extends Scene {
     this.uiState.selectedBuildingType = null
     this.uiState.selectedBuildingId = null
     this.uiState.hoverPosition = null
+
+    // 重置控制面板状态
+    this.pauseButtonText.setText(this.t('button_pause_text'))
+    this.restartButton.setVisible(false)
+    this.restartButtonText.setVisible(false)
 
     // 清除渲染
     this.buildingGraphics.clear()
