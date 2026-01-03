@@ -206,11 +206,12 @@ export async function mockEndGame(request: GameEndRequest): Promise<GameEndRespo
 
 /**
  * GET /api/game/leaderboard - 获取排行榜
+ * @param limit 返回条数，默认 10，最大 100
  */
-export async function mockGetLeaderboard(): Promise<LeaderboardResponse> {
+export async function mockGetLeaderboard(limit: number = 10): Promise<LeaderboardResponse> {
   await delay()
 
-  const entries: LeaderboardEntry[] = [
+  const allEntries: LeaderboardEntry[] = [
     { rank: 1, nickname: 'ProPlayer', score: 99999, wavesCompleted: 100, createdAt: '2025-01-01T00:00:00Z' },
     { rank: 2, nickname: 'GameMaster', score: 88888, wavesCompleted: 90, createdAt: '2025-01-02T00:00:00Z' },
     { rank: 3, nickname: 'TowerKing', score: 77777, wavesCompleted: 80, createdAt: '2025-01-03T00:00:00Z' },
@@ -222,6 +223,8 @@ export async function mockGetLeaderboard(): Promise<LeaderboardResponse> {
     { rank: 9, nickname: 'Warrior', score: 11111, wavesCompleted: 20, createdAt: '2025-01-09T00:00:00Z' },
     { rank: 10, nickname: 'Rookie', score: 5000, wavesCompleted: 10, createdAt: '2025-01-10T00:00:00Z' },
   ]
+
+  const entries = allEntries.slice(0, Math.min(limit, 100))
 
   return { entries }
 }

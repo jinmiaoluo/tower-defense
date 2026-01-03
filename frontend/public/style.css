@@ -1,9 +1,47 @@
+:root {
+  /* 背景色 */
+  --color-background: #1a1a2e;
+  --color-background-secondary: #2a2a3e;
+  --color-background-tertiary: #3a3a4e;
+
+  /* 文本色 */
+  --color-text: rgba(255, 255, 255, 0.87);
+  --color-text-secondary: rgba(255, 255, 255, 0.6);
+  --color-text-muted: rgba(255, 255, 255, 0.38);
+
+  /* 边框色 */
+  --color-border: #4a4a6e;
+  --color-border-light: #5a5a7e;
+
+  /* 交互色 */
+  --color-primary: #4488ff;
+  --color-primary-hover: #5599ff;
+  --color-primary-active: #3377ee;
+
+  /* 状态色 */
+  --color-success: #00ff00;
+  --color-warning: #ffcc00;
+  --color-danger: #ff4444;
+  --color-info: #00ffff;
+
+  /* 游戏色 */
+  --color-grid-line: #444444;
+  --color-grid-fill: #2a2a3e;
+  --color-path: #3a3a5e;
+  --color-entrance: #00ff00;
+  --color-exit: #ff0000;
+  --color-hover-valid: #00ff00;
+  --color-hover-invalid: #ff0000;
+  --color-selected: #00ffff;
+}
+
 body {
   margin: 0;
   padding: 0;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #1a1a2e;
+  color: var(--color-text);
+  background-color: var(--color-background);
   font-family: Arial, Helvetica, sans-serif;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 #app {
@@ -19,4 +57,9 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
+}
+
+#game-container canvas {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
 }

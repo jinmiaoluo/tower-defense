@@ -83,6 +83,32 @@ Boot → Preloader → Game
 - **Preloader**: 加载游戏资源，显示进度条
 - **Game**: 游戏主逻辑
 
+## 环境变量配置
+
+复制 `.env.example` 创建环境变量文件：
+
+```bash
+cp .env.example .env.development.local
+```
+
+可用的环境变量：
+
+- `VITE_USE_MOCK` - 是否使用 Mock API（`true`/`false`）
+- `VITE_API_BASE_URL` - 真实 API 基础路径
+
+开发环境（Mock 模式）：
+
+```bash
+VITE_USE_MOCK=true
+```
+
+生产环境（真实 API）：
+
+```bash
+VITE_USE_MOCK=false
+VITE_API_BASE_URL=/api/game
+```
+
 ## 开发指南
 
 详细开发文档请参考：
