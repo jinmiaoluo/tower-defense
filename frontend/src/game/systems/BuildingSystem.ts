@@ -196,7 +196,14 @@ export function createBuildingSystem(config: GameConfig): BuildingSystem {
 
   /**
    * 获取攻击间隔帧数
-   * 公式: frames = max(FPS / speed, 1)
+   * 参考旧实现 td-obj-building.js:168
+   * 旧公式: floor(max(2 / (speed * global_speed), 1))
+   * 其中 global_speed = 0.1，简化为 floor(20 / speed)
+   *
+   * 由于帧率差异（旧 24 FPS，新 60 FPS），需要乘以帧率比例
+   * 新公式: floor(max(2 / (speed * global_speed) * (60 / 24), 1))
+   *       = floor(max(20 / speed * 2.5, 1))
+   *       = floor(max(50 / speed, 1))
    */
   function getAttackSpeedFrames(type: BuildingType): number {
     const buildingConfig = buildings[type]
@@ -206,7 +213,13 @@ export function createBuildingSystem(config: GameConfig): BuildingSystem {
       return Infinity
     }
 
-    return Math.max(Math.floor(GAME_CONSTANTS.FPS / speed), 1)
+    // 旧实现基础攻击间隔：2 / (speed * GLOBAL_SPEED) = 20 / speed 帧（24 FPS）
+    // 换算到 60 FPS：乘以帧率比例 60 / 24 = 2.5
+    const OLD_FPS = 24
+    const baseInterval = 2 / (speed * GAME_CONSTANTS.GLOBAL_SPEED)
+    const scaledInterval = baseInterval * (GAME_CONSTANTS.FPS / OLD_FPS)
+
+    return Math.max(Math.floor(scaledInterval), 1)
   }
 
   /**

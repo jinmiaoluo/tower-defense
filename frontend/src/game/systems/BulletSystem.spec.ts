@@ -144,7 +144,7 @@ describe('BulletSystem', () => {
         building,
         target,
         damage: 12,
-        speed: 10, // 配置值，实际速度 = 10 × 20 = 200 像素/帧
+        speed: 10, // 配置值，实际速度 = 10 × 20 × 0.1 = 20 像素/帧
         startX: 16, // 格子中心
         startY: 16,
         targetX: 3 * 32 + 16, // 112
@@ -152,11 +152,11 @@ describe('BulletSystem', () => {
       })
 
       // 方向向量 (96, 128)，长度 160
-      // 实际速度 = 10 × 20 = 200
-      // vx = 96 * 200 / 160 = 120
-      // vy = 128 * 200 / 160 = 160
-      expect(bullet.vx).toBeCloseTo(120)
-      expect(bullet.vy).toBeCloseTo(160)
+      // 实际速度 = 10 × 20 × 0.1 = 20 (旧实现: 20 * speed * global_speed)
+      // vx = 96 * 20 / 160 = 12
+      // vy = 128 * 20 / 160 = 16
+      expect(bullet.vx).toBeCloseTo(12)
+      expect(bullet.vy).toBeCloseTo(16)
     })
 
     it('应记录原始目标信息', () => {
@@ -349,7 +349,7 @@ describe('BulletSystem', () => {
       })
 
       // 子弹朝 (10, 10) 飞行，使用较慢速度以便测试
-      // speed=1 表示实际速度 = 1 × 20 = 20 像素/帧
+      // speed=1 表示实际速度 = 1 × 20 × 0.1 = 2 像素/帧
       bulletSystem.createBullet({
         building,
         target: originalTarget,

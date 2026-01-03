@@ -9,12 +9,12 @@ import type { IWaveRecorder } from '@/types/recorder'
 import type { Position } from '@/types'
 import { GAME_CONSTANTS } from '@/types'
 
-const { GRID_SIZE } = GAME_CONSTANTS
+const { GRID_SIZE, GLOBAL_SPEED } = GAME_CONSTANTS
 
 /**
  * 子弹速度因子
  * 旧实现中：speed = 20 * this.speed * TD.global_speed
- * 配置值（如 bullet_speed: 6）需要乘以此因子才是实际像素速度
+ * 其中 global_speed = 0.1，所以实际公式为: 20 * bullet_speed * 0.1 = 2 * bullet_speed
  */
 const BULLET_SPEED_FACTOR = 20
 
@@ -168,9 +168,10 @@ export function createBulletSystem(): BulletSystem {
       const dy = targetY - startY
       const distance = Math.sqrt(dx * dx + dy * dy)
 
-      // 计算实际像素速度（配置值 × 速度因子）
-      // 旧实现: speed = 20 * this.speed * TD.global_speed
-      const actualSpeed = speed * BULLET_SPEED_FACTOR
+      // 计算实际像素速度
+      // 旧实现: speed = 20 * this.speed * TD.global_speed (global_speed = 0.1)
+      // 等价于: 20 * bullet_speed * 0.1 = 2 * bullet_speed
+      const actualSpeed = speed * BULLET_SPEED_FACTOR * GLOBAL_SPEED
 
       // 计算速度分量（如果距离为 0，默认向右）
       let vx: number, vy: number

@@ -358,16 +358,23 @@ describe('BuildingSystem', () => {
 
   // ============================================================================
   // getAttackSpeedFrames - 攻击间隔帧数
+  // 参考旧实现 td-obj-building.js:168
+  // 旧公式: floor(max(2 / (speed * global_speed), 1)) 帧（24 FPS）
+  // 新公式: floor(max(2 / (speed * 0.1) * (60 / 24), 1)) = floor(50 / speed)
   // ============================================================================
 
   describe('getAttackSpeedFrames', () => {
-    it('根据 speed 计算攻击间隔帧数', () => {
-      // 60 FPS 下，speed=2 表示每秒攻击 2 次，间隔 30 帧
-      expect(system.getAttackSpeedFrames('cannon')).toBe(30)
-      // speed=3 表示每秒攻击 3 次，间隔 20 帧
-      expect(system.getAttackSpeedFrames('LMG')).toBe(20)
-      // speed=20 表示每秒攻击 20 次，间隔 3 帧
-      expect(system.getAttackSpeedFrames('laser_gun')).toBe(3)
+    it('根据旧实现公式计算攻击间隔帧数（保持相同攻击频率）', () => {
+      // 旧实现: 2 / (speed * 0.1) = 20 / speed 帧（24 FPS）
+      // 新实现: 乘以帧率比例 60/24 = 2.5，即 50 / speed 帧（60 FPS）
+      // cannon speed=2: floor(50 / 2) = 25 帧
+      expect(system.getAttackSpeedFrames('cannon')).toBe(25)
+      // LMG speed=3: floor(50 / 3) = 16 帧
+      expect(system.getAttackSpeedFrames('LMG')).toBe(16)
+      // HMG speed=3: floor(50 / 3) = 16 帧
+      expect(system.getAttackSpeedFrames('HMG')).toBe(16)
+      // laser_gun speed=20: floor(50 / 20) = 2 帧
+      expect(system.getAttackSpeedFrames('laser_gun')).toBe(2)
     })
 
     it('wall 没有攻击速度，返回 Infinity', () => {
@@ -378,6 +385,21 @@ describe('BuildingSystem', () => {
       // 即使 speed 很高，间隔也至少 1 帧
       const frames = system.getAttackSpeedFrames('laser_gun')
       expect(frames).toBeGreaterThanOrEqual(1)
+    })
+
+    it('攻击频率与旧实现保持一致', () => {
+      // 验证攻击间隔时间（秒）与旧实现一致
+      // 旧实现 24 FPS: cannon 10 帧 = 0.417 秒
+      // 新实现 60 FPS: cannon 25 帧 = 0.417 秒
+      const cannonFrames = system.getAttackSpeedFrames('cannon')
+      const cannonSeconds = cannonFrames / 60
+      expect(cannonSeconds).toBeCloseTo(0.417, 2)
+
+      // 旧实现 24 FPS: LMG 6 帧 = 0.25 秒
+      // 新实现 60 FPS: LMG 16 帧 = 0.267 秒（略有差异是因为取整）
+      const lmgFrames = system.getAttackSpeedFrames('LMG')
+      const lmgSeconds = lmgFrames / 60
+      expect(lmgSeconds).toBeCloseTo(0.25, 1)
     })
   })
 
