@@ -98,6 +98,12 @@ export const GAME_CONSTANTS = {
   MONSTER_SPAWN_INTERVAL_FRAMES: 30,
   /** 全局速度系数（参考旧实现 TD.global_speed = 0.1） */
   GLOBAL_SPEED: 0.1,
+  /** 得分系数 - 波次奖励 = 完成波次 × 10 */
+  SCORE_WAVE_COEFFICIENT: 10,
+  /** 得分系数 - 生命奖励 = 剩余生命 × 5 */
+  SCORE_LIFE_COEFFICIENT: 5,
+  /** 得分系数 - 金币奖励 = floor(剩余金币 × 0.1) */
+  SCORE_MONEY_COEFFICIENT: 0.1,
 } as const
 
 /** 建筑类型数组（用于 UI 展示顺序） */
