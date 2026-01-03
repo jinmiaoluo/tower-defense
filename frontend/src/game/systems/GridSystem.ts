@@ -5,7 +5,7 @@
  */
 
 import type { MapConfig, Position } from '@/types'
-import type { GridCell } from '@/types/entities'
+import type { GridCell, MapState } from '@/types/entities'
 import { createPathSystem } from './PathSystem'
 
 /** GridSystem 接口定义 */
@@ -45,6 +45,15 @@ export interface GridSystem {
 
   /** 获取当前地图配置（障碍物包含建筑） */
   getMapConfig(): MapConfig
+
+  /** 获取当前地图状态快照（用于 IGameScene.map） */
+  getMapState(): MapState
+
+  /** 获取入口位置 */
+  getEntrance(): Position
+
+  /** 获取出口位置 */
+  getExit(): Position
 }
 
 /**
@@ -243,6 +252,23 @@ export function createGridSystem(mapConfig: MapConfig): GridSystem {
 
     getMapConfig(): MapConfig {
       return getMapConfigWithBuildings()
+    },
+
+    getMapState(): MapState {
+      return {
+        width,
+        height,
+        cells,
+        cachedPath,
+      }
+    },
+
+    getEntrance(): Position {
+      return entrance
+    },
+
+    getExit(): Position {
+      return exit
     },
   }
 }

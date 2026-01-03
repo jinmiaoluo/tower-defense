@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { GridSystem, createGridSystem } from './GridSystem'
 import type { MapConfig, Position } from '@/types'
-import type { GridCell } from '@/types/entities'
+import type { GridCell, MapState } from '@/types/entities'
 
 describe('GridSystem', () => {
   let gridSystem: GridSystem
@@ -327,6 +327,125 @@ describe('GridSystem', () => {
       expect(config.exit).toEqual([4, 4])
       expect(config.obstacles).toContainEqual([2, 2]) // 原始障碍物
       expect(config.obstacles).toContainEqual([1, 1]) // 建筑
+    })
+  })
+
+  // ============================================================================
+  // getMapState 测试 - MapState 数据快照
+  // ============================================================================
+
+  describe('getMapState', () => {
+    it('应该返回符合 MapState 接口的对象', () => {
+      const mapState = gridSystem.getMapState()
+
+      expect(mapState).toBeDefined()
+      expect(typeof mapState.width).toBe('number')
+      expect(typeof mapState.height).toBe('number')
+      expect(Array.isArray(mapState.cells)).toBe(true)
+      // cachedPath 可以是 Position[] 或 null
+      expect(mapState.cachedPath === null || Array.isArray(mapState.cachedPath)).toBe(true)
+    })
+
+    it('应该返回正确的地图尺寸', () => {
+      const mapState = gridSystem.getMapState()
+
+      expect(mapState.width).toBe(5)
+      expect(mapState.height).toBe(5)
+    })
+
+    it('应该返回正确的格子二维数组', () => {
+      const mapState = gridSystem.getMapState()
+
+      expect(mapState.cells.length).toBe(5) // height
+      expect(mapState.cells[0].length).toBe(5) // width
+
+      // 验证入口格子
+      expect(mapState.cells[0][0].isEntrance).toBe(true)
+      // 验证出口格子
+      expect(mapState.cells[4][4].isExit).toBe(true)
+      // 验证障碍物格子
+      expect(mapState.cells[2][2].isObstacle).toBe(true)
+    })
+
+    it('应该返回当前缓存的路径', () => {
+      const mapState = gridSystem.getMapState()
+
+      expect(mapState.cachedPath).not.toBeNull()
+      expect(mapState.cachedPath!.length).toBeGreaterThan(0)
+      expect(mapState.cachedPath![0]).toEqual([0, 0]) // 起点
+      expect(mapState.cachedPath![mapState.cachedPath!.length - 1]).toEqual([4, 4]) // 终点
+    })
+
+    it('放置建筑后 MapState 应该反映最新状态', () => {
+      gridSystem.placeBuilding([1, 1], 'b-001')
+      const mapState = gridSystem.getMapState()
+
+      // 格子状态应该更新
+      expect(mapState.cells[1][1].buildingId).toBe('b-001')
+      expect(mapState.cells[1][1].isPassable).toBe(false)
+
+      // 路径应该更新（不经过建筑）
+      const hasBuilding = mapState.cachedPath!.some((p) => p[0] === 1 && p[1] === 1)
+      expect(hasBuilding).toBe(false)
+    })
+
+    it('移除建筑后 MapState 应该反映最新状态', () => {
+      gridSystem.placeBuilding([1, 1], 'b-001')
+      gridSystem.removeBuilding([1, 1])
+      const mapState = gridSystem.getMapState()
+
+      // 格子状态应该恢复
+      expect(mapState.cells[1][1].buildingId).toBeNull()
+      expect(mapState.cells[1][1].isPassable).toBe(true)
+    })
+
+    it('返回的是实时视图而非快照（状态变化会反映到已获取的对象）', () => {
+      const mapState = gridSystem.getMapState()
+
+      // 放置建筑前
+      expect(mapState.cells[1][1].buildingId).toBeNull()
+
+      // 放置建筑
+      gridSystem.placeBuilding([1, 1], 'b-001')
+
+      // 状态变化会反映到同一个 mapState 对象（视图语义）
+      expect(mapState.cells[1][1].buildingId).toBe('b-001')
+    })
+  })
+
+  // ============================================================================
+  // getEntrance / getExit 测试 - 便捷访问入口/出口位置
+  // ============================================================================
+
+  describe('getEntrance', () => {
+    it('应该返回入口位置', () => {
+      const entrance = gridSystem.getEntrance()
+      expect(entrance).toEqual([0, 0])
+    })
+
+    it('返回的位置应该与 cells 中标记的入口一致', () => {
+      const entrance = gridSystem.getEntrance()
+      const cell = gridSystem.getCell(entrance)
+      expect(cell!.isEntrance).toBe(true)
+    })
+  })
+
+  describe('getExit', () => {
+    it('应该返回出口位置', () => {
+      const exit = gridSystem.getExit()
+      expect(exit).toEqual([4, 4])
+    })
+
+    it('返回的位置应该与 cells 中标记的出口一致', () => {
+      const exit = gridSystem.getExit()
+      const cell = gridSystem.getCell(exit)
+      expect(cell!.isExit).toBe(true)
+    })
+
+    it('返回的位置应该与路径终点一致', () => {
+      const exit = gridSystem.getExit()
+      const path = gridSystem.getCurrentPath()
+      expect(exit).toEqual(path[path.length - 1])
     })
   })
 })
