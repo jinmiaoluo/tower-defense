@@ -28,10 +28,18 @@ export interface BuildingConfig {
   cost: number
   /** 基础伤害（wall 为 0） */
   damage: number
-  /** 攻击范围（格子数） */
+  /** 最小攻击范围（格子数） */
   range: number
-  /** 攻击间隔（帧数，越小攻击越快） */
+  /** 最大攻击范围（格子数，升级可扩展到此值） */
+  max_range: number
+  /** 攻击速度（越高攻击越快，wall 为 0） */
   speed: number
+  /** 子弹速度（laser_gun 为 0，即时命中） */
+  bullet_speed: number
+  /** 建筑生命值 */
+  life: number
+  /** 建筑护盾值 */
+  shield: number
   /** 升级成本比例（默认 0.75） */
   upgradeCostRatio: number
   /** 出售回收比例（默认 0.5） */
