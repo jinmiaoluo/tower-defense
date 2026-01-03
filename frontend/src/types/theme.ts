@@ -62,6 +62,9 @@ export interface GameColors {
   hoverInvalid: number
   selected: number
 
+  // 攻击范围虚线
+  rangeDash: number
+
   // UI 文本
   uiText: string
 }

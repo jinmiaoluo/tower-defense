@@ -53,6 +53,7 @@ export const darkTheme: ThemeConfig = {
     hoverValid: 0x00ff00,
     hoverInvalid: 0xff0000,
     selected: 0x00ffff,
+    rangeDash: 0xffffff,
     uiText: '#ffffff',
   },
 }
@@ -106,6 +107,7 @@ export const lightTheme: ThemeConfig = {
     hoverValid: 0x00aa00,
     hoverInvalid: 0xcc0000,
     selected: 0x0088aa,
+    rangeDash: 0x000000,
     uiText: '#333333',
   },
 }

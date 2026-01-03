@@ -25,6 +25,7 @@ import {
 import { getTranslator } from '@/i18n'
 import { getTheme, darkTheme } from '@/theme'
 import { STORAGE_KEY as THEME_STORAGE_KEY, type ResolvedTheme as ThemeType } from '@/types/theme'
+import { isMobileDevice } from '@/utils/device'
 
 const { GRID_SIZE } = GAME_CONSTANTS
 
@@ -39,6 +40,7 @@ interface UIState {
   selectedBuildingType: BuildingType | null
   selectedBuildingId: string | null
   hoverPosition: Position | null
+  mobilePreviewPosition: Position | null
 }
 
 /** 提示消息持续时间 (毫秒) */
@@ -92,6 +94,9 @@ export class Game extends Scene {
 
   // 当前主题颜色（从 localStorage 读取初始主题）
   private gameColors: GameColors = this.getInitialThemeColors()
+
+  // 移动设备标识
+  private isMobile: boolean = isMobileDevice()
 
   // 建筑面板按钮文字（用于语言切换时更新）
   private buildingPanelTexts: Phaser.GameObjects.Text[] = []
@@ -191,6 +196,7 @@ export class Game extends Scene {
       selectedBuildingType: null,
       selectedBuildingId: null,
       hoverPosition: null,
+      mobilePreviewPosition: null,
     }
   }
 
@@ -245,7 +251,17 @@ export class Game extends Scene {
 
       // 如果选中了建筑类型，尝试放置
       if (this.uiState.selectedBuildingType) {
-        this.tryPlaceBuilding(gridPos)
+        if (this.isMobile) {
+          const preview = this.uiState.mobilePreviewPosition
+          if (preview && preview[0] === gridPos[0] && preview[1] === gridPos[1]) {
+            this.tryPlaceBuilding(gridPos)
+            this.uiState.mobilePreviewPosition = null
+          } else {
+            this.uiState.mobilePreviewPosition = gridPos
+          }
+        } else {
+          this.tryPlaceBuilding(gridPos)
+        }
         return
       }
 
@@ -377,6 +393,33 @@ export class Game extends Scene {
     this.restartButtonText.setText(this.t('button_restart_text'))
   }
 
+  /** 绘制虚线圆 */
+  private strokeDashedCircle(
+    g: Phaser.GameObjects.Graphics,
+    x: number,
+    y: number,
+    radius: number,
+    color: number,
+    alpha: number,
+    dashLength: number = 8,
+    gapLength: number = 6,
+  ) {
+    const circumference = 2 * Math.PI * radius
+    const totalLength = dashLength + gapLength
+    const segments = Math.floor(circumference / totalLength)
+    const dashAngle = (dashLength / circumference) * 2 * Math.PI
+    const gapAngle = (gapLength / circumference) * 2 * Math.PI
+
+    g.lineStyle(1, color, alpha)
+    for (let i = 0; i < segments; i++) {
+      const startAngle = i * (dashAngle + gapAngle)
+      const endAngle = startAngle + dashAngle
+      g.beginPath()
+      g.arc(x, y, radius, startAngle, endAngle, false)
+      g.strokePath()
+    }
+  }
+
   /** 屏幕坐标转格子坐标 */
   private screenToGrid(x: number, y: number): Position | null {
     const gx = Math.floor((x - this.mapOffsetX) / GRID_SIZE)
@@ -461,6 +504,7 @@ export class Game extends Scene {
   selectBuildingType(type: BuildingType | null) {
     this.uiState.selectedBuildingType = type
     this.uiState.selectedBuildingId = null
+    this.uiState.mobilePreviewPosition = null
     EventBus.emit('building-type-selected', type)
   }
 
@@ -701,18 +745,24 @@ export class Game extends Scene {
     const colors = this.getColors()
     g.clear()
 
-    if (
-      !this.uiState.selectedBuildingType ||
-      !this.uiState.hoverPosition
-    ) {
+    if (!this.uiState.selectedBuildingType) {
       return
     }
 
-    const [hx, hy] = this.uiState.hoverPosition
+    // 移动端使用 mobilePreviewPosition，PC 端使用 hoverPosition
+    const previewPos = this.isMobile
+      ? this.uiState.mobilePreviewPosition
+      : this.uiState.hoverPosition
+
+    if (!previewPos) {
+      return
+    }
+
+    const [hx, hy] = previewPos
     const px = this.mapOffsetX + hx * GRID_SIZE
     const py = this.mapOffsetY + hy * GRID_SIZE
 
-    const canPlace = this.logic.canPlaceBuilding(this.uiState.hoverPosition)
+    const canPlace = this.logic.canPlaceBuilding(previewPos)
     const color = canPlace ? colors.hoverValid : colors.hoverInvalid
 
     // 预览建筑
@@ -722,15 +772,14 @@ export class Game extends Scene {
     g.lineStyle(2, color, 0.8)
     g.strokeRect(px + 4, py + 4, GRID_SIZE - 8, GRID_SIZE - 8)
 
-    // 射程预览
+    // 射程预览（虚线圆）
     if (this.uiState.selectedBuildingType !== 'wall') {
       const buildingConfig = this.gameConfig.buildings[this.uiState.selectedBuildingType]
       const range = buildingConfig.range * GRID_SIZE
       const centerX = px + GRID_SIZE / 2
       const centerY = py + GRID_SIZE / 2
 
-      g.lineStyle(1, color, 0.3)
-      g.strokeCircle(centerX, centerY, range)
+      this.strokeDashedCircle(g, centerX, centerY, range, colors.rangeDash, 0.6)
     }
   }
 
@@ -1204,6 +1253,7 @@ export class Game extends Scene {
     this.uiState.selectedBuildingType = null
     this.uiState.selectedBuildingId = null
     this.uiState.hoverPosition = null
+    this.uiState.mobilePreviewPosition = null
 
     // 重置控制面板状态
     this.pauseButtonText.setText(this.t('button_pause_text'))
