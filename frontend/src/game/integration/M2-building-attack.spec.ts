@@ -841,11 +841,11 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
       const largeMonsterDeps = createMonsterDeps(largeGridSystem, pathSystem)
       const buildingDeps = createBuildingDeps(buildingSystem)
 
-      // 激光枪射程 6-10，放在 [8, 0] 可以打到 [8, 8] 路径点（距离 8）
+      // 激光枪 level=1 射程为 6，放在 [8, 4] 可以打到 [8, 8] 路径点（距离 4）
       const building = createBuilding({
         id: 'laser-001',
         type: 'laser_gun',
-        position: [8, 0],
+        position: [8, 4],
         level: 1,
       }, buildingDeps) as IBuilding & IBuildingRuntime
 
@@ -867,7 +867,7 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
       for (let i = 0; i < path.length; i++) {
         monster.progress = i / (path.length - 1)
         const pos = monster.getGridPosition()
-        if (buildingSystem.isInRange({ type: 'laser_gun', level: 1, position: [8, 0] }, pos)) {
+        if (buildingSystem.isInRange({ type: 'laser_gun', level: 1, position: [8, 4] }, pos)) {
           foundInRange = true
           break
         }

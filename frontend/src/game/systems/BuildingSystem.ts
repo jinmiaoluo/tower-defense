@@ -156,7 +156,8 @@ export function createBuildingSystem(config: GameConfig): BuildingSystem {
 
   /**
    * 计算指定等级的射程
-   * 公式: range = min(baseRange × level^0.1, maxRange)
+   * 公式: range = min(baseRange × 1.2^(level-1), maxRange)
+   * 参考旧实现: td-obj-building.js:258-289，使用默认升级规则每级 ×1.2
    */
   function getRangeAtLevel(type: BuildingType, level: number): number {
     const buildingConfig = buildings[type]
@@ -166,17 +167,20 @@ export function createBuildingSystem(config: GameConfig): BuildingSystem {
       return 0
     }
 
-    const levelFactor = Math.pow(level, 0.1)
-    const calculatedRange = range * levelFactor
-    return Math.min(Math.floor(calculatedRange), max_range)
+    // 逐级计算：每级 × 1.2，与伤害升级规则一致
+    let currentRange = range
+    for (let i = 1; i < level; i++) {
+      currentRange = currentRange * 1.2
+    }
+    return Math.min(Math.floor(currentRange), max_range)
   }
 
   /**
    * 检查目标是否在射程内
-   * 射程规则:
-   * - range: 最小射程（太近无法攻击）
-   * - max_range: 最大射程（太远无法攻击）
-   * - 实际射程会随等级提升
+   * 射程规则（参考旧实现 td-obj-building.js:187-204）:
+   * - range: 初始射程（1 级时的值）
+   * - max_range: 射程升级上限
+   * - 无最小射程限制，建筑可攻击 0 到当前射程内的任意目标
    */
   function isInRange(building: BuildingForRangeCheck, targetPos: Position): boolean {
     const { type, level, position } = building
@@ -187,11 +191,10 @@ export function createBuildingSystem(config: GameConfig): BuildingSystem {
     }
 
     const distance = calculateDistance(position, targetPos)
-    const levelFactor = Math.pow(level, 0.1)
-    const minRange = buildingConfig.range * levelFactor
-    const maxRange = Math.min(buildingConfig.max_range * levelFactor, buildingConfig.max_range)
+    const currentRange = getRangeAtLevel(type, level)
 
-    return distance >= minRange && distance <= maxRange
+    // 只检查最大射程，无最小射程限制
+    return distance <= currentRange
   }
 
   /**

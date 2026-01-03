@@ -239,6 +239,7 @@ describe('BuildingSystem', () => {
 
   // ============================================================================
   // getRangeAtLevel - 等级射程计算
+  // 参考旧实现 td-obj-building.js:258-289，使用默认升级规则每级 ×1.2
   // ============================================================================
 
   describe('getRangeAtLevel', () => {
@@ -252,56 +253,60 @@ describe('BuildingSystem', () => {
       expect(system.getRangeAtLevel('wall', 10)).toBe(0)
     })
 
-    it('射程随等级增加（level ** 0.1 倍率）', () => {
-      // 2 级射程 = floor(4 * 2^0.1) = floor(4 * 1.0718) = 4
-      const range2 = system.getRangeAtLevel('cannon', 2)
-      // 10 级射程 = floor(4 * 10^0.1) = floor(4 * 1.2589) = 5
-      const range10 = system.getRangeAtLevel('cannon', 10)
-      expect(range10).toBeGreaterThan(range2)
+    it('射程随等级增加（每级 × 1.2）', () => {
+      // 2 级射程 = floor(4 * 1.2) = 4
+      expect(system.getRangeAtLevel('cannon', 2)).toBe(4)
+      // 3 级射程 = floor(4.8 * 1.2) = floor(5.76) = 5
+      expect(system.getRangeAtLevel('cannon', 3)).toBe(5)
+      // 4 级射程 = floor(5.76 * 1.2) = floor(6.91) = 6
+      expect(system.getRangeAtLevel('cannon', 4)).toBe(6)
     })
 
     it('射程不超过 max_range', () => {
       // cannon max_range 是 8，即使等级很高也不能超过
-      const range = system.getRangeAtLevel('cannon', 100)
-      expect(range).toBeLessThanOrEqual(8)
+      // 6 级射程 = floor(4 * 1.2^5) = floor(9.95) = 9，受 max_range=8 限制 -> 8
+      expect(system.getRangeAtLevel('cannon', 6)).toBe(8)
+      // 更高等级仍然受限
+      expect(system.getRangeAtLevel('cannon', 100)).toBe(8)
     })
   })
 
   // ============================================================================
   // isInRange - 射程验证
+  // 参考旧实现 td-obj-building.js:187-204，无最小射程限制
   // ============================================================================
 
   describe('isInRange', () => {
-    it('目标在最小射程到最大射程内返回 true', () => {
+    it('目标在射程内返回 true', () => {
       const building: BuildingForRangeCheck = {
         type: 'cannon',
         level: 1,
         position: [5, 5],
       }
-      // cannon 1 级射程 4-8，检查距离 5 的目标
-      const target: Position = [5, 10] // 距离 5
+      // cannon 1 级射程 4，检查距离 3 的目标
+      const target: Position = [5, 8] // 距离 3
       expect(system.isInRange(building, target)).toBe(true)
     })
 
-    it('目标太近（小于 range）返回 false', () => {
+    it('目标距离为 0 也在射程内（无最小射程）', () => {
       const building: BuildingForRangeCheck = {
         type: 'cannon',
         level: 1,
         position: [5, 5],
       }
-      // cannon 1 级最小射程 4，检查距离 2 的目标
-      const target: Position = [5, 7] // 距离 2
-      expect(system.isInRange(building, target)).toBe(false)
+      // 目标与建筑重叠
+      const target: Position = [5, 5] // 距离 0
+      expect(system.isInRange(building, target)).toBe(true)
     })
 
-    it('目标太远（大于 max_range）返回 false', () => {
+    it('目标太远（大于当前射程）返回 false', () => {
       const building: BuildingForRangeCheck = {
         type: 'cannon',
         level: 1,
         position: [5, 5],
       }
-      // cannon 1 级最大射程 8，检查距离 10 的目标
-      const target: Position = [5, 15] // 距离 10
+      // cannon 1 级射程 4，检查距离 5 的目标
+      const target: Position = [5, 10] // 距离 5
       expect(system.isInRange(building, target)).toBe(false)
     })
 
@@ -321,38 +326,37 @@ describe('BuildingSystem', () => {
         level: 1,
         position: [5, 5],
       }
-      const building10: BuildingForRangeCheck = {
+      const building6: BuildingForRangeCheck = {
         type: 'cannon',
-        level: 10,
+        level: 6,
         position: [5, 5],
       }
-      // 某个距离在 1 级时超出射程，但在 10 级时在射程内
-      const target: Position = [5, 13] // 距离 8
-      // 1 级 max_range = 8, level^0.1 = 1，所以 8 刚好是边界
-      expect(system.isInRange(building1, target)).toBe(true)
-      expect(system.isInRange(building10, target)).toBe(true)
+      // 距离 7 在 1 级时超出射程（射程 4），但在 6 级时在射程内（射程 8）
+      const target: Position = [5, 12] // 距离 7
+      expect(system.isInRange(building1, target)).toBe(false)
+      expect(system.isInRange(building6, target)).toBe(true)
     })
 
-    it('边界情况：目标刚好在最小射程上', () => {
+    it('边界情况：目标刚好在射程边界上', () => {
       const building: BuildingForRangeCheck = {
         type: 'cannon',
         level: 1,
         position: [5, 5],
       }
-      // cannon 1 级最小射程 4
+      // cannon 1 级射程 4
       const target: Position = [5, 9] // 距离 4
       expect(system.isInRange(building, target)).toBe(true)
     })
 
-    it('边界情况：目标刚好在最大射程上', () => {
+    it('边界情况：目标刚好超出射程', () => {
       const building: BuildingForRangeCheck = {
         type: 'cannon',
         level: 1,
         position: [5, 5],
       }
-      // cannon 1 级最大射程 8
-      const target: Position = [5, 13] // 距离 8
-      expect(system.isInRange(building, target)).toBe(true)
+      // cannon 1 级射程 4，距离 4.1 超出
+      const target: Position = [5, 9.1] // 距离 4.1
+      expect(system.isInRange(building, target)).toBe(false)
     })
   })
 
