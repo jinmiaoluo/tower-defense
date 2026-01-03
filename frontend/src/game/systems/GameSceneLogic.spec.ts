@@ -397,6 +397,150 @@ describe('GameSceneLogic', () => {
   })
 
   // ============================================================================
+  // 重置游戏测试
+  // ============================================================================
+
+  describe('reset', () => {
+    it('重置后游戏状态恢复到初始值', () => {
+      // 放置建筑并运行一些帧
+      logic.placeBuilding([1, 1], 'cannon')
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 50, speed: 3, shield: 0, money: 5 }],
+      })
+
+      for (let i = 0; i < 100; i++) {
+        logic.update()
+      }
+
+      // 重置
+      logic.reset()
+
+      const state = logic.getState()
+      expect(state.money).toBe(MOCK_GAME_CONFIG.initial.money)
+      expect(state.life).toBe(MOCK_GAME_CONFIG.initial.life)
+      expect(state.score).toBe(0)
+      expect(state.wave).toBe(0)
+      expect(state.frame).toBe(0)
+      expect(state.isPlaying).toBe(true)
+      expect(state.isPaused).toBe(false)
+      expect(state.isGameOver).toBe(false)
+    })
+
+    it('重置后清空所有怪物', () => {
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [
+          { id: 'uuid-1', type: 0, life: 50, speed: 3, shield: 0, money: 5 },
+          { id: 'uuid-2', type: 0, life: 50, speed: 3, shield: 0, money: 5 },
+        ],
+      })
+
+      logic.update()
+      expect(logic.getMonsters().length).toBeGreaterThan(0)
+
+      logic.reset()
+      expect(logic.getMonsters()).toHaveLength(0)
+    })
+
+    it('重置后清空所有建筑', () => {
+      logic.placeBuilding([1, 1], 'cannon')
+      logic.placeBuilding([2, 2], 'LMG')
+      expect(logic.getBuildings()).toHaveLength(2)
+
+      logic.reset()
+      expect(logic.getBuildings()).toHaveLength(0)
+    })
+
+    it('重置后清空所有子弹', () => {
+      logic.placeBuilding([3, 3], 'cannon')
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 50, speed: 1, shield: 0, money: 5 }],
+      })
+
+      for (let i = 0; i < 500; i++) {
+        logic.update()
+        if (logic.getBullets().length > 0) break
+      }
+
+      logic.reset()
+      expect(logic.getBullets()).toHaveLength(0)
+    })
+
+    it('重置后可以重新开始新波次', () => {
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 50, speed: 30, shield: 0, money: 5 }],
+      })
+
+      for (let i = 0; i < 500; i++) {
+        logic.update()
+        if (logic.isWaveComplete()) break
+      }
+
+      logic.reset()
+
+      // 应该可以重新开始波次
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-new', type: 0, life: 50, speed: 3, shield: 0, money: 5 }],
+      })
+
+      expect(logic.getState().wave).toBe(1)
+      logic.update()
+      expect(logic.getMonsters().length).toBeGreaterThan(0)
+    })
+
+    it('重置后可以重新放置建筑', () => {
+      logic.placeBuilding([1, 1], 'cannon')
+      logic.reset()
+
+      // 应该可以在同一位置放置建筑
+      const result = logic.placeBuilding([1, 1], 'LMG')
+      expect(result.success).toBe(true)
+    })
+
+    it('游戏结束后重置可以继续游戏', () => {
+      // 设置低生命值
+      const lowLifeConfig = {
+        ...MOCK_GAME_CONFIG,
+        initial: { ...MOCK_GAME_CONFIG.initial, life: 1 },
+      }
+      const lowLifeLogic = createGameSceneLogic(lowLifeConfig)
+
+      // 让怪物穿过导致游戏结束
+      lowLifeLogic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 5, life: 50, speed: 30, shield: 0, money: 5 }],
+      })
+
+      for (let i = 0; i < 5000; i++) {
+        lowLifeLogic.update()
+        if (lowLifeLogic.getState().isGameOver) break
+      }
+
+      expect(lowLifeLogic.getState().isGameOver).toBe(true)
+
+      // 重置
+      lowLifeLogic.reset()
+
+      // 应该可以继续游戏
+      expect(lowLifeLogic.getState().isGameOver).toBe(false)
+      expect(lowLifeLogic.getState().isPlaying).toBe(true)
+      expect(lowLifeLogic.getState().life).toBe(1)
+    })
+
+    it('暂停状态下重置后恢复为非暂停', () => {
+      logic.togglePause()
+      expect(logic.getState().isPaused).toBe(true)
+
+      logic.reset()
+      expect(logic.getState().isPaused).toBe(false)
+    })
+  })
+
+  // ============================================================================
   // 累计分数测试
   // ============================================================================
 

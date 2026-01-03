@@ -54,6 +54,9 @@ export interface IMonster {
 
   /** 获取当前格子坐标 */
   getGridPosition(): Position
+
+  /** 获取当前像素坐标（用于渲染） */
+  getPixelPosition(): { x: number; y: number }
 }
 
 /** 怪物创建参数 */
@@ -105,6 +108,12 @@ export interface IBuilding {
 
   /** 重置波次统计 */
   resetWaveStats(): void
+
+  /** 获取当前目标的格子位置（用于渲染炮管指向，包含最后目标位置） */
+  getCurrentTargetPosition(): Position | null
+
+  /** 是否有活跃目标（用于激光射线渲染判断） */
+  hasActiveTarget(): boolean
 }
 
 /** 建筑创建参数 */

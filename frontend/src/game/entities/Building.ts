@@ -56,6 +56,8 @@ class Building implements IBuilding {
   kills: number
 
   private readonly deps: BuildingDependencies
+  private currentTarget: IMonster | null = null
+  private lastTargetPosition: Position | null = null
 
   constructor(params: BuildingCreateParams, deps: BuildingDependencies) {
     this.id = params.id
@@ -79,10 +81,23 @@ class Building implements IBuilding {
   /**
    * 在怪物列表中寻找目标
    * 策略：优先选择路径进度最高的怪物（更接近出口的威胁更大）
+   * 参考旧实现: td-obj-building.js:187-204
    */
   findTarget(monsters: IMonster[]): IMonster | null {
     if (!this.deps.isWeapon(this.type)) {
+      this.currentTarget = null
       return null
+    }
+
+    // 如果当前目标仍然有效且在射程内，保持目标
+    if (this.currentTarget && this.currentTarget.isValid) {
+      const targetPos = this.currentTarget.getGridPosition()
+      if (this.deps.isInRange(
+        { type: this.type, level: this.level, position: this.position },
+        targetPos,
+      )) {
+        return this.currentTarget
+      }
     }
 
     // 筛选有效且在射程内的怪物
@@ -99,13 +114,16 @@ class Building implements IBuilding {
     })
 
     if (validTargets.length === 0) {
+      this.currentTarget = null
       return null
     }
 
     // 选择路径进度最高的怪物
-    return validTargets.reduce((best, current) => {
+    this.currentTarget = validTargets.reduce((best, current) => {
       return current.progress > best.progress ? current : best
     })
+
+    return this.currentTarget
   }
 
   /**
@@ -165,6 +183,21 @@ class Building implements IBuilding {
   resetWaveStats(): void {
     this.damageDealt = 0
     this.kills = 0
+  }
+
+  /** 获取当前目标的格子位置（用于渲染炮管指向） */
+  getCurrentTargetPosition(): Position | null {
+    if (this.currentTarget && this.currentTarget.isValid) {
+      this.lastTargetPosition = this.currentTarget.getGridPosition()
+      return this.lastTargetPosition
+    }
+    // 没有目标时返回最后的目标位置，保持炮管方向
+    return this.lastTargetPosition
+  }
+
+  /** 是否有活跃目标 */
+  hasActiveTarget(): boolean {
+    return this.currentTarget !== null && this.currentTarget.isValid
   }
 
   /** 每帧更新冷却 */

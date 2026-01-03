@@ -562,6 +562,86 @@ describe('GridSystem', () => {
     })
   })
 
+  // ============================================================================
+  // reset 测试
+  // ============================================================================
+
+  describe('reset', () => {
+    it('重置后清除所有建筑', () => {
+      gridSystem.placeBuilding([1, 1], 'b-001')
+      gridSystem.placeBuilding([3, 3], 'b-002')
+
+      expect(gridSystem.getBuildingAt([1, 1])).toBe('b-001')
+      expect(gridSystem.getBuildingAt([3, 3])).toBe('b-002')
+
+      gridSystem.reset()
+
+      expect(gridSystem.getBuildingAt([1, 1])).toBeNull()
+      expect(gridSystem.getBuildingAt([3, 3])).toBeNull()
+    })
+
+    it('重置后格子恢复可通行状态', () => {
+      gridSystem.placeBuilding([1, 1], 'b-001')
+      expect(gridSystem.isPassable([1, 1])).toBe(false)
+
+      gridSystem.reset()
+
+      expect(gridSystem.isPassable([1, 1])).toBe(true)
+    })
+
+    it('重置后障碍物格子仍然不可通行', () => {
+      expect(gridSystem.isPassable([2, 2])).toBe(false)
+
+      gridSystem.reset()
+
+      expect(gridSystem.isPassable([2, 2])).toBe(false)
+    })
+
+    it('重置后可以重新放置建筑', () => {
+      gridSystem.placeBuilding([1, 1], 'b-001')
+      gridSystem.reset()
+
+      const result = gridSystem.placeBuilding([1, 1], 'b-new')
+      expect(result).toBe(true)
+      expect(gridSystem.getBuildingAt([1, 1])).toBe('b-new')
+    })
+
+    it('重置后路径重新计算', () => {
+      // 放置建筑使路径绕行
+      gridSystem.placeBuilding([1, 0], 'b-001')
+      const pathWithBuilding = gridSystem.getCurrentPath()
+
+      gridSystem.reset()
+
+      const pathAfterReset = gridSystem.getCurrentPath()
+
+      // 重置后路径可能会更短（因为没有建筑了）
+      expect(pathAfterReset.length).toBeLessThanOrEqual(pathWithBuilding.length)
+
+      // 确保路径不包含之前的建筑位置（或者可以经过）
+      const hasOriginalBuildingPosition = pathAfterReset.some(
+        (p) => p[0] === 1 && p[1] === 0,
+      )
+      // 重置后可以经过该位置（如果最短路径需要的话）
+      // 这里只验证路径有效
+      expect(pathAfterReset.length).toBeGreaterThan(0)
+      expect(pathAfterReset[0]).toEqual([0, 0])
+      expect(pathAfterReset[pathAfterReset.length - 1]).toEqual([4, 4])
+    })
+
+    it('重置后 getObstacles 只返回原始障碍物', () => {
+      gridSystem.placeBuilding([1, 1], 'b-001')
+      const obstaclesWithBuilding = gridSystem.getObstacles()
+      expect(obstaclesWithBuilding).toContainEqual([1, 1])
+
+      gridSystem.reset()
+
+      const obstaclesAfterReset = gridSystem.getObstacles()
+      expect(obstaclesAfterReset).toContainEqual([2, 2])
+      expect(obstaclesAfterReset).not.toContainEqual([1, 1])
+    })
+  })
+
   describe('findPathFromPosition - 从指定位置到出口的路径', () => {
     it('从入口位置应该返回完整路径', () => {
       const path = gridSystem.findPathFromPosition([0, 0])

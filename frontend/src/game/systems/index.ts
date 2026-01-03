@@ -21,3 +21,11 @@ export {
   type FinalScoreInput,
   type FinalScoreBreakdown,
 } from './ScoreSystem'
+export { createWaveManager, type WaveManager, type WaveState } from './WaveManager'
+export {
+  createGameSceneLogic,
+  type GameSceneLogic,
+  type GameState,
+  type PlaceBuildingResult,
+  type BuildingActionResult,
+} from './GameSceneLogic'

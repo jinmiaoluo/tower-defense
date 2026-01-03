@@ -20,7 +20,7 @@ import { createPathSystem, type PathSystem } from './PathSystem'
 import { createWaveManager, type WaveManager } from './WaveManager'
 import { createWaveRecorder, type WaveRecorder } from './WaveRecorder'
 import { createBuildingSystem, type BuildingSystem } from './BuildingSystem'
-import { createBulletSystem, type BulletSystem, type Rect } from './BulletSystem'
+import { createBulletSystem, type BulletSystem, type Rect, type Bullet } from './BulletSystem'
 // 注意: DamageSystem 的伤害计算在 Monster 实体的 takeDamage 方法中完成
 // 注意: EconomySystem 的生命奖励功能由服务端计算并通过 API 返回
 // 客户端在 Game.ts 中根据服务端响应的 lifeReward 应用奖励
@@ -60,9 +60,12 @@ export interface GameSceneLogic {
   getState(): GameState
   getMonsters(): readonly IMonster[]
   getBuildings(): readonly IBuilding[]
+  getBullets(): readonly Bullet[]
   getCurrentPath(): Position[]
   getWaveRecorder(): IWaveRecorder
   getBuilding(id: string): IBuilding | null
+  canPlaceBuilding(position: Position): boolean
+  getUpgradeCost(type: BuildingType, level: number): number
 
   // 波次管理
   startWave(waveConfig: WaveConfig): void
@@ -298,6 +301,10 @@ export function createGameSceneLogic(config: GameConfig): GameSceneLogic {
       return buildings
     },
 
+    getBullets(): readonly Bullet[] {
+      return bulletSystem.getBullets()
+    },
+
     getCurrentPath(): Position[] {
       return gridSystem.getCurrentPath()
     },
@@ -308,6 +315,18 @@ export function createGameSceneLogic(config: GameConfig): GameSceneLogic {
 
     getBuilding(id: string): IBuilding | null {
       return buildings.find((b) => b.id === id) ?? null
+    },
+
+    canPlaceBuilding(position: Position): boolean {
+      const monsterPositions = getMonsterPositions()
+      return (
+        gridSystem.canPlaceBuilding(position) &&
+        !gridSystem.wouldBlockMonsters(position, monsterPositions)
+      )
+    },
+
+    getUpgradeCost(type: BuildingType, level: number): number {
+      return buildingSystem.getUpgradeCost(type, level)
     },
 
     startWave(waveConfig: WaveConfig): void {
@@ -479,6 +498,7 @@ export function createGameSceneLogic(config: GameConfig): GameSceneLogic {
       accumulatedScore = 0
 
       // 重置系统
+      gridSystem.reset()
       waveManager.reset()
       bulletSystem.clear()
       waveRecorder = createWaveRecorder(0, 0)

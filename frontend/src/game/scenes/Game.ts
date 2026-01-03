@@ -1,105 +1,143 @@
 /**
  * Game Scene - 游戏主场景
- * 整合 PathSystem + GridSystem + Monster，实现游戏主循环
+ * 整合 GameSceneLogic，负责渲染和用户交互
+ * 逻辑层与渲染层分离，Game.ts 只负责渲染
  */
 
 import { Scene } from 'phaser'
 import { EventBus } from '../EventBus'
-import { createPathSystem, type PathSystem } from '../systems/PathSystem'
-import { createGridSystem, type GridSystem } from '../systems/GridSystem'
-import { createMonster, type MonsterDependencies, type IMonsterRuntime } from '../entities/Monster'
-import { MOCK_MONSTERS } from '@/mocks'
+import { AppEventBus } from '@/utils/EventEmitter'
+import { createGameSceneLogic, type GameSceneLogic } from '../systems'
 import { mockStartGame, mockSubmitWave } from '@/mocks/api'
-import type { GameConfig, MonsterConfig, WaveConfig, MonsterTypeId } from '@/types'
-import type { Path } from '@/types/entities'
+import type { GameConfig, WaveConfig, Position, BuildingType, GameColors, ResolvedTheme } from '@/types'
 import { GAME_CONSTANTS } from '@/types'
+import {
+  createPhaserAdapter,
+  renderBuilding,
+  renderMonster,
+  renderBullet,
+  BUILDING_COLORS,
+  type RenderContext,
+  type BuildingRenderData,
+  type MonsterRenderData,
+  type BulletRenderData,
+} from '../render'
+import { getTranslator } from '@/i18n'
+import { getTheme, darkTheme } from '@/theme'
+import { STORAGE_KEY as THEME_STORAGE_KEY, type ResolvedTheme as ThemeType } from '@/types/theme'
 
-const { GRID_SIZE, GLOBAL_SPEED } = GAME_CONSTANTS
-
-/** 颜色常量 */
-const COLORS = {
-  GRID_LINE: 0x444444,
-  GRID_FILL: 0x2a2a3e,
-  ENTRANCE: 0x00ff00,
-  EXIT: 0xff0000,
-  PATH: 0x3a3a5e,
-  OBSTACLE: 0x666666,
-  MONSTER_HEALTH_BG: 0x333333,
-  MONSTER_HEALTH: 0x00ff00,
-  UI_TEXT: '#ffffff',
-}
+const { GRID_SIZE } = GAME_CONSTANTS
 
 /** 波次间隔帧数 (60 FPS x 3 秒 = 180 帧) */
 const WAVE_INTERVAL_FRAMES = 180
 
-/** 波次结果追踪 */
-interface WaveResult {
-  killed: number
-  killedByType: Record<number, number>
-  passed: number
-  scoreGained: number
-  moneyGained: number
-  lifeLost: number
-  totalDamageDealt: number
-  totalLifeDestroyed: number
-  startFrame: number
-}
-
-/** 游戏状态 */
-interface GameState {
-  money: number
-  life: number
-  score: number
-  wave: number
-  frame: number
-  difficulty: number
-  isPlaying: boolean
-  isPaused: boolean
+/** 游戏 UI 状态 */
+interface UIState {
   isLoading: boolean
   waveIntervalCounter: number
   isSubmittingWave: boolean
+  selectedBuildingType: BuildingType | null
+  selectedBuildingId: string | null
+  hoverPosition: Position | null
 }
 
-export class Game extends Scene {
-  // 游戏系统
-  private pathSystem!: PathSystem
-  private gridSystem!: GridSystem
+/** 提示消息持续时间 (毫秒) */
+const TIP_DURATION = 2000
 
-  // 游戏状态
-  private gameState!: GameState
+export class Game extends Scene {
+  // 核心逻辑
+  private logic!: GameSceneLogic
+
+  // UI 状态
+  private uiState!: UIState
 
   // 会话状态
   private sessionId: string = ''
   private gameConfig!: GameConfig
   private currentWaveConfig!: WaveConfig
-  private waveResult!: WaveResult
-
-  // 怪物列表
-  private monsters: IMonsterRuntime[] = []
-  private monsterGraphics: Map<string, Phaser.GameObjects.Graphics> = new Map()
 
   // 渲染对象
   private mapGraphics!: Phaser.GameObjects.Graphics
   private pathGraphics!: Phaser.GameObjects.Graphics
+  private buildingGraphics!: Phaser.GameObjects.Graphics
+  private monsterGraphics!: Phaser.GameObjects.Graphics
+  private bulletGraphics!: Phaser.GameObjects.Graphics
+  private hoverGraphics!: Phaser.GameObjects.Graphics
   private uiText!: Phaser.GameObjects.Text
+  private buildingPanel!: Phaser.GameObjects.Container
+
+  // 渲染上下文适配器
+  private buildingRenderCtx!: RenderContext
+  private monsterRenderCtx!: RenderContext
+  private bulletRenderCtx!: RenderContext
+
+  // 提示消息
+  private tipContainer!: Phaser.GameObjects.Container
+  private tipBackground!: Phaser.GameObjects.Graphics
+  private tipText!: Phaser.GameObjects.Text
+  private tipTimer: Phaser.Time.TimerEvent | null = null
+
+  // Tooltip（悬停提示）
+  private tooltipContainer!: Phaser.GameObjects.Container
+  private tooltipBackground!: Phaser.GameObjects.Graphics
+  private tooltipText!: Phaser.GameObjects.Text
+  private tooltipSource: 'panel' | 'map' | null = null
 
   // 地图偏移（居中显示）
   private mapOffsetX = 0
   private mapOffsetY = 0
 
+  // 翻译函数
+  private t = getTranslator()
+
+  // 当前主题颜色（从 localStorage 读取初始主题）
+  private gameColors: GameColors = this.getInitialThemeColors()
+
+  // 建筑面板按钮文字（用于语言切换时更新）
+  private buildingPanelTexts: Phaser.GameObjects.Text[] = []
+
   constructor() {
     super('Game')
   }
 
+  /** 获取初始主题颜色（从 localStorage 读取） */
+  private getInitialThemeColors(): GameColors {
+    try {
+      const saved = localStorage.getItem(THEME_STORAGE_KEY)
+      if (saved === 'light' || saved === 'dark') {
+        return getTheme(saved).gameColors
+      }
+      // system 模式：检测系统主题
+      if (saved === 'system' && typeof window !== 'undefined') {
+        const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+        return getTheme(isDark ? 'dark' : 'light').gameColors
+      }
+    } catch {
+      // localStorage 可能被禁用
+    }
+    return darkTheme.gameColors
+  }
+
+  /** 获取当前主题颜色 */
+  private getColors(): GameColors {
+    return this.gameColors
+  }
+
   create() {
-    // 初始化游戏状态（加载中）
-    this.initGameState()
+    // 初始化 UI 状态
+    this.initUIState()
+
+    // 设置初始 canvas 背景色（根据保存的主题）
+    this.cameras.main.setBackgroundColor(this.gameColors.canvasBackground)
 
     // 创建渲染对象
     this.createRenderObjects()
 
     // 创建 UI
     this.createUI()
+
+    // 设置输入事件
+    this.setupInput()
 
     // 异步初始化游戏会话
     mockStartGame().then((response) => {
@@ -112,81 +150,340 @@ export class Game extends Scene {
       const mapWidth = this.gameConfig.map.width * GRID_SIZE
       const mapHeight = this.gameConfig.map.height * GRID_SIZE
       this.mapOffsetX = Math.floor((width - mapWidth) / 2)
-      this.mapOffsetY = Math.floor((height - mapHeight) / 2) + 30
+      this.mapOffsetY = Math.floor((height - mapHeight) / 2) + 50
 
-      // 初始化游戏系统
-      this.initSystems()
+      // 创建核心逻辑
+      this.logic = createGameSceneLogic(this.gameConfig)
 
-      // 使用服务端配置更新游戏状态
-      this.gameState.money = this.gameConfig.initial.money
-      this.gameState.life = this.gameConfig.initial.life
-      this.gameState.difficulty = this.gameConfig.initial.difficulty
-      this.gameState.isLoading = false
+      // 开始第一波
+      this.logic.startWave(this.currentWaveConfig)
+
+      this.uiState.isLoading = false
 
       // 渲染静态元素
       this.renderMap()
       this.renderPath()
-
-      // 初始化波次结果并生成怪物
-      this.resetWaveResult()
-      this.spawnWaveFromConfig()
+      this.createBuildingPanel()
 
       // 通知 Vue 场景已就绪
       EventBus.emit('current-scene-ready', this)
     })
   }
 
-  /** 初始化游戏系统 */
-  private initSystems() {
-    this.pathSystem = createPathSystem()
-    this.gridSystem = createGridSystem(this.gameConfig.map)
-  }
-
-  /** 初始化游戏状态 */
-  private initGameState() {
-    this.gameState = {
-      money: 0,
-      life: 0,
-      score: 0,
-      wave: 1,
-      frame: 0,
-      difficulty: 1,
-      isPlaying: true,
-      isPaused: false,
+  /** 初始化 UI 状态 */
+  private initUIState() {
+    this.uiState = {
       isLoading: true,
       waveIntervalCounter: 0,
       isSubmittingWave: false,
-    }
-  }
-
-  /** 重置波次结果追踪 */
-  private resetWaveResult() {
-    this.waveResult = {
-      killed: 0,
-      killedByType: {},
-      passed: 0,
-      scoreGained: 0,
-      moneyGained: 0,
-      lifeLost: 0,
-      totalDamageDealt: 0,
-      totalLifeDestroyed: 0,
-      startFrame: this.gameState.frame,
+      selectedBuildingType: null,
+      selectedBuildingId: null,
+      hoverPosition: null,
     }
   }
 
   /** 创建渲染对象 */
   private createRenderObjects() {
-    // 地图背景层
     this.mapGraphics = this.add.graphics()
-
-    // 路径层
     this.pathGraphics = this.add.graphics()
+    this.buildingGraphics = this.add.graphics()
+    this.monsterGraphics = this.add.graphics()
+    this.bulletGraphics = this.add.graphics()
+    this.hoverGraphics = this.add.graphics()
+
+    // 创建渲染上下文适配器
+    this.buildingRenderCtx = createPhaserAdapter(this.buildingGraphics)
+    this.monsterRenderCtx = createPhaserAdapter(this.monsterGraphics)
+    this.bulletRenderCtx = createPhaserAdapter(this.bulletGraphics)
+  }
+
+  /** 设置输入事件 */
+  private setupInput() {
+    this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      if (this.uiState.isLoading) return
+
+      const gridPos = this.screenToGrid(pointer.x, pointer.y)
+      if (gridPos) {
+        this.uiState.hoverPosition = gridPos
+        this.checkMapElementTooltip(pointer.x, pointer.y, gridPos)
+      } else {
+        this.uiState.hoverPosition = null
+        this.hideTooltip('map')
+      }
+    })
+
+    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      if (this.uiState.isLoading) return
+
+      // 检查是否点击在交互 UI 元素上（建筑面板按钮等）
+      // hitTestPointer 返回指针位置下所有设置了 interactive 的游戏对象
+      const hitObjects = this.input.hitTestPointer(pointer)
+      if (hitObjects.length > 0) {
+        // 点击了某个交互对象（如建筑面板按钮），不处理地图点击
+        return
+      }
+
+      const gridPos = this.screenToGrid(pointer.x, pointer.y)
+      if (!gridPos) {
+        // 点击地图外且不在 UI 上，取消选择
+        this.uiState.selectedBuildingType = null
+        this.uiState.selectedBuildingId = null
+        return
+      }
+
+      // 如果选中了建筑类型，尝试放置
+      if (this.uiState.selectedBuildingType) {
+        this.tryPlaceBuilding(gridPos)
+        return
+      }
+
+      // 否则检查是否点击了已有建筑
+      const buildings = this.logic.getBuildings()
+      const clickedBuilding = buildings.find(
+        (b) => b.position[0] === gridPos[0] && b.position[1] === gridPos[1],
+      )
+
+      if (clickedBuilding) {
+        this.uiState.selectedBuildingId = clickedBuilding.id
+        EventBus.emit('building-selected', clickedBuilding)
+      } else {
+        this.uiState.selectedBuildingId = null
+      }
+    })
+
+    // 键盘快捷键
+    this.input.keyboard?.on('keydown-ESC', () => {
+      this.uiState.selectedBuildingType = null
+      this.uiState.selectedBuildingId = null
+    })
+
+    this.input.keyboard?.on('keydown-ONE', () => {
+      this.selectBuildingType('LMG')
+    })
+
+    this.input.keyboard?.on('keydown-TWO', () => {
+      this.selectBuildingType('cannon')
+    })
+
+    this.input.keyboard?.on('keydown-THREE', () => {
+      this.selectBuildingType('HMG')
+    })
+
+    this.input.keyboard?.on('keydown-FOUR', () => {
+      this.selectBuildingType('laser_gun')
+    })
+
+    this.input.keyboard?.on('keydown-FIVE', () => {
+      this.selectBuildingType('wall')
+    })
+
+    this.input.keyboard?.on('keydown-U', () => {
+      if (this.uiState.selectedBuildingId) {
+        this.tryUpgradeBuilding(this.uiState.selectedBuildingId)
+      }
+    })
+
+    this.input.keyboard?.on('keydown-S', () => {
+      if (this.uiState.selectedBuildingId) {
+        this.trySellBuilding(this.uiState.selectedBuildingId)
+      }
+    })
+
+    this.input.keyboard?.on('keydown-SPACE', () => {
+      if (this.logic) {
+        this.logic.togglePause()
+      }
+    })
+
+    // 监听重新开始事件
+    EventBus.on('restart-game', () => {
+      this.restart()
+    })
+
+    // 监听主题变化（来自 Vue 层的 AppEventBus）
+    AppEventBus.on('theme-changed', (theme: unknown) => {
+      this.handleThemeChange(theme as ResolvedTheme)
+    })
+
+    // 监听语言变化（来自 Vue 层的 AppEventBus）
+    AppEventBus.on('locale-changed', (_locale: unknown) => {
+      this.handleLocaleChange()
+    })
+  }
+
+  /** 处理主题变化 */
+  private handleThemeChange(theme: ResolvedTheme) {
+    this.gameColors = getTheme(theme).gameColors
+    // 更新 canvas 背景色
+    this.cameras.main.setBackgroundColor(this.gameColors.canvasBackground)
+    // 重新渲染需要主题颜色的元素
+    if (!this.uiState.isLoading) {
+      this.renderMap()
+      this.renderPath()
+      // 更新 UI 文本颜色
+      this.uiText.setColor(this.gameColors.uiText)
+    }
+  }
+
+  /** 处理语言变化 */
+  private handleLocaleChange() {
+    // 更新翻译函数
+    this.t = getTranslator()
+    // 更新建筑面板文字
+    this.updateBuildingPanelTexts()
+    // 更新 UI 文字
+    this.updateUI()
+  }
+
+  /** 更新建筑面板文字 */
+  private updateBuildingPanelTexts() {
+    if (!this.gameConfig) return
+
+    const buildingTypes: BuildingType[] = ['LMG', 'cannon', 'HMG', 'laser_gun', 'wall']
+    buildingTypes.forEach((type, index) => {
+      if (this.buildingPanelTexts[index]) {
+        const config = this.gameConfig.buildings[type]
+        const buildingName = this.t(`building_name_${type}`)
+        this.buildingPanelTexts[index].setText(`${buildingName}\n$${config.cost}`)
+      }
+    })
+  }
+
+  /** 屏幕坐标转格子坐标 */
+  private screenToGrid(x: number, y: number): Position | null {
+    const gx = Math.floor((x - this.mapOffsetX) / GRID_SIZE)
+    const gy = Math.floor((y - this.mapOffsetY) / GRID_SIZE)
+
+    if (
+      gx >= 0 &&
+      gx < this.gameConfig.map.width &&
+      gy >= 0 &&
+      gy < this.gameConfig.map.height
+    ) {
+      return [gx, gy]
+    }
+    return null
+  }
+
+  /** 检查地图元素的 tooltip（入口/出口/怪物） */
+  private checkMapElementTooltip(screenX: number, screenY: number, gridPos: Position) {
+    const [gx, gy] = gridPos
+    const { entrance, exit } = this.gameConfig.map
+
+    // 检查入口
+    if (gx === entrance[0] && gy === entrance[1]) {
+      const centerX = this.mapOffsetX + gx * GRID_SIZE + GRID_SIZE / 2
+      const centerY = this.mapOffsetY + gy * GRID_SIZE
+      this.showTooltip(this.t('entrance'), centerX, centerY)
+      return
+    }
+
+    // 检查出口
+    if (gx === exit[0] && gy === exit[1]) {
+      const centerX = this.mapOffsetX + gx * GRID_SIZE + GRID_SIZE / 2
+      const centerY = this.mapOffsetY + gy * GRID_SIZE
+      this.showTooltip(this.t('exit'), centerX, centerY)
+      return
+    }
+
+    // 检查怪物
+    const monsters = this.logic.getMonsters()
+    for (const monster of monsters) {
+      if (!monster.isValid || monster.progress < 0) continue
+
+      const pos = monster.getPixelPosition()
+      const monsterX = this.mapOffsetX + pos.x
+      const monsterY = this.mapOffsetY + pos.y
+      const distance = Math.sqrt(
+        Math.pow(screenX - monsterX, 2) + Math.pow(screenY - monsterY, 2),
+      )
+
+      if (distance <= monster.radius) {
+        const tooltipText = this.t('monster_info', [
+          Math.ceil(monster.currentLife),
+          monster.shield ?? 0,
+          monster.speed.toFixed(1),
+          monster.damage,
+        ])
+        this.showTooltip(tooltipText, monsterX, monsterY - monster.radius)
+        return
+      }
+    }
+
+    // 不在任何地图元素上时隐藏地图 tooltip（不影响建筑面板的 tooltip）
+    this.hideTooltip('map')
+  }
+
+  /** 选择建筑类型 */
+  selectBuildingType(type: BuildingType | null) {
+    this.uiState.selectedBuildingType = type
+    this.uiState.selectedBuildingId = null
+    EventBus.emit('building-type-selected', type)
+  }
+
+  /** 尝试放置建筑 */
+  private tryPlaceBuilding(position: Position) {
+    if (!this.uiState.selectedBuildingType) return
+
+    const result = this.logic.placeBuilding(
+      position,
+      this.uiState.selectedBuildingType,
+    )
+
+    if (result.success) {
+      EventBus.emit('building-placed', {
+        id: result.buildingId,
+        type: this.uiState.selectedBuildingType,
+        position,
+      })
+      this.renderPath()
+    } else {
+      // 显示提示消息
+      if (result.reason === 'insufficient_money') {
+        const cost = this.gameConfig.buildings[this.uiState.selectedBuildingType].cost
+        const tipX = this.mapOffsetX + position[0] * GRID_SIZE + GRID_SIZE / 2
+        const tipY = this.mapOffsetY + position[1] * GRID_SIZE - 20
+        this.showTip(`金钱不足，需要 $${cost}!`, tipX, tipY)
+      }
+      EventBus.emit('building-place-failed', result.reason)
+    }
+  }
+
+  /** 尝试升级建筑 */
+  tryUpgradeBuilding(buildingId: string) {
+    const building = this.logic.getBuilding(buildingId)
+    const result = this.logic.upgradeBuilding(buildingId)
+    if (result.success) {
+      EventBus.emit('building-upgraded', this.logic.getBuilding(buildingId))
+    } else {
+      // 显示提示消息
+      if (result.reason === 'insufficient_money' && building) {
+        const cost = this.logic.getUpgradeCost(building.type, building.level)
+        const tipX = this.mapOffsetX + building.position[0] * GRID_SIZE + GRID_SIZE / 2
+        const tipY = this.mapOffsetY + building.position[1] * GRID_SIZE - 20
+        this.showTip(`金钱不足，需要 $${cost}!`, tipX, tipY)
+      }
+      EventBus.emit('building-upgrade-failed', result.reason)
+    }
+  }
+
+  /** 尝试出售建筑 */
+  trySellBuilding(buildingId: string) {
+    const result = this.logic.sellBuilding(buildingId)
+    if (result.success) {
+      this.uiState.selectedBuildingId = null
+      this.renderPath()
+      EventBus.emit('building-sold', buildingId)
+    } else {
+      EventBus.emit('building-sell-failed', result.reason)
+    }
   }
 
   /** 渲染地图 */
   private renderMap() {
-    const { width, height } = this.gameConfig.map
+    const { width, height, entrance, exit, obstacles } = this.gameConfig.map
     const g = this.mapGraphics
+    const colors = this.getColors()
 
     g.clear()
 
@@ -196,59 +493,50 @@ export class Game extends Scene {
         const px = this.mapOffsetX + x * GRID_SIZE
         const py = this.mapOffsetY + y * GRID_SIZE
 
-        const cell = this.gridSystem.getCell([x, y])
-        if (!cell) continue
+        let fillColor = colors.gridFill
+        const isEntrance = x === entrance[0] && y === entrance[1]
+        const isExit = x === exit[0] && y === exit[1]
+        const isObstacle = obstacles.some(
+          ([ox, oy]) => ox === x && oy === y,
+        )
 
-        // 填充颜色
-        let fillColor = COLORS.GRID_FILL
-        if (cell.isEntrance) {
-          fillColor = COLORS.ENTRANCE
-        } else if (cell.isExit) {
-          fillColor = COLORS.EXIT
-        } else if (cell.isObstacle) {
-          fillColor = COLORS.OBSTACLE
+        if (isEntrance) {
+          fillColor = colors.entrance
+        } else if (isExit) {
+          fillColor = colors.exit
+        } else if (isObstacle) {
+          fillColor = colors.obstacle
         }
 
-        // 绘制格子
-        g.fillStyle(fillColor, cell.isEntrance || cell.isExit ? 0.5 : 1)
+        g.fillStyle(fillColor, isEntrance || isExit ? 0.5 : 1)
         g.fillRect(px, py, GRID_SIZE, GRID_SIZE)
 
-        // 绘制边框
-        g.lineStyle(1, COLORS.GRID_LINE, 0.5)
+        g.lineStyle(1, colors.gridLine, 0.5)
         g.strokeRect(px, py, GRID_SIZE, GRID_SIZE)
       }
     }
 
-    // 绘制入口和出口标记
-    this.drawEntranceExit()
-  }
-
-  /** 绘制入口和出口标记 */
-  private drawEntranceExit() {
-    const g = this.mapGraphics
-    const entrance = this.gridSystem.getEntrance()
-    const exit = this.gridSystem.getExit()
-
-    // 入口圆圈
+    // 入口标记
     const entranceX = this.mapOffsetX + entrance[0] * GRID_SIZE + GRID_SIZE / 2
     const entranceY = this.mapOffsetY + entrance[1] * GRID_SIZE + GRID_SIZE / 2
-    g.lineStyle(2, COLORS.ENTRANCE, 1)
+    g.lineStyle(2, colors.entrance, 1)
     g.strokeCircle(entranceX, entranceY, GRID_SIZE / 3)
 
-    // 出口圆圈
+    // 出口标记
     const exitX = this.mapOffsetX + exit[0] * GRID_SIZE + GRID_SIZE / 2
     const exitY = this.mapOffsetY + exit[1] * GRID_SIZE + GRID_SIZE / 2
-    g.lineStyle(2, COLORS.EXIT, 1)
+    g.lineStyle(2, colors.exit, 1)
     g.strokeCircle(exitX, exitY, GRID_SIZE / 3)
   }
 
   /** 渲染路径 */
   private renderPath() {
     const g = this.pathGraphics
-    const path = this.gridSystem.getCurrentPath()
+    const path = this.logic.getCurrentPath()
+    const colors = this.getColors()
 
     g.clear()
-    g.fillStyle(COLORS.PATH, 0.3)
+    g.fillStyle(colors.path, 0.3)
 
     for (const [x, y] of path) {
       const px = this.mapOffsetX + x * GRID_SIZE
@@ -257,302 +545,549 @@ export class Game extends Scene {
     }
   }
 
+  /** 渲染所有建筑 */
+  private renderBuildings() {
+    const buildings = this.logic.getBuildings()
+
+    this.buildingRenderCtx.clear()
+
+    for (const building of buildings) {
+      const [x, y] = building.position
+      const px = this.mapOffsetX + x * GRID_SIZE
+      const py = this.mapOffsetY + y * GRID_SIZE
+      const centerX = px + GRID_SIZE / 2
+      const centerY = py + GRID_SIZE / 2
+      const isSelected = building.id === this.uiState.selectedBuildingId
+
+      // 获取建筑当前目标位置（由 Building 实体维护，包含最后目标位置）
+      const targetPosition = building.getCurrentTargetPosition() ?? undefined
+
+      const data: BuildingRenderData = {
+        id: building.id,
+        type: building.type,
+        position: building.position,
+        level: building.level,
+        centerX,
+        centerY,
+        gridSize: GRID_SIZE,
+        isSelected,
+        targetPosition,
+      }
+
+      renderBuilding(this.buildingRenderCtx, data)
+
+      // 激光射线渲染（与旧实现一致: td-obj-building.js:361-376）
+      // 只有当有实际目标时才渲染激光线
+      if (building.type === 'laser_gun' && building.hasActiveTarget() && targetPosition) {
+        const targetX = this.mapOffsetX + targetPosition[0] * GRID_SIZE + GRID_SIZE / 2
+        const targetY = this.mapOffsetY + targetPosition[1] * GRID_SIZE + GRID_SIZE / 2
+
+        // 外层激光线（蓝色半透明）
+        this.buildingRenderCtx.lineStyle(3, 0x3232c8, 0.5)
+        this.buildingRenderCtx.lineBetween(centerX, centerY, targetX, targetY)
+
+        // 内层激光线（亮蓝色）
+        this.buildingRenderCtx.lineStyle(1, 0x9696ff, 0.5)
+        this.buildingRenderCtx.lineBetween(centerX, centerY, targetX, targetY)
+      }
+
+      // 射程指示（选中时显示）
+      if (isSelected && building.type !== 'wall') {
+        const range = building.getRange() * GRID_SIZE
+        this.buildingRenderCtx.lineStyle(1, this.getColors().selected, 0.3)
+        this.buildingRenderCtx.strokeCircle(centerX, centerY, range)
+      }
+    }
+  }
+
+  /** 渲染所有怪物 */
+  private renderMonsters() {
+    const monsters = this.logic.getMonsters()
+
+    this.monsterRenderCtx.clear()
+
+    for (const monster of monsters) {
+      if (!monster.isValid || monster.progress < 0) continue
+
+      const pos = monster.getPixelPosition()
+      const x = this.mapOffsetX + pos.x
+      const y = this.mapOffsetY + pos.y
+
+      const data: MonsterRenderData = {
+        id: monster.id,
+        x,
+        y,
+        radius: monster.radius,
+        color: monster.color,
+        currentLife: monster.currentLife,
+        maxLife: monster.maxLife,
+        shield: monster.shield ?? 0,
+      }
+
+      renderMonster(this.monsterRenderCtx, data)
+    }
+  }
+
+  /** 渲染所有子弹 */
+  private renderBullets() {
+    const bullets = this.logic.getBullets()
+
+    this.bulletRenderCtx.clear()
+
+    for (const bullet of bullets) {
+      if (!bullet.isValid) continue
+
+      const x = this.mapOffsetX + bullet.x
+      const y = this.mapOffsetY + bullet.y
+
+      const data: BulletRenderData = {
+        x,
+        y,
+        radius: bullet.radius,
+        vx: bullet.vx,
+        vy: bullet.vy,
+      }
+
+      renderBullet(this.bulletRenderCtx, data)
+    }
+  }
+
+  /** 渲染悬停指示 */
+  private renderHover() {
+    const g = this.hoverGraphics
+    const colors = this.getColors()
+    g.clear()
+
+    if (
+      !this.uiState.selectedBuildingType ||
+      !this.uiState.hoverPosition
+    ) {
+      return
+    }
+
+    const [hx, hy] = this.uiState.hoverPosition
+    const px = this.mapOffsetX + hx * GRID_SIZE
+    const py = this.mapOffsetY + hy * GRID_SIZE
+
+    const canPlace = this.logic.canPlaceBuilding(this.uiState.hoverPosition)
+    const color = canPlace ? colors.hoverValid : colors.hoverInvalid
+
+    // 预览建筑
+    g.fillStyle(color, 0.3)
+    g.fillRect(px + 4, py + 4, GRID_SIZE - 8, GRID_SIZE - 8)
+
+    g.lineStyle(2, color, 0.8)
+    g.strokeRect(px + 4, py + 4, GRID_SIZE - 8, GRID_SIZE - 8)
+
+    // 射程预览
+    if (this.uiState.selectedBuildingType !== 'wall') {
+      const buildingConfig = this.gameConfig.buildings[this.uiState.selectedBuildingType]
+      const range = buildingConfig.range * GRID_SIZE
+      const centerX = px + GRID_SIZE / 2
+      const centerY = py + GRID_SIZE / 2
+
+      g.lineStyle(1, color, 0.3)
+      g.strokeCircle(centerX, centerY, range)
+    }
+  }
+
   /** 创建 UI */
   private createUI() {
     const { width } = this.scale
 
-    this.uiText = this.add.text(width / 2, 20, '', {
-      fontFamily: 'Arial',
-      fontSize: '18px',
-      color: COLORS.UI_TEXT,
-    }).setOrigin(0.5, 0)
+    this.uiText = this.add
+      .text(width / 2, 20, '', {
+        fontFamily: 'Arial',
+        fontSize: '18px',
+        color: this.getColors().uiText,
+      })
+      .setOrigin(0.5, 0)
+
+    // 创建提示容器
+    this.createTipContainer()
+
+    // 创建 Tooltip 容器
+    this.createTooltipContainer()
 
     this.updateUI()
   }
 
+  /** 创建提示容器 */
+  private createTipContainer() {
+    const { width, height } = this.scale
+
+    this.tipContainer = this.add.container(width / 2, height / 2)
+    this.tipContainer.setVisible(false)
+    this.tipContainer.setDepth(1000)
+
+    this.tipBackground = this.add.graphics()
+    this.tipText = this.add.text(0, 0, '', {
+      fontFamily: 'Courier New',
+      fontSize: '14px',
+      color: '#000000',
+    })
+    this.tipText.setOrigin(0.5, 0.5)
+
+    this.tipContainer.add([this.tipBackground, this.tipText])
+  }
+
+  /** 创建 Tooltip 容器 */
+  private createTooltipContainer() {
+    this.tooltipContainer = this.add.container(0, 0)
+    this.tooltipContainer.setVisible(false)
+    this.tooltipContainer.setDepth(1001)
+
+    this.tooltipBackground = this.add.graphics()
+    this.tooltipText = this.add.text(0, 0, '', {
+      fontFamily: 'Arial',
+      fontSize: '12px',
+      color: '#ffffff',
+      wordWrap: { width: 200 },
+      align: 'left',
+      lineSpacing: 2,
+    })
+    this.tooltipText.setOrigin(0.5, 1)
+
+    this.tooltipContainer.add([this.tooltipBackground, this.tooltipText])
+  }
+
+  /** 显示 Tooltip */
+  private showTooltip(message: string, x: number, y: number, source: 'panel' | 'map' = 'map') {
+    this.tooltipSource = source
+    this.tooltipText.setText(message)
+
+    const padding = 8
+    const bgWidth = this.tooltipText.width + padding * 2
+    const bgHeight = this.tooltipText.height + padding * 2
+
+    // 将文本上移 padding 像素，使其在背景中垂直居中
+    this.tooltipText.setPosition(0, -padding)
+
+    this.tooltipBackground.clear()
+    this.tooltipBackground.fillStyle(0x333333, 0.9)
+    this.tooltipBackground.lineStyle(1, 0x666666, 1)
+    this.tooltipBackground.fillRoundedRect(-bgWidth / 2, -bgHeight, bgWidth, bgHeight, 4)
+    this.tooltipBackground.strokeRoundedRect(-bgWidth / 2, -bgHeight, bgWidth, bgHeight, 4)
+
+    this.tooltipContainer.setPosition(x, y - 10)
+    this.tooltipContainer.setVisible(true)
+  }
+
+  /** 隐藏 Tooltip（仅隐藏指定来源的 tooltip，不指定则强制隐藏） */
+  private hideTooltip(source?: 'panel' | 'map') {
+    if (source && this.tooltipSource !== source) {
+      return
+    }
+    this.tooltipContainer.setVisible(false)
+    this.tooltipSource = null
+  }
+
+  /** 显示提示消息 */
+  private showTip(message: string, x?: number, y?: number) {
+    const { width, height } = this.scale
+
+    // 设置文本
+    this.tipText.setText(message)
+
+    // 计算背景尺寸
+    const padding = 10
+    const bgWidth = this.tipText.width + padding * 2
+    const bgHeight = this.tipText.height + padding * 2
+
+    // 绘制黄色背景（与旧实现一致）
+    this.tipBackground.clear()
+    this.tipBackground.fillStyle(0xffff00, 0.8)
+    this.tipBackground.lineStyle(2, 0xdede00, 1)
+    this.tipBackground.fillRoundedRect(-bgWidth / 2, -bgHeight / 2, bgWidth, bgHeight, 4)
+    this.tipBackground.strokeRoundedRect(-bgWidth / 2, -bgHeight / 2, bgWidth, bgHeight, 4)
+
+    // 设置位置
+    const posX = x ?? width / 2
+    const posY = y ?? height / 2
+    this.tipContainer.setPosition(posX, posY)
+
+    // 显示
+    this.tipContainer.setVisible(true)
+
+    // 清除之前的定时器
+    if (this.tipTimer) {
+      this.tipTimer.destroy()
+    }
+
+    // 自动隐藏
+    this.tipTimer = this.time.delayedCall(TIP_DURATION, () => {
+      this.tipContainer.setVisible(false)
+    })
+  }
+
+  /** 创建建筑面板 */
+  private createBuildingPanel() {
+    const { width, height } = this.scale
+
+    this.buildingPanel = this.add.container(width / 2, height - 40)
+    this.buildingPanelTexts = []
+
+    const buildingTypes: BuildingType[] = ['LMG', 'cannon', 'HMG', 'laser_gun', 'wall']
+    const buttonWidth = 80
+    const buttonHeight = 30
+    const gap = 10
+    const startX = -((buildingTypes.length * (buttonWidth + gap) - gap) / 2)
+
+    buildingTypes.forEach((type, index) => {
+      const x = startX + index * (buttonWidth + gap) + buttonWidth / 2
+      const config = this.gameConfig.buildings[type]
+
+      // 按钮背景
+      const buttonColor = BUILDING_COLORS[type].primary
+      const button = this.add.rectangle(x, 0, buttonWidth, buttonHeight, buttonColor, 0.8)
+      button.setStrokeStyle(2, 0xffffff)
+      button.setInteractive({ useHandCursor: true })
+
+      button.on('pointerover', () => {
+        button.setFillStyle(buttonColor, 1)
+        // 显示建筑介绍 tooltip
+        const buildingName = this.t(`building_name_${type}`)
+        let tooltipText: string
+        if (type === 'wall') {
+          tooltipText = this.t('building_tooltip_wall', [buildingName, config.cost])
+        } else {
+          tooltipText = this.t('building_tooltip_weapon', [
+            buildingName,
+            config.cost,
+            config.damage,
+            config.speed,
+            config.range,
+          ])
+        }
+        const panelX = width / 2
+        const panelY = height - 40
+        const buttonScreenX = panelX + x
+        const buttonScreenY = panelY - buttonHeight / 2
+        this.showTooltip(tooltipText, buttonScreenX, buttonScreenY, 'panel')
+      })
+
+      button.on('pointerout', () => {
+        button.setFillStyle(buttonColor, 0.8)
+        this.hideTooltip()
+      })
+
+      button.on('pointerdown', () => {
+        this.selectBuildingType(type)
+        this.hideTooltip()
+      })
+
+      // 按钮文字（使用 i18n 翻译）
+      const buildingName = this.t(`building_name_${type}`)
+      const text = this.add.text(x, 0, `${buildingName}\n$${config.cost}`, {
+        fontFamily: 'Arial',
+        fontSize: '10px',
+        color: '#ffffff',
+        align: 'center',
+      })
+      text.setOrigin(0.5, 0.5)
+
+      this.buildingPanelTexts.push(text)
+      this.buildingPanel.add([button, text])
+    })
+  }
+
   /** 更新 UI 显示 */
   private updateUI() {
-    const { money, life, score, wave, frame, waveIntervalCounter } = this.gameState
-    const aliveMonsters = this.monsters.filter(m => m.isValid).length
+    if (this.uiState.isLoading) {
+      this.uiText.setText(this.t('loading'))
+      return
+    }
 
-    let statusText = `Wave: ${wave} | Money: ${money} | Life: ${life} | Score: ${score} | Monsters: ${aliveMonsters} | Frame: ${frame}`
+    const state = this.logic.getState()
+    const monsters = this.logic.getMonsters()
+    const aliveMonsters = monsters.filter((m) => m.isValid).length
 
-    // 显示波次间隔倒计时
-    if (waveIntervalCounter > 0) {
-      const secondsLeft = Math.ceil(waveIntervalCounter / 60)
-      statusText += ` | Next wave in: ${secondsLeft}s`
+    let statusText = `${this.t('wave_info', [state.wave])} | ${this.t('panel_money_title')}${state.money} | ${this.t('panel_life_title')}${state.life} | ${this.t('panel_score_title')}${state.score} | ${this.t('panel_monster_title')}${aliveMonsters}`
+
+    if (state.isPaused) {
+      statusText += ` | ${this.t('paused')}`
+    }
+
+    if (this.uiState.waveIntervalCounter > 0) {
+      const secondsLeft = Math.ceil(this.uiState.waveIntervalCounter / 60)
+      statusText += ` | ${this.t('next_wave_in', [secondsLeft])}`
+    }
+
+    if (this.uiState.selectedBuildingType) {
+      const buildingName = this.t(`building_name_${this.uiState.selectedBuildingType}`)
+      statusText += ` | ${this.t('selected', [buildingName])}`
     }
 
     this.uiText.setText(statusText)
   }
 
-  /** 从服务端配置生成一波怪物 */
-  private spawnWaveFromConfig() {
-    for (let i = 0; i < this.currentWaveConfig.monsters.length; i++) {
-      const monsterConfig = this.currentWaveConfig.monsters[i]
-      this.spawnMonster(monsterConfig, i * 30)
-    }
-  }
-
-  /** 生成单个怪物 */
-  private spawnMonster(config: MonsterConfig, delayFrames: number = 0) {
-    const displayConfig = MOCK_MONSTERS[config.type]
-
-    const deps: MonsterDependencies = {
-      getPath: () => this.gridSystem.getCurrentPath(),
-      getPositionAtProgress: (path: Path, progress: number) => {
-        return this.pathSystem.getPositionAtProgress(path, progress)
-      },
-    }
-
-    const monster = createMonster({
-      id: config.id,
-      type: config.type,
-      life: config.life,
-      speed: config.speed,
-      shield: config.shield,
-      money: config.money,
-      color: displayConfig.color,
-      damage: displayConfig.damage,
-    }, deps)
-
-    if (delayFrames > 0) {
-      const path = this.gridSystem.getCurrentPath()
-      const totalPathLength = (path.length - 1) * GRID_SIZE
-      const actualSpeed = config.speed * GLOBAL_SPEED
-      const delayProgress = -(delayFrames * actualSpeed) / totalPathLength
-      monster.progress = delayProgress
-    }
-
-    this.monsters.push(monster)
-
-    const graphics = this.add.graphics()
-    this.monsterGraphics.set(config.id, graphics)
-  }
-
-  /** 渲染单个怪物 */
-  private renderMonster(monster: IMonsterRuntime) {
-    const graphics = this.monsterGraphics.get(monster.id)
-    if (!graphics) return
-
-    graphics.clear()
-
-    // 如果怪物还在等待生成（负进度），不渲染
-    if (monster.progress < 0) return
-
-    const pos = monster.getPixelPosition()
-    const x = this.mapOffsetX + pos.x
-    const y = this.mapOffsetY + pos.y
-
-    // 解析颜色
-    const color = Phaser.Display.Color.HexStringToColor(monster.color).color
-
-    // 绘制怪物身体（圆形）
-    graphics.fillStyle(color, 1)
-    graphics.fillCircle(x, y, monster.radius)
-
-    // 绘制边框
-    graphics.lineStyle(1, 0x000000, 0.5)
-    graphics.strokeCircle(x, y, monster.radius)
-
-    // 绘制血条背景
-    const healthBarWidth = monster.radius * 2
-    const healthBarHeight = 4
-    const healthBarY = y - monster.radius - 6
-
-    graphics.fillStyle(COLORS.MONSTER_HEALTH_BG, 1)
-    graphics.fillRect(x - healthBarWidth / 2, healthBarY, healthBarWidth, healthBarHeight)
-
-    // 绘制血条
-    const healthPercent = monster.currentLife / monster.maxLife
-    const healthColor = healthPercent > 0.5 ? 0x00ff00 : healthPercent > 0.25 ? 0xffff00 : 0xff0000
-    graphics.fillStyle(healthColor, 1)
-    graphics.fillRect(x - healthBarWidth / 2, healthBarY, healthBarWidth * healthPercent, healthBarHeight)
-  }
-
-  /** 清理无效怪物并追踪波次结果 */
-  private cleanupMonsters() {
-    const invalidMonsters = this.monsters.filter(m => !m.isValid)
-
-    for (const monster of invalidMonsters) {
-      if (monster.reachedExit()) {
-        // 怪物到达终点：记录 passed 和 lifeLost
-        this.waveResult.passed++
-        this.waveResult.lifeLost += monster.damage
-        this.gameState.life -= monster.damage
-        if (this.gameState.life <= 0) {
-          this.gameState.life = 0
-          this.gameOver()
-        }
-      } else {
-        // 怪物被击杀：记录 killed、moneyGained、killedByType
-        this.waveResult.killed++
-        this.waveResult.moneyGained += monster.money
-        this.waveResult.totalLifeDestroyed += monster.maxLife
-        const typeId = monster.type as MonsterTypeId
-        this.waveResult.killedByType[typeId] = (this.waveResult.killedByType[typeId] || 0) + 1
-        this.gameState.money += monster.money
-      }
-
-      const graphics = this.monsterGraphics.get(monster.id)
-      if (graphics) {
-        graphics.destroy()
-        this.monsterGraphics.delete(monster.id)
-      }
-    }
-
-    this.monsters = this.monsters.filter(m => m.isValid)
-  }
-
-  /** 检查波次是否结束 */
+  /** 检查波次是否结束并处理 */
   private checkWaveComplete() {
-    const hasActiveMonsters = this.monsters.some(m => m.isValid || m.progress < 0)
+    if (this.uiState.isSubmittingWave) return
 
-    if (!hasActiveMonsters && this.gameState.isPlaying && !this.gameState.isSubmittingWave) {
-      // 波次刚结束时，提交波次结果到服务端
-      if (this.gameState.waveIntervalCounter === 0) {
-        this.gameState.isSubmittingWave = true
+    if (this.logic.isWaveComplete()) {
+      if (this.uiState.waveIntervalCounter === 0) {
+        this.uiState.isSubmittingWave = true
         this.submitWaveResult()
         return
       }
 
-      // 波次间隔倒计时
-      if (this.gameState.waveIntervalCounter > 0) {
-        this.gameState.waveIntervalCounter--
-        return
-      }
+      this.uiState.waveIntervalCounter--
 
-      // 倒计时结束，生成下一波
-      this.gameState.wave++
-      this.resetWaveResult()
-      this.spawnWaveFromConfig()
+      if (this.uiState.waveIntervalCounter === 0) {
+        this.logic.startWave(this.currentWaveConfig)
+        this.renderPath()
+      }
     }
   }
 
   /** 提交波次结果到服务端 */
   private submitWaveResult() {
-    const waveDurationFrames = this.gameState.frame - this.waveResult.startFrame
+    const state = this.logic.getState()
+    const waveRecorder = this.logic.getWaveRecorder()
+    const buildings = this.logic.getBuildings()
 
-    mockSubmitWave({
-      sessionId: this.sessionId,
-      waveNumber: this.gameState.wave,
-      actions: [],
-      attacks: [],
-      result: {
-        killed: this.waveResult.killed,
-        killedByType: this.waveResult.killedByType,
-        passed: this.waveResult.passed,
-        scoreGained: this.waveResult.scoreGained,
-        moneyGained: this.waveResult.moneyGained,
-        lifeLost: this.waveResult.lifeLost,
-        totalDamageDealt: this.waveResult.totalDamageDealt,
-        totalLifeDestroyed: this.waveResult.totalLifeDestroyed,
-        waveDurationFrames,
-      },
-      buildings: [],
-    }).then((response) => {
+    const buildingSnapshots = buildings.map((b) => ({
+      id: b.id,
+      type: b.type,
+      position: b.position,
+      level: b.level,
+      damageDealt: b.damageDealt,
+      kills: b.kills,
+    }))
+
+    mockSubmitWave(
+      waveRecorder.toWaveRequest(this.sessionId, buildingSnapshots),
+    ).then((response) => {
       if (!response.valid) {
         console.error('Wave validation failed:', response.error)
+        this.uiState.isSubmittingWave = false
         return
       }
-
-      // 同步服务端状态
-      this.gameState.money = response.serverState.money
-      this.gameState.score = response.serverState.score
-      this.gameState.life = response.serverState.life
-      this.gameState.difficulty = response.serverState.difficulty
 
       // 检查游戏是否结束
-      if (this.gameState.life <= 0 || !response.nextWave) {
+      if (state.life <= 0 || !response.nextWave) {
         this.gameOver()
         return
-      }
-
-      // 应用生命奖励
-      if (response.nextWave.lifeReward) {
-        this.gameState.life = Math.min(this.gameState.life + response.nextWave.lifeReward, 100)
       }
 
       // 保存下一波配置
       this.currentWaveConfig = response.nextWave
 
       // 开始波次间隔倒计时
-      this.gameState.waveIntervalCounter = WAVE_INTERVAL_FRAMES
-      this.gameState.isSubmittingWave = false
+      this.uiState.waveIntervalCounter = WAVE_INTERVAL_FRAMES
+      this.uiState.isSubmittingWave = false
     })
   }
 
   /** 游戏结束 */
   private gameOver() {
-    this.gameState.isPlaying = false
+    const state = this.logic.getState()
+    const waveRecorder = this.logic.getWaveRecorder()
+    const buildings = this.logic.getBuildings()
 
-    // 显示游戏结束文字
-    const { width, height } = this.scale
-    this.add.text(width / 2, height / 2, 'GAME OVER', {
-      fontFamily: 'Arial Black',
-      fontSize: '64px',
-      color: '#ff0000',
-      stroke: '#000000',
-      strokeThickness: 8,
-    }).setOrigin(0.5)
+    // 获取最后一波结果
+    const lastWaveResult = waveRecorder.getResult()
 
-    this.add.text(width / 2, height / 2 + 60, `Final Score: ${this.gameState.score}`, {
-      fontFamily: 'Arial',
-      fontSize: '32px',
-      color: '#ffffff',
-    }).setOrigin(0.5)
+    // 转换建筑列表为快照格式
+    const buildingSnapshots = buildings.map((b) => ({
+      id: b.id,
+      type: b.type,
+      position: b.position,
+      level: b.level,
+      damageDealt: 0,
+      kills: 0,
+    }))
 
-    this.add.text(width / 2, height / 2 + 100, `Waves Completed: ${this.gameState.wave - 1}`, {
-      fontFamily: 'Arial',
-      fontSize: '24px',
-      color: '#cccccc',
-    }).setOrigin(0.5)
+    // 发送游戏结束事件到 Vue 层（不再在画布上绘制文字）
+    EventBus.emit('game-over', {
+      score: state.score,
+      wave: state.wave,
+      sessionId: this.sessionId,
+      lastWaveResult,
+      buildings: buildingSnapshots,
+    })
   }
 
   /** 游戏主循环 */
   update() {
-    if (!this.gameState.isPlaying || this.gameState.isPaused || this.gameState.isLoading) {
-      return
-    }
+    if (this.uiState.isLoading) return
 
-    this.gameState.frame++
+    const state = this.logic.getState()
 
-    // 更新所有怪物
-    for (const monster of this.monsters) {
-      if (monster.isValid && monster.progress >= 0) {
-        monster.update()
-      } else if (monster.progress < 0) {
-        // 等待生成的怪物，增加进度
-        const path = this.gridSystem.getCurrentPath()
-        const totalPathLength = (path.length - 1) * GRID_SIZE
-        const actualSpeed = monster.speed * GLOBAL_SPEED
-        monster.progress += actualSpeed / totalPathLength
-      }
-    }
+    if (state.isGameOver) return
 
-    // 渲染怪物
-    for (const monster of this.monsters) {
-      this.renderMonster(monster)
-    }
+    // 更新逻辑
+    this.logic.update()
 
-    // 清理无效怪物
-    this.cleanupMonsters()
-
-    // 检查波次是否结束
-    this.checkWaveComplete()
-
-    // 更新 UI
+    // 渲染
+    this.renderBuildings()
+    this.renderMonsters()
+    this.renderBullets()
+    this.renderHover()
     this.updateUI()
+
+    // 检查波次完成
+    this.checkWaveComplete()
   }
 
   /** 暂停/恢复游戏 */
   togglePause() {
-    this.gameState.isPaused = !this.gameState.isPaused
-    EventBus.emit('game-paused', this.gameState.isPaused)
+    if (this.logic) {
+      this.logic.togglePause()
+      EventBus.emit('game-paused', this.logic.getState().isPaused)
+    }
   }
 
   /** 获取游戏状态 */
-  getGameState(): GameState {
-    return { ...this.gameState }
+  getGameState() {
+    if (this.logic) {
+      return this.logic.getState()
+    }
+    return null
+  }
+
+  /** 重新开始游戏 */
+  async restart() {
+    // 设置加载状态
+    this.uiState.isLoading = true
+    this.uiState.waveIntervalCounter = 0
+    this.uiState.isSubmittingWave = false
+    this.uiState.selectedBuildingType = null
+    this.uiState.selectedBuildingId = null
+    this.uiState.hoverPosition = null
+
+    // 清除渲染
+    this.buildingGraphics.clear()
+    this.monsterGraphics.clear()
+    this.bulletGraphics.clear()
+    this.hoverGraphics.clear()
+
+    try {
+      // 请求新的游戏会话
+      const response = await mockStartGame()
+
+      this.sessionId = response.sessionId
+      this.gameConfig = response.config
+      this.currentWaveConfig = response.firstWave
+
+      // 重置核心逻辑
+      this.logic.reset()
+
+      // 开始第一波
+      this.logic.startWave(this.currentWaveConfig)
+
+      this.uiState.isLoading = false
+
+      // 重新渲染静态元素
+      this.renderMap()
+      this.renderPath()
+
+      // 通知重新开始完成
+      EventBus.emit('game-restarted')
+    } catch (error) {
+      console.error('Failed to restart game:', error)
+      this.uiState.isLoading = false
+    }
   }
 }

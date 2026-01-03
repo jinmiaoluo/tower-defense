@@ -9,7 +9,12 @@ const config: Phaser.Types.Core.GameConfig = {
   height: 768,
   parent: 'game-container',
   backgroundColor: '#1a1a2e',
-  scene: [Boot, Preloader, Game]
+  scene: [Boot, Preloader, Game],
+  render: {
+    antialias: true,
+    roundPixels: true,
+  },
+  resolution: window.devicePixelRatio || 1,
 }
 
 const StartGame = (parent: string) => {

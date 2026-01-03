@@ -77,6 +77,9 @@ export interface GridSystem {
 
   /** 获取出口位置 */
   getExit(): Position
+
+  /** 重置网格状态（清除所有建筑） */
+  reset(): void
 }
 
 /**
@@ -380,6 +383,24 @@ export function createGridSystem(mapConfig: MapConfig): GridSystem {
 
     getExit(): Position {
       return exit
+    },
+
+    reset(): void {
+      // 清除所有建筑
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const cell = cells[y][x]
+          if (cell.buildingId !== null) {
+            cell.buildingId = null
+            // 恢复可通行状态（如果不是原始障碍物）
+            if (!cell.isObstacle) {
+              cell.isPassable = true
+            }
+          }
+        }
+      }
+      // 重新计算路径
+      recalculatePath()
     },
   }
 }
