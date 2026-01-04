@@ -35,6 +35,7 @@ export interface BuildingRenderData {
   gridSize: number
   isSelected: boolean
   targetPosition?: Position
+  frame?: number
 }
 
 /** 怪物渲染数据 */
@@ -47,6 +48,7 @@ export interface MonsterRenderData {
   currentLife: number
   maxLife: number
   shield: number
+  frame?: number
 }
 
 /** 子弹渲染数据 */

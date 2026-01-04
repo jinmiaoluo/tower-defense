@@ -1,5 +1,5 @@
 /**
- * 建筑渲染器 - 像素艺术风格
+ * 建筑渲染器 - 简单动画风格
  */
 
 import type { RenderContext, BuildingRenderData } from './types'
@@ -8,40 +8,55 @@ import { DPR } from '../dpr'
 /** 选中建筑的高亮颜色 */
 const SELECTED_COLOR = 0x00ffff
 
-/** 像素单位大小（DPR 缩放） */
-const PIXEL_SIZE = 2 * DPR
-
-/** 像素风格建筑颜色配置 */
-const PIXEL_COLORS = {
+/** 简单风格建筑颜色配置 */
+const COLORS = {
   wall: {
-    brick: 0x8b4513,
-    mortar: 0x5c3317,
-    highlight: 0xa0522d,
+    base: 0x666666,
+    dark: 0x444444,
+    light: 0x888888,
   },
   cannon: {
-    base: 0x228b22,
-    dark: 0x006400,
-    light: 0x32cd32,
-    barrel: 0x2f4f4f,
+    base: 0x339933,
+    dark: 0x226622,
+    light: 0x55bb55,
+    barrel: 0x333333,
   },
   LMG: {
-    base: 0x4169e1,
-    dark: 0x191970,
-    light: 0x6495ed,
-    barrel: 0x1e3a5f,
+    base: 0x3366ff,
+    dark: 0x2244cc,
+    light: 0x5588ff,
+    barrel: 0x222266,
   },
   HMG: {
-    base: 0xb22222,
-    dark: 0x8b0000,
-    light: 0xcd5c5c,
-    barrel: 0x4a0404,
+    base: 0xcc3333,
+    dark: 0x992222,
+    light: 0xee5555,
+    barrel: 0x442222,
   },
   laser_gun: {
-    crystal: 0xff0000,
-    crystalLight: 0xff6666,
-    base: 0x9400d3,
-    baseLight: 0xba55d3,
+    base: 0x9933ff,
+    dark: 0x6622cc,
+    light: 0xbb55ff,
+    crystal: 0xff3333,
   },
+}
+
+/** 计算呼吸动画缩放 */
+function calcBreath(frame: number, speed: number = 0.08): number {
+  return 1 + Math.sin(frame * speed) * 0.05
+}
+
+/** 计算脉冲动画亮度 */
+function calcPulse(frame: number, speed: number = 0.1): number {
+  return (Math.sin(frame * speed) + 1) / 2
+}
+
+/** 调整颜色亮度 */
+function adjustBrightness(color: number, factor: number): number {
+  const r = Math.min(255, Math.floor(((color >> 16) & 0xff) * factor))
+  const g = Math.min(255, Math.floor(((color >> 8) & 0xff) * factor))
+  const b = Math.min(255, Math.floor((color & 0xff) * factor))
+  return (r << 16) | (g << 8) | b
 }
 
 /**
@@ -68,309 +83,258 @@ export function renderBuilding(ctx: RenderContext, data: BuildingRenderData): vo
 }
 
 /**
- * 绘制单个像素块
- */
-function drawPixel(ctx: RenderContext, x: number, y: number, color: number): void {
-  ctx.fillStyle(color, 1)
-  ctx.fillRect(x, y, PIXEL_SIZE, PIXEL_SIZE)
-}
-
-/**
- * 渲染墙 - 像素砖块风格
+ * 渲染墙 - 简单方块
  */
 function renderWall(ctx: RenderContext, data: BuildingRenderData): void {
-  const { centerX, centerY, gridSize, isSelected } = data
-  const gs2 = gridSize / 2
-  const colors = PIXEL_COLORS.wall
-  const startX = centerX - gs2 + 2 * DPR
-  const startY = centerY - gs2 + 2 * DPR
+  const { centerX, centerY, gridSize, isSelected, frame = 0 } = data
+  const colors = COLORS.wall
   const size = gridSize - 4 * DPR
+  const half = size / 2
 
-  // 背景砂浆色
-  ctx.fillStyle(colors.mortar, 1)
-  ctx.fillRect(startX, startY, size, size)
+  // 简单呼吸动画
+  const scale = calcBreath(frame, 0.05)
+  const animSize = size * scale
+  const animHalf = animSize / 2
 
-  // 绘制砖块纹理（交错排列）
-  const brickW = 6 * DPR
-  const brickH = 3 * DPR
-  for (let row = 0; row < Math.floor(size / brickH); row++) {
-    const offset = row % 2 === 0 ? 0 : brickW / 2
-    for (let col = -1; col < Math.ceil(size / brickW) + 1; col++) {
-      const bx = startX + col * brickW + offset
-      const by = startY + row * brickH
-      if (bx >= startX && bx + brickW - 1 <= startX + size && by + brickH - 1 <= startY + size) {
-        ctx.fillStyle(colors.brick, 1)
-        ctx.fillRect(bx, by, brickW - 1, brickH - 1)
-        // 高光像素
-        drawPixel(ctx, bx, by, colors.highlight)
-      }
-    }
-  }
-
-  // 黑色边框
-  ctx.lineStyle(2 * DPR, 0x000000, 1)
-  ctx.strokeRect(startX, startY, size, size)
-
-  // 选中高亮
-  if (isSelected) {
-    ctx.lineStyle(2 * DPR, SELECTED_COLOR, 1)
-    ctx.strokeRect(centerX - gs2, centerY - gs2, gridSize, gridSize)
-  }
-}
-
-/**
- * 渲染炮台 - 像素炮塔风格
- */
-function renderCannon(ctx: RenderContext, data: BuildingRenderData): void {
-  const { centerX, centerY, gridSize, isSelected, targetPosition } = data
-  const gs2 = gridSize / 2
-  const colors = PIXEL_COLORS.cannon
-  const p = PIXEL_SIZE
-
-  // 底座（大方块）
-  const baseSize = 16 * DPR
-  const baseX = centerX - baseSize / 2
-  const baseY = centerY - baseSize / 2
-
-  // 深色底层
+  // 外层深色
   ctx.fillStyle(colors.dark, 1)
-  ctx.fillRect(baseX, baseY, baseSize, baseSize)
+  ctx.fillRect(centerX - animHalf, centerY - animHalf, animSize, animSize)
 
-  // 主色中层
+  // 内层主色
+  const innerSize = animSize - 4 * DPR
   ctx.fillStyle(colors.base, 1)
-  ctx.fillRect(baseX + p, baseY + p, baseSize - p * 2, baseSize - p * 2)
-
-  // 高光区域（左上角）
-  ctx.fillStyle(colors.light, 1)
-  ctx.fillRect(baseX + p, baseY + p, p * 3, p)
-  ctx.fillRect(baseX + p, baseY + p * 2, p, p * 2)
-
-  // 炮管（指向目标）
-  const barrelLength = gs2
-  const barrelWidth = 4 * DPR
-  let angle = 0
-
-  if (targetPosition) {
-    // 使用格子坐标差值计算方向，避免像素坐标偏移量问题
-    const dx = targetPosition[0] - data.position[0]
-    const dy = targetPosition[1] - data.position[1]
-    angle = Math.atan2(dy, dx)
-  }
-
-  // 绘制像素化炮管
-  const steps = Math.floor(barrelLength / p)
-  for (let i = 0; i < steps; i++) {
-    const bx = centerX + Math.cos(angle) * i * p - p / 2
-    const by = centerY + Math.sin(angle) * i * p - p / 2
-    ctx.fillStyle(i < 2 ? colors.dark : colors.barrel, 1)
-    ctx.fillRect(Math.round(bx), Math.round(by), barrelWidth, barrelWidth)
-  }
-
-  // 中心炮座
-  ctx.fillStyle(colors.dark, 1)
-  ctx.fillRect(centerX - 3 * DPR, centerY - 3 * DPR, 6 * DPR, 6 * DPR)
-
-  // 黑色边框
-  ctx.lineStyle(1 * DPR, 0x000000, 1)
-  ctx.strokeRect(baseX, baseY, baseSize, baseSize)
-
-  // 选中高亮
-  if (isSelected) {
-    ctx.lineStyle(2 * DPR, SELECTED_COLOR, 1)
-    ctx.strokeRect(centerX - gs2 + 2 * DPR, centerY - gs2 + 2 * DPR, gridSize - 4 * DPR, gridSize - 4 * DPR)
-  }
-}
-
-/**
- * 渲染轻机枪 (LMG) - 像素精准塔风格
- */
-function renderLMG(ctx: RenderContext, data: BuildingRenderData): void {
-  const { centerX, centerY, gridSize, isSelected, targetPosition } = data
-  const gs2 = gridSize / 2
-  const colors = PIXEL_COLORS.LMG
-  const p = PIXEL_SIZE
-
-  // 底座（较小方块）
-  const baseSize = 12 * DPR
-  const baseX = centerX - baseSize / 2
-  const baseY = centerY - baseSize / 2
-
-  // 深色底层
-  ctx.fillStyle(colors.dark, 1)
-  ctx.fillRect(baseX, baseY, baseSize, baseSize)
-
-  // 主色层
-  ctx.fillStyle(colors.base, 1)
-  ctx.fillRect(baseX + p, baseY + p, baseSize - p * 2, baseSize - p * 2)
+  ctx.fillRect(centerX - innerSize / 2, centerY - innerSize / 2, innerSize, innerSize)
 
   // 高光
   ctx.fillStyle(colors.light, 1)
-  ctx.fillRect(baseX + p, baseY + p, p * 2, p)
-  ctx.fillRect(baseX + p, baseY + p * 2, p, p)
+  ctx.fillRect(centerX - innerSize / 2, centerY - innerSize / 2, innerSize / 3, 3 * DPR)
 
-  // 枪管（细长）
-  const barrelLength = gs2 + 2 * DPR
+  // 边框
+  ctx.lineStyle(1 * DPR, 0x000000, 1)
+  ctx.strokeRect(centerX - animHalf, centerY - animHalf, animSize, animSize)
+
+  // 选中高亮
+  if (isSelected) {
+    ctx.lineStyle(2 * DPR, SELECTED_COLOR, 1)
+    ctx.strokeRect(centerX - half - 2 * DPR, centerY - half - 2 * DPR, size + 4 * DPR, size + 4 * DPR)
+  }
+}
+
+/**
+ * 渲染炮台 - 圆形底座 + 炮管
+ */
+function renderCannon(ctx: RenderContext, data: BuildingRenderData): void {
+  const { centerX, centerY, gridSize, isSelected, targetPosition, frame = 0 } = data
+  const colors = COLORS.cannon
+  const baseRadius = 10 * DPR
+
+  // 呼吸动画
+  const scale = calcBreath(frame, 0.06)
+  const animRadius = baseRadius * scale
+
+  // 外圈深色
+  ctx.fillStyle(colors.dark, 1)
+  ctx.fillCircle(centerX, centerY, animRadius + 2 * DPR)
+
+  // 主圆
+  ctx.fillStyle(colors.base, 1)
+  ctx.fillCircle(centerX, centerY, animRadius)
+
+  // 高光
+  ctx.fillStyle(colors.light, 1)
+  ctx.fillCircle(centerX - 3 * DPR, centerY - 3 * DPR, 4 * DPR)
+
+  // 炮管
+  const barrelLength = gridSize / 2
   let angle = 0
-
   if (targetPosition) {
-    // 使用格子坐标差值计算方向
     const dx = targetPosition[0] - data.position[0]
     const dy = targetPosition[1] - data.position[1]
     angle = Math.atan2(dy, dx)
   }
 
-  // 绘制细长像素枪管
-  const steps = Math.floor(barrelLength / p)
-  for (let i = 0; i < steps; i++) {
-    const bx = centerX + Math.cos(angle) * i * p - 1 * DPR
-    const by = centerY + Math.sin(angle) * i * p - 1 * DPR
-    ctx.fillStyle(colors.barrel, 1)
-    ctx.fillRect(Math.round(bx), Math.round(by), 2 * DPR, 2 * DPR)
-  }
+  const endX = centerX + Math.cos(angle) * barrelLength
+  const endY = centerY + Math.sin(angle) * barrelLength
+  ctx.lineStyle(5 * DPR, colors.barrel, 1)
+  ctx.lineBetween(centerX, centerY, endX, endY)
 
-  // 中心点
+  // 炮口
   ctx.fillStyle(colors.dark, 1)
-  ctx.fillRect(centerX - 2 * DPR, centerY - 2 * DPR, 4 * DPR, 4 * DPR)
+  ctx.fillCircle(endX, endY, 3 * DPR)
 
-  // 黑色边框
+  // 边框
   ctx.lineStyle(1 * DPR, 0x000000, 1)
-  ctx.strokeRect(baseX, baseY, baseSize, baseSize)
+  ctx.strokeCircle(centerX, centerY, animRadius + 2 * DPR)
 
   // 选中高亮
   if (isSelected) {
     ctx.lineStyle(2 * DPR, SELECTED_COLOR, 1)
-    ctx.strokeRect(centerX - gs2 + 4 * DPR, centerY - gs2 + 4 * DPR, gridSize - 8 * DPR, gridSize - 8 * DPR)
+    ctx.strokeCircle(centerX, centerY, baseRadius + 6 * DPR)
   }
 }
 
 /**
- * 渲染重机枪 (HMG) - 像素重型塔风格
+ * 渲染轻机枪 - 小圆形底座 + 细枪管
+ */
+function renderLMG(ctx: RenderContext, data: BuildingRenderData): void {
+  const { centerX, centerY, gridSize, isSelected, targetPosition, frame = 0 } = data
+  const colors = COLORS.LMG
+  const baseRadius = 8 * DPR
+
+  // 呼吸动画
+  const scale = calcBreath(frame, 0.07)
+  const animRadius = baseRadius * scale
+
+  // 外圈
+  ctx.fillStyle(colors.dark, 1)
+  ctx.fillCircle(centerX, centerY, animRadius + 2 * DPR)
+
+  // 主圆
+  ctx.fillStyle(colors.base, 1)
+  ctx.fillCircle(centerX, centerY, animRadius)
+
+  // 高光
+  ctx.fillStyle(colors.light, 1)
+  ctx.fillCircle(centerX - 2 * DPR, centerY - 2 * DPR, 3 * DPR)
+
+  // 枪管
+  const barrelLength = gridSize / 2 + 4 * DPR
+  let angle = 0
+  if (targetPosition) {
+    const dx = targetPosition[0] - data.position[0]
+    const dy = targetPosition[1] - data.position[1]
+    angle = Math.atan2(dy, dx)
+  }
+
+  const endX = centerX + Math.cos(angle) * barrelLength
+  const endY = centerY + Math.sin(angle) * barrelLength
+  ctx.lineStyle(3 * DPR, colors.barrel, 1)
+  ctx.lineBetween(centerX, centerY, endX, endY)
+
+  // 边框
+  ctx.lineStyle(1 * DPR, 0x000000, 1)
+  ctx.strokeCircle(centerX, centerY, animRadius + 2 * DPR)
+
+  // 选中高亮
+  if (isSelected) {
+    ctx.lineStyle(2 * DPR, SELECTED_COLOR, 1)
+    ctx.strokeCircle(centerX, centerY, baseRadius + 5 * DPR)
+  }
+}
+
+/**
+ * 渲染重机枪 - 大圆形底座 + 粗枪管
  */
 function renderHMG(ctx: RenderContext, data: BuildingRenderData): void {
-  const { centerX, centerY, gridSize, isSelected, targetPosition } = data
-  const gs2 = gridSize / 2
-  const colors = PIXEL_COLORS.HMG
-  const p = PIXEL_SIZE
+  const { centerX, centerY, gridSize, isSelected, targetPosition, frame = 0 } = data
+  const colors = COLORS.HMG
+  const baseRadius = 12 * DPR
 
-  // 底座（大方块）
-  const baseSize = 20 * DPR
-  const baseX = centerX - baseSize / 2
-  const baseY = centerY - baseSize / 2
+  // 呼吸动画
+  const scale = calcBreath(frame, 0.05)
+  const animRadius = baseRadius * scale
 
-  // 深色底层
+  // 外圈
   ctx.fillStyle(colors.dark, 1)
-  ctx.fillRect(baseX, baseY, baseSize, baseSize)
+  ctx.fillCircle(centerX, centerY, animRadius + 3 * DPR)
 
-  // 主色层
+  // 主圆
   ctx.fillStyle(colors.base, 1)
-  ctx.fillRect(baseX + p, baseY + p, baseSize - p * 2, baseSize - p * 2)
+  ctx.fillCircle(centerX, centerY, animRadius)
 
-  // 中心区域（更亮）
+  // 内圈
   ctx.fillStyle(colors.light, 1)
-  ctx.fillRect(baseX + p * 2, baseY + p * 2, baseSize - p * 4, baseSize - p * 4)
+  ctx.fillCircle(centerX, centerY, animRadius - 4 * DPR)
 
-  // 高光（左上角）
-  ctx.fillStyle(0xee6666, 1)
-  ctx.fillRect(baseX + p, baseY + p, p * 3, p)
-  ctx.fillRect(baseX + p, baseY + p * 2, p * 2, p)
+  // 高光
+  ctx.fillStyle(0xffffff, 0.3)
+  ctx.fillCircle(centerX - 4 * DPR, centerY - 4 * DPR, 4 * DPR)
 
   // 粗枪管
-  const barrelLength = gs2 + 4 * DPR
-  const barrelWidth = 6 * DPR
+  const barrelLength = gridSize / 2 + 6 * DPR
   let angle = 0
-
   if (targetPosition) {
-    // 使用格子坐标差值计算方向
     const dx = targetPosition[0] - data.position[0]
     const dy = targetPosition[1] - data.position[1]
     angle = Math.atan2(dy, dx)
   }
 
-  // 绘制粗像素枪管（双排）
-  const steps = Math.floor(barrelLength / p)
-  for (let i = 0; i < steps; i++) {
-    const bx = centerX + Math.cos(angle) * i * p - barrelWidth / 2
-    const by = centerY + Math.sin(angle) * i * p - barrelWidth / 2
-    ctx.fillStyle(i < 3 ? colors.dark : colors.barrel, 1)
-    ctx.fillRect(Math.round(bx), Math.round(by), barrelWidth, barrelWidth)
-  }
+  const endX = centerX + Math.cos(angle) * barrelLength
+  const endY = centerY + Math.sin(angle) * barrelLength
+  ctx.lineStyle(7 * DPR, colors.barrel, 1)
+  ctx.lineBetween(centerX, centerY, endX, endY)
 
-  // 中心炮座
+  // 炮口
   ctx.fillStyle(colors.dark, 1)
-  ctx.fillRect(centerX - 4 * DPR, centerY - 4 * DPR, 8 * DPR, 8 * DPR)
-  ctx.fillStyle(0x660000, 1)
-  ctx.fillRect(centerX - 2 * DPR, centerY - 2 * DPR, 4 * DPR, 4 * DPR)
+  ctx.fillCircle(endX, endY, 4 * DPR)
 
-  // 黑色边框
+  // 边框
   ctx.lineStyle(1 * DPR, 0x000000, 1)
-  ctx.strokeRect(baseX, baseY, baseSize, baseSize)
+  ctx.strokeCircle(centerX, centerY, animRadius + 3 * DPR)
 
   // 选中高亮
   if (isSelected) {
     ctx.lineStyle(2 * DPR, SELECTED_COLOR, 1)
-    ctx.strokeRect(centerX - gs2 + 1 * DPR, centerY - gs2 + 1 * DPR, gridSize - 2 * DPR, gridSize - 2 * DPR)
+    ctx.strokeCircle(centerX, centerY, baseRadius + 6 * DPR)
   }
 }
 
 /**
- * 渲染激光枪 - 像素水晶塔风格
+ * 渲染激光枪 - 三角形 + 脉冲动画
  */
 function renderLaserGun(ctx: RenderContext, data: BuildingRenderData): void {
-  const { centerX, centerY, gridSize, isSelected } = data
-  const gs2 = gridSize / 2
-  const colors = PIXEL_COLORS.laser_gun
-  const p = PIXEL_SIZE
+  const { centerX, centerY, gridSize, isSelected, frame = 0 } = data
+  const colors = COLORS.laser_gun
+  const size = 12 * DPR
 
-  // 紫色底座
-  const baseSize = 14 * DPR
-  const baseX = centerX - baseSize / 2
-  const baseY = centerY - baseSize / 2 + 2 * DPR
+  // 脉冲动画
+  const pulse = calcPulse(frame, 0.12)
+  const crystalColor = adjustBrightness(colors.crystal, 0.8 + pulse * 0.4)
+
+  // 底座圆形
+  ctx.fillStyle(colors.dark, 1)
+  ctx.fillCircle(centerX, centerY + 4 * DPR, 10 * DPR)
 
   ctx.fillStyle(colors.base, 1)
-  ctx.fillRect(baseX, baseY, baseSize, baseSize)
+  ctx.fillCircle(centerX, centerY + 4 * DPR, 8 * DPR)
 
-  ctx.fillStyle(colors.baseLight, 1)
-  ctx.fillRect(baseX + p, baseY + p, baseSize - p * 2, baseSize - p * 2)
+  // 水晶三角形
+  const topY = centerY - size
+  const bottomY = centerY + 2 * DPR
+  const halfWidth = 6 * DPR
 
-  // 像素化红色水晶（金字塔形状）
-  const crystalLevels = [
-    { width: 2 * DPR, yOffset: -10 * DPR },
-    { width: 4 * DPR, yOffset: -8 * DPR },
-    { width: 6 * DPR, yOffset: -6 * DPR },
-    { width: 8 * DPR, yOffset: -4 * DPR },
-    { width: 10 * DPR, yOffset: -2 * DPR },
-  ]
+  ctx.fillStyle(crystalColor, 1)
+  ctx.fillTriangle(
+    centerX, topY,
+    centerX - halfWidth, bottomY,
+    centerX + halfWidth, bottomY
+  )
 
-  for (const level of crystalLevels) {
-    const lx = centerX - level.width / 2
-    const ly = centerY + level.yOffset
-    ctx.fillStyle(colors.crystal, 1)
-    ctx.fillRect(lx, ly, level.width, p)
-    // 高光
-    if (level.width > 2 * DPR) {
-      ctx.fillStyle(colors.crystalLight, 1)
-      ctx.fillRect(lx, ly, p, p)
-    }
-  }
+  // 水晶高光
+  ctx.fillStyle(0xffffff, 0.5)
+  ctx.fillTriangle(
+    centerX - 2 * DPR, topY + 4 * DPR,
+    centerX - halfWidth + 2 * DPR, bottomY - 4 * DPR,
+    centerX - 1 * DPR, bottomY - 4 * DPR
+  )
 
-  // 水晶顶端高光
+  // 水晶边框
+  ctx.lineStyle(1 * DPR, colors.dark, 1)
+  ctx.strokeTriangle(
+    centerX, topY,
+    centerX - halfWidth, bottomY,
+    centerX + halfWidth, bottomY
+  )
+
+  // 中心能量点
+  const energyRadius = 2 * DPR + pulse * 1 * DPR
   ctx.fillStyle(0xffffff, 1)
-  ctx.fillRect(centerX - 1 * DPR, centerY - 10 * DPR, 2 * DPR, 2 * DPR)
-
-  // 中心能量核心
-  ctx.fillStyle(0x000000, 1)
-  ctx.fillRect(centerX - 3 * DPR, centerY, 6 * DPR, 6 * DPR)
-  ctx.fillStyle(colors.crystal, 1)
-  ctx.fillRect(centerX - 2 * DPR, centerY + 1 * DPR, 4 * DPR, 4 * DPR)
-
-  // 底座边框
-  ctx.lineStyle(1 * DPR, 0x000000, 1)
-  ctx.strokeRect(baseX, baseY, baseSize, baseSize)
+  ctx.fillCircle(centerX, centerY - 2 * DPR, energyRadius)
 
   // 选中高亮
   if (isSelected) {
     ctx.lineStyle(2 * DPR, SELECTED_COLOR, 1)
-    ctx.strokeRect(centerX - gs2 + 3 * DPR, centerY - gs2 + 3 * DPR, gridSize - 6 * DPR, gridSize - 6 * DPR)
+    ctx.strokeCircle(centerX, centerY, 14 * DPR)
   }
 }
 

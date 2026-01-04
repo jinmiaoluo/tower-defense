@@ -39,7 +39,7 @@ describe('BuildingRenderer', () => {
   })
 
   describe('renderBuilding', () => {
-    it('渲染墙应绘制像素砖块', () => {
+    it('渲染墙应绘制方块', () => {
       const data: BuildingRenderData = {
         id: 'wall-1',
         type: 'wall',
@@ -53,12 +53,12 @@ describe('BuildingRenderer', () => {
 
       renderBuilding(ctx, data)
 
-      // 像素风格使用 fillRect 绘制砖块纹理
+      // 简单风格使用 fillRect 绘制方块
       const fillRectCalls = (ctx.fillRect as ReturnType<typeof vi.fn>).mock.calls
-      expect(fillRectCalls.length).toBeGreaterThan(5)
+      expect(fillRectCalls.length).toBeGreaterThanOrEqual(2)
     })
 
-    it('渲染炮台应绘制像素方块和炮管', () => {
+    it('渲染炮台应绘制圆形底座和炮管', () => {
       const data: BuildingRenderData = {
         id: 'cannon-1',
         type: 'cannon',
@@ -73,12 +73,14 @@ describe('BuildingRenderer', () => {
 
       renderBuilding(ctx, data)
 
-      // 像素风格使用 fillRect 绘制底座和炮管
-      const fillRectCalls = (ctx.fillRect as ReturnType<typeof vi.fn>).mock.calls
-      expect(fillRectCalls.length).toBeGreaterThan(3)
+      // 简单风格使用 fillCircle 绘制圆形底座
+      const fillCircleCalls = (ctx.fillCircle as ReturnType<typeof vi.fn>).mock.calls
+      expect(fillCircleCalls.length).toBeGreaterThanOrEqual(3)
+      // 使用 lineBetween 绘制炮管
+      expect(ctx.lineBetween).toHaveBeenCalled()
     })
 
-    it('渲染 LMG 应绘制像素方块和枪管', () => {
+    it('渲染 LMG 应绘制圆形底座和枪管', () => {
       const data: BuildingRenderData = {
         id: 'lmg-1',
         type: 'LMG',
@@ -93,12 +95,12 @@ describe('BuildingRenderer', () => {
 
       renderBuilding(ctx, data)
 
-      // 像素风格使用 fillRect 绘制
-      const fillRectCalls = (ctx.fillRect as ReturnType<typeof vi.fn>).mock.calls
-      expect(fillRectCalls.length).toBeGreaterThan(3)
+      // 简单风格使用 fillCircle 绘制
+      const fillCircleCalls = (ctx.fillCircle as ReturnType<typeof vi.fn>).mock.calls
+      expect(fillCircleCalls.length).toBeGreaterThanOrEqual(3)
     })
 
-    it('渲染 HMG 应绘制像素大方块和粗枪管', () => {
+    it('渲染 HMG 应绘制大圆形底座和粗枪管', () => {
       const data: BuildingRenderData = {
         id: 'hmg-1',
         type: 'HMG',
@@ -113,12 +115,12 @@ describe('BuildingRenderer', () => {
 
       renderBuilding(ctx, data)
 
-      // HMG 有多层像素方块
-      const fillRectCalls = (ctx.fillRect as ReturnType<typeof vi.fn>).mock.calls
-      expect(fillRectCalls.length).toBeGreaterThanOrEqual(5)
+      // HMG 有多层圆形
+      const fillCircleCalls = (ctx.fillCircle as ReturnType<typeof vi.fn>).mock.calls
+      expect(fillCircleCalls.length).toBeGreaterThanOrEqual(4)
     })
 
-    it('渲染激光枪应绘制像素水晶塔', () => {
+    it('渲染激光枪应绘制三角形水晶', () => {
       const data: BuildingRenderData = {
         id: 'laser-1',
         type: 'laser_gun',
@@ -132,9 +134,12 @@ describe('BuildingRenderer', () => {
 
       renderBuilding(ctx, data)
 
-      // 像素水晶塔使用多个 fillRect 绘制金字塔形状
-      const fillRectCalls = (ctx.fillRect as ReturnType<typeof vi.fn>).mock.calls
-      expect(fillRectCalls.length).toBeGreaterThan(5)
+      // 激光枪使用三角形绘制水晶
+      const fillTriangleCalls = (ctx.fillTriangle as ReturnType<typeof vi.fn>).mock.calls
+      expect(fillTriangleCalls.length).toBeGreaterThanOrEqual(1)
+      // 也使用圆形绘制底座和能量点
+      const fillCircleCalls = (ctx.fillCircle as ReturnType<typeof vi.fn>).mock.calls
+      expect(fillCircleCalls.length).toBeGreaterThanOrEqual(2)
     })
 
     it('选中建筑应绘制高亮边框', () => {
@@ -154,9 +159,7 @@ describe('BuildingRenderer', () => {
 
       // 检查是否使用了选中颜色（青色 0x00ffff）
       const lineStyleCalls = (ctx.lineStyle as ReturnType<typeof vi.fn>).mock.calls
-      const hasSelectedColor = lineStyleCalls.some(
-        (call) => call[1] === 0x00ffff,
-      )
+      const hasSelectedColor = lineStyleCalls.some((call) => call[1] === 0x00ffff)
       expect(hasSelectedColor).toBe(true)
     })
   })

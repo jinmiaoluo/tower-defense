@@ -1,12 +1,9 @@
 /**
- * 怪物渲染器 - 像素艺术风格
+ * 怪物渲染器 - 简单动画风格
  */
 
 import type { RenderContext, MonsterRenderData } from './types'
 import { DPR } from '../dpr'
-
-/** 像素单位大小（DPR 缩放） */
-const PIXEL_SIZE = 2 * DPR
 
 /** 血条配置（DPR 缩放） */
 const HEALTH_BAR = {
@@ -15,12 +12,6 @@ const HEALTH_BAR = {
   offsetY: 12 * DPR,
   backgroundColor: 0x000000,
   shieldColor: 0x00ffff,
-}
-
-/** 怪物大小阈值（DPR 缩放） */
-const SIZE_THRESHOLD = {
-  small: 6 * DPR,
-  medium: 10 * DPR,
 }
 
 /**
@@ -47,7 +38,7 @@ function parseColor(color: string): number {
 }
 
 /**
- * 计算较暗的颜色（用于阴影）
+ * 计算较暗的颜色
  */
 function darkenColor(color: number, factor: number = 0.6): number {
   const r = Math.floor(((color >> 16) & 0xff) * factor)
@@ -57,7 +48,7 @@ function darkenColor(color: number, factor: number = 0.6): number {
 }
 
 /**
- * 计算较亮的颜色（用于高光）
+ * 计算较亮的颜色
  */
 function lightenColor(color: number, factor: number = 1.4): number {
   const r = Math.min(255, Math.floor(((color >> 16) & 0xff) * factor))
@@ -66,161 +57,60 @@ function lightenColor(color: number, factor: number = 1.4): number {
   return (r << 16) | (g << 8) | b
 }
 
+/** 计算呼吸动画缩放 */
+function calcBreath(frame: number, speed: number = 0.1): number {
+  return 1 + Math.sin(frame * speed) * 0.08
+}
+
 /**
  * 渲染单个怪物
  */
 export function renderMonster(ctx: RenderContext, data: MonsterRenderData): void {
-  const { x, y, radius, color, currentLife, maxLife, shield } = data
+  const { x, y, radius, color, currentLife, maxLife, shield, frame = 0 } = data
 
   const bodyColor = parseColor(color)
+  const dark = darkenColor(bodyColor)
+  const light = lightenColor(bodyColor)
 
-  // 根据大小选择不同的像素图案
-  if (radius < SIZE_THRESHOLD.small) {
-    renderSmallMonster(ctx, x, y, bodyColor)
-  } else if (radius < SIZE_THRESHOLD.medium) {
-    renderMediumMonster(ctx, x, y, bodyColor)
-  } else {
-    renderLargeMonster(ctx, x, y, bodyColor)
-  }
+  // 呼吸动画
+  const scale = calcBreath(frame, 0.12)
+  const animRadius = radius * scale
+
+  // 外圈（阴影）
+  ctx.fillStyle(dark, 1)
+  ctx.fillCircle(x, y, animRadius + 2 * DPR)
+
+  // 主体圆
+  ctx.fillStyle(bodyColor, 1)
+  ctx.fillCircle(x, y, animRadius)
+
+  // 高光
+  ctx.fillStyle(light, 0.6)
+  ctx.fillCircle(x - animRadius * 0.3, y - animRadius * 0.3, animRadius * 0.4)
+
+  // 眼睛
+  const eyeOffset = animRadius * 0.25
+  const eyeRadius = Math.max(2 * DPR, animRadius * 0.2)
+  ctx.fillStyle(0x000000, 1)
+  ctx.fillCircle(x - eyeOffset, y - eyeOffset * 0.5, eyeRadius)
+  ctx.fillCircle(x + eyeOffset, y - eyeOffset * 0.5, eyeRadius)
+
+  // 眼睛高光
+  const pupilRadius = eyeRadius * 0.4
+  ctx.fillStyle(0xffffff, 1)
+  ctx.fillCircle(x - eyeOffset + pupilRadius, y - eyeOffset * 0.5 - pupilRadius, pupilRadius)
+  ctx.fillCircle(x + eyeOffset + pupilRadius, y - eyeOffset * 0.5 - pupilRadius, pupilRadius)
+
+  // 边框
+  ctx.lineStyle(1 * DPR, 0x000000, 0.5)
+  ctx.strokeCircle(x, y, animRadius + 2 * DPR)
 
   // 绘制血条
   renderHealthBar(ctx, x, y, radius, currentLife, maxLife, shield)
 }
 
 /**
- * 渲染小型怪物 - 像素史莱姆
- */
-function renderSmallMonster(ctx: RenderContext, x: number, y: number, color: number): void {
-  const p = PIXEL_SIZE
-  const dark = darkenColor(color)
-  const light = lightenColor(color)
-
-  // 史莱姆形状（底宽顶窄）
-  //   ##
-  //  ####
-  // ######
-
-  // 底层（最宽）
-  ctx.fillStyle(dark, 1)
-  ctx.fillRect(x - p * 3, y + p, p * 6, p)
-
-  // 中层
-  ctx.fillStyle(color, 1)
-  ctx.fillRect(x - p * 2, y - p, p * 4, p * 2)
-
-  // 顶层
-  ctx.fillStyle(color, 1)
-  ctx.fillRect(x - p, y - p * 2, p * 2, p)
-
-  // 高光
-  ctx.fillStyle(light, 1)
-  ctx.fillRect(x - p, y - p, p, p)
-
-  // 眼睛
-  ctx.fillStyle(0x000000, 1)
-  ctx.fillRect(x - p, y, p, p)
-  ctx.fillRect(x + p - 1, y, p, p)
-}
-
-/**
- * 渲染中型怪物 - 像素小人
- */
-function renderMediumMonster(ctx: RenderContext, x: number, y: number, color: number): void {
-  const p = PIXEL_SIZE
-  const dark = darkenColor(color)
-  const light = lightenColor(color)
-
-  // 像素小人形状
-  //  ##
-  // ####
-  //  ##
-  // #  #
-
-  // 头部
-  ctx.fillStyle(color, 1)
-  ctx.fillRect(x - p, y - p * 4, p * 2, p * 2)
-
-  // 头部高光
-  ctx.fillStyle(light, 1)
-  ctx.fillRect(x - p, y - p * 4, p, p)
-
-  // 眼睛
-  ctx.fillStyle(0x000000, 1)
-  ctx.fillRect(x - p + 1, y - p * 3, 2, 2)
-  ctx.fillRect(x + 1, y - p * 3, 2, 2)
-
-  // 身体
-  ctx.fillStyle(color, 1)
-  ctx.fillRect(x - p * 2, y - p * 2, p * 4, p * 3)
-
-  // 身体阴影
-  ctx.fillStyle(dark, 1)
-  ctx.fillRect(x + p, y - p * 2, p, p * 3)
-
-  // 腿
-  ctx.fillStyle(dark, 1)
-  ctx.fillRect(x - p * 2, y + p, p, p * 2)
-  ctx.fillRect(x + p, y + p, p, p * 2)
-}
-
-/**
- * 渲染大型怪物 - 像素怪兽
- */
-function renderLargeMonster(ctx: RenderContext, x: number, y: number, color: number): void {
-  const p = PIXEL_SIZE
-  const dark = darkenColor(color)
-  const light = lightenColor(color)
-
-  // 大型怪兽形状（带角）
-  // #    #
-  //  ####
-  // ######
-  // ######
-  //  #  #
-
-  // 角
-  ctx.fillStyle(dark, 1)
-  ctx.fillRect(x - p * 3, y - p * 5, p, p * 2)
-  ctx.fillRect(x + p * 2, y - p * 5, p, p * 2)
-
-  // 头部
-  ctx.fillStyle(color, 1)
-  ctx.fillRect(x - p * 2, y - p * 4, p * 4, p * 2)
-
-  // 头部高光
-  ctx.fillStyle(light, 1)
-  ctx.fillRect(x - p * 2, y - p * 4, p * 2, p)
-
-  // 眼睛（红色发光）
-  ctx.fillStyle(0xff0000, 1)
-  ctx.fillRect(x - p, y - p * 3, p, p)
-  ctx.fillRect(x, y - p * 3, p, p)
-
-  // 身体
-  ctx.fillStyle(color, 1)
-  ctx.fillRect(x - p * 3, y - p * 2, p * 6, p * 4)
-
-  // 身体纹理
-  ctx.fillStyle(dark, 1)
-  ctx.fillRect(x - p * 2, y - p, p, p)
-  ctx.fillRect(x + p, y, p, p)
-
-  // 身体高光
-  ctx.fillStyle(light, 1)
-  ctx.fillRect(x - p * 3, y - p * 2, p, p * 2)
-
-  // 腿
-  ctx.fillStyle(dark, 1)
-  ctx.fillRect(x - p * 2, y + p * 2, p * 2, p * 2)
-  ctx.fillRect(x, y + p * 2, p * 2, p * 2)
-
-  // 黑色轮廓（部分）
-  ctx.lineStyle(1, 0x000000, 0.5)
-  ctx.strokeRect(x - p * 3, y - p * 2, p * 6, p * 4)
-}
-
-/**
- * 渲染血条 - 像素风格
+ * 渲染血条
  */
 function renderHealthBar(
   ctx: RenderContext,

@@ -39,7 +39,7 @@ describe('MonsterRenderer', () => {
   })
 
   describe('renderMonster', () => {
-    it('渲染怪物应绘制像素身体', () => {
+    it('渲染怪物应绘制圆形身体', () => {
       const data: MonsterRenderData = {
         id: 'monster-1',
         x: 100,
@@ -53,9 +53,9 @@ describe('MonsterRenderer', () => {
 
       renderMonster(ctx, data)
 
-      // 像素风格使用 fillRect 绘制怪物身体
-      const fillRectCalls = (ctx.fillRect as ReturnType<typeof vi.fn>).mock.calls
-      expect(fillRectCalls.length).toBeGreaterThan(3)
+      // 简单风格使用 fillCircle 绘制怪物身体（外圈+主体+高光+眼睛+瞳孔）
+      const fillCircleCalls = (ctx.fillCircle as ReturnType<typeof vi.fn>).mock.calls
+      expect(fillCircleCalls.length).toBeGreaterThanOrEqual(7)
     })
 
     it('渲染怪物应绘制血条背景和血量', () => {
@@ -219,9 +219,9 @@ describe('MonsterRenderer', () => {
       }
 
       expect(ctx.clear).toHaveBeenCalledTimes(1)
-      // 像素风格使用 fillRect 渲染，每个怪物多次调用
-      const fillRectCalls = (ctx.fillRect as ReturnType<typeof vi.fn>).mock.calls
-      expect(fillRectCalls.length).toBeGreaterThanOrEqual(10)
+      // 简单风格使用 fillCircle 渲染，每个怪物至少 7 次调用
+      const fillCircleCalls = (ctx.fillCircle as ReturnType<typeof vi.fn>).mock.calls
+      expect(fillCircleCalls.length).toBeGreaterThanOrEqual(14)
     })
   })
 })
