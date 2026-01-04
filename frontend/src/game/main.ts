@@ -4,6 +4,7 @@ import { Preloader } from './scenes/Preloader'
 import { Game } from './scenes/Game'
 import { GAME_CONSTANTS } from '@/types'
 import { DPR } from './dpr'
+import { getInitialGameColors } from '@/theme'
 
 const { GRID_SIZE } = GAME_CONSTANTS
 
@@ -47,12 +48,15 @@ function calculateGameSize(): { width: number; height: number } {
 
 const { width, height } = calculateGameSize()
 
+// 动态获取初始背景色（根据系统主题或用户设置）
+const initialColors = getInitialGameColors()
+
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
   width: width * DPR,
   height: height * DPR,
   parent: 'game-container',
-  backgroundColor: '#1a1a2e',
+  backgroundColor: initialColors.canvasBackground,
   scene: [Boot, Preloader, Game],
   scale: {
     mode: Phaser.Scale.FIT,

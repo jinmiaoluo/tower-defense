@@ -2,7 +2,8 @@
  * 主题颜色配置
  */
 
-import type { ThemeConfig, ResolvedTheme } from '@/types/theme'
+import type { ThemeConfig, ResolvedTheme, GameColors } from '@/types/theme'
+import { STORAGE_KEY } from '@/types/theme'
 
 export const darkTheme: ThemeConfig = {
   name: 'dark',
@@ -159,4 +160,42 @@ export function applyThemeToCSSVariables(theme: ThemeConfig): void {
   root.style.setProperty('--color-selected', colors.selected)
 
   root.setAttribute('data-theme', theme.name)
+}
+
+/**
+ * 获取初始游戏颜色（用于 Phaser canvas 初始化）
+ * 解决首次加载时 canvas 主题与系统主题不同步的问题
+ *
+ * 逻辑：
+ * 1. 检查 localStorage 中保存的主题模式
+ * 2. 如果是 light/dark，直接返回对应颜色
+ * 3. 如果是 system 或 null（首次访问），检测系统主题
+ */
+export function getInitialGameColors(): GameColors {
+  const MEDIA_QUERY = '(prefers-color-scheme: dark)'
+
+  function getSystemTheme(): ResolvedTheme {
+    if (typeof window === 'undefined') return 'dark'
+    return window.matchMedia(MEDIA_QUERY).matches ? 'dark' : 'light'
+  }
+
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY)
+
+    if (saved === 'light') {
+      return lightTheme.gameColors
+    }
+    if (saved === 'dark') {
+      return darkTheme.gameColors
+    }
+    // system 模式或首次访问（null）：检测系统主题
+    const systemTheme = getSystemTheme()
+    return getTheme(systemTheme).gameColors
+  } catch {
+    // localStorage 可能被禁用，回退到系统主题检测
+    const systemTheme = typeof window !== 'undefined'
+      ? (window.matchMedia(MEDIA_QUERY).matches ? 'dark' : 'light')
+      : 'dark'
+    return getTheme(systemTheme).gameColors
+  }
 }

@@ -8,4 +8,5 @@ export {
   themes,
   getTheme,
   applyThemeToCSSVariables,
+  getInitialGameColors,
 } from './colors'

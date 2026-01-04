@@ -25,8 +25,7 @@ import {
   type SelectionRenderData,
 } from '../render'
 import { getTranslator } from '@/i18n'
-import { getTheme, darkTheme } from '@/theme'
-import { STORAGE_KEY as THEME_STORAGE_KEY } from '@/types/theme'
+import { getTheme, getInitialGameColors } from '@/theme'
 import { isMobileDevice } from '@/utils/device'
 import { DPR } from '../dpr'
 
@@ -128,22 +127,9 @@ export class Game extends Scene {
     super('Game')
   }
 
-  /** 获取初始主题颜色（从 localStorage 读取） */
+  /** 获取初始主题颜色（根据系统主题或用户设置） */
   private getInitialThemeColors(): GameColors {
-    try {
-      const saved = localStorage.getItem(THEME_STORAGE_KEY)
-      if (saved === 'light' || saved === 'dark') {
-        return getTheme(saved).gameColors
-      }
-      // system 模式：检测系统主题
-      if (saved === 'system' && typeof window !== 'undefined') {
-        const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-        return getTheme(isDark ? 'dark' : 'light').gameColors
-      }
-    } catch {
-      // localStorage 可能被禁用
-    }
-    return darkTheme.gameColors
+    return getInitialGameColors()
   }
 
   /** 获取当前主题颜色 */
