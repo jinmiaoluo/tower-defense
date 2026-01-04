@@ -8,7 +8,7 @@ import { Scene } from 'phaser'
 import { EventBus } from '../EventBus'
 import { AppEventBus } from '@/utils/EventEmitter'
 import { createGameSceneLogic, type GameSceneLogic } from '../systems'
-import { mockStartGame, mockSubmitWave } from '@/mocks/api'
+import { gameApi } from '@/api'
 import type { GameConfig, WaveConfig, Position, BuildingType, GameColors, ResolvedTheme } from '@/types'
 import { GAME_CONSTANTS } from '@/types'
 import {
@@ -168,7 +168,7 @@ export class Game extends Scene {
     this.setupInput()
 
     // 异步初始化游戏会话
-    mockStartGame().then((response) => {
+    gameApi.createSession().then((response) => {
       this.sessionId = response.sessionId
       this.gameConfig = response.config
       this.currentWaveConfig = response.firstWave
@@ -1338,7 +1338,7 @@ export class Game extends Scene {
       kills: b.kills,
     }))
 
-    mockSubmitWave(
+    gameApi.submitWave(
       waveRecorder.toWaveRequest(this.sessionId, buildingSnapshots),
     ).then((response) => {
       if (!response.valid) {
@@ -1459,7 +1459,7 @@ export class Game extends Scene {
 
     try {
       // 请求新的游戏会话
-      const response = await mockStartGame()
+      const response = await gameApi.createSession()
 
       this.sessionId = response.sessionId
       this.gameConfig = response.config
