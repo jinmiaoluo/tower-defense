@@ -3,6 +3,7 @@ import { Boot } from './scenes/Boot'
 import { Preloader } from './scenes/Preloader'
 import { Game } from './scenes/Game'
 import { GAME_CONSTANTS } from '@/types'
+import { DPR } from './dpr'
 
 const { GRID_SIZE } = GAME_CONSTANTS
 
@@ -48,18 +49,20 @@ const { width, height } = calculateGameSize()
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
-  width,
-  height,
+  width: width * DPR,
+  height: height * DPR,
   parent: 'game-container',
   backgroundColor: '#1a1a2e',
   scene: [Boot, Preloader, Game],
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.NO_CENTER,
+    zoom: 1 / DPR,
   },
   render: {
     antialias: true,
-    roundPixels: true,
+    roundPixels: false,
+    pixelArt: false,
   },
 }
 

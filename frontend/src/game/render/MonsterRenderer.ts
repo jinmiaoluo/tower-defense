@@ -3,17 +3,24 @@
  */
 
 import type { RenderContext, MonsterRenderData } from './types'
+import { DPR } from '../dpr'
 
-/** 像素单位大小 */
-const PIXEL_SIZE = 2
+/** 像素单位大小（DPR 缩放） */
+const PIXEL_SIZE = 2 * DPR
 
-/** 血条配置 */
+/** 血条配置（DPR 缩放） */
 const HEALTH_BAR = {
-  width: 20,
-  height: 3,
-  offsetY: 12,
+  width: 20 * DPR,
+  height: 3 * DPR,
+  offsetY: 12 * DPR,
   backgroundColor: 0x000000,
   shieldColor: 0x00ffff,
+}
+
+/** 怪物大小阈值（DPR 缩放） */
+const SIZE_THRESHOLD = {
+  small: 6 * DPR,
+  medium: 10 * DPR,
 }
 
 /**
@@ -68,9 +75,9 @@ export function renderMonster(ctx: RenderContext, data: MonsterRenderData): void
   const bodyColor = parseColor(color)
 
   // 根据大小选择不同的像素图案
-  if (radius < 6) {
+  if (radius < SIZE_THRESHOLD.small) {
     renderSmallMonster(ctx, x, y, bodyColor)
-  } else if (radius < 10) {
+  } else if (radius < SIZE_THRESHOLD.medium) {
     renderMediumMonster(ctx, x, y, bodyColor)
   } else {
     renderLargeMonster(ctx, x, y, bodyColor)

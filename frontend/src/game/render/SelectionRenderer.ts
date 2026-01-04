@@ -6,6 +6,7 @@
 
 import type { RenderContext } from './types'
 import type { Position } from '@/types'
+import { DPR } from '../dpr'
 
 /** 选中渲染数据 */
 export interface SelectionRenderData {
@@ -49,7 +50,7 @@ export function renderBuildingSelection(
     ctx.fillCircle(centerX, centerY, rangePixels)
 
     // 描边圆
-    ctx.lineStyle(1, colors.rangeSelected, 1)
+    ctx.lineStyle(1 * DPR, colors.rangeSelected, 1)
     ctx.strokeCircle(centerX, centerY, rangePixels)
   }
 }

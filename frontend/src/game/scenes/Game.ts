@@ -26,10 +26,14 @@ import {
 } from '../render'
 import { getTranslator } from '@/i18n'
 import { getTheme, darkTheme } from '@/theme'
-import { STORAGE_KEY as THEME_STORAGE_KEY, type ResolvedTheme as ThemeType } from '@/types/theme'
+import { STORAGE_KEY as THEME_STORAGE_KEY } from '@/types/theme'
 import { isMobileDevice } from '@/utils/device'
+import { DPR } from '../dpr'
 
 const { GRID_SIZE } = GAME_CONSTANTS
+
+// 渲染用的缩放格子尺寸（适配高 DPR 显示）
+const RENDER_GRID_SIZE = GRID_SIZE * DPR
 
 /** 波次间隔帧数 (60 FPS x 3 秒 = 180 帧) */
 const WAVE_INTERVAL_FRAMES = 180
@@ -171,11 +175,11 @@ export class Game extends Scene {
 
       // 计算地图偏移（居中显示，考虑 UI 元素）
       const { width, height } = this.scale
-      const mapWidth = this.gameConfig.map.width * GRID_SIZE
-      const mapHeight = this.gameConfig.map.height * GRID_SIZE
+      const mapWidth = this.gameConfig.map.width * RENDER_GRID_SIZE
+      const mapHeight = this.gameConfig.map.height * RENDER_GRID_SIZE
       // 预留顶部状态栏和底部按钮面板的空间
-      const topReserve = 50
-      const bottomReserve = 90
+      const topReserve = 50 * DPR
+      const bottomReserve = 90 * DPR
       const availableHeight = height - topReserve - bottomReserve
       this.mapOffsetX = Math.floor((width - mapWidth) / 2)
       this.mapOffsetY = topReserve + Math.floor((availableHeight - mapHeight) / 2)
@@ -415,8 +419,8 @@ export class Game extends Scene {
 
   /** 屏幕坐标转格子坐标 */
   private screenToGrid(x: number, y: number): Position | null {
-    const gx = Math.floor((x - this.mapOffsetX) / GRID_SIZE)
-    const gy = Math.floor((y - this.mapOffsetY) / GRID_SIZE)
+    const gx = Math.floor((x - this.mapOffsetX) / RENDER_GRID_SIZE)
+    const gy = Math.floor((y - this.mapOffsetY) / RENDER_GRID_SIZE)
 
     if (
       gx >= 0 &&
@@ -436,16 +440,16 @@ export class Game extends Scene {
 
     // 检查入口
     if (gx === entrance[0] && gy === entrance[1]) {
-      const centerX = this.mapOffsetX + gx * GRID_SIZE + GRID_SIZE / 2
-      const centerY = this.mapOffsetY + gy * GRID_SIZE
+      const centerX = this.mapOffsetX + gx * RENDER_GRID_SIZE + RENDER_GRID_SIZE / 2
+      const centerY = this.mapOffsetY + gy * RENDER_GRID_SIZE
       this.showTooltip(this.t('entrance'), centerX, centerY)
       return
     }
 
     // 检查出口
     if (gx === exit[0] && gy === exit[1]) {
-      const centerX = this.mapOffsetX + gx * GRID_SIZE + GRID_SIZE / 2
-      const centerY = this.mapOffsetY + gy * GRID_SIZE
+      const centerX = this.mapOffsetX + gx * RENDER_GRID_SIZE + RENDER_GRID_SIZE / 2
+      const centerY = this.mapOffsetY + gy * RENDER_GRID_SIZE
       this.showTooltip(this.t('exit'), centerX, centerY)
       return
     }
@@ -456,24 +460,25 @@ export class Game extends Scene {
       if (!monster.isValid || monster.progress < 0) continue
 
       const pos = monster.getPixelPosition()
-      const monsterX = this.mapOffsetX + pos.x
-      const monsterY = this.mapOffsetY + pos.y
+      const monsterX = this.mapOffsetX + pos.x * DPR
+      const monsterY = this.mapOffsetY + pos.y * DPR
+      const scaledRadius = monster.radius * DPR
 
       // 检测怪物身体（圆形）
       const distance = Math.sqrt(
         Math.pow(screenX - monsterX, 2) + Math.pow(screenY - monsterY, 2),
       )
-      const isOverBody = distance <= monster.radius
+      const isOverBody = distance <= scaledRadius
 
       // 检测血条区域（矩形：宽 22px，高约 20px，包含血条和可能的护盾条）
-      const healthBarWidth = 22
-      const healthBarHeight = 20
-      const healthBarY = monsterY - monster.radius - 12
+      const healthBarWidth = 22 * DPR
+      const healthBarHeight = 20 * DPR
+      const healthBarY = monsterY - scaledRadius - 12 * DPR
       const isOverHealthBar =
         screenX >= monsterX - healthBarWidth / 2 &&
         screenX <= monsterX + healthBarWidth / 2 &&
         screenY >= healthBarY - healthBarHeight &&
-        screenY <= healthBarY + 4
+        screenY <= healthBarY + 4 * DPR
 
       if (isOverBody || isOverHealthBar) {
         const tooltipText = this.t('monster_tooltip', [
@@ -484,7 +489,7 @@ export class Game extends Scene {
           monster.damage,
           monster.money,
         ])
-        this.showTooltip(tooltipText, monsterX, monsterY - monster.radius)
+        this.showTooltip(tooltipText, monsterX, monsterY - scaledRadius)
         return
       }
     }
@@ -539,8 +544,8 @@ export class Game extends Scene {
       // 显示提示消息
       if (result.reason === 'insufficient_money') {
         const cost = this.gameConfig.buildings[this.uiState.selectedBuildingType].cost
-        const tipX = this.mapOffsetX + position[0] * GRID_SIZE + GRID_SIZE / 2
-        const tipY = this.mapOffsetY + position[1] * GRID_SIZE - 20
+        const tipX = this.mapOffsetX + position[0] * RENDER_GRID_SIZE + RENDER_GRID_SIZE / 2
+        const tipY = this.mapOffsetY + position[1] * RENDER_GRID_SIZE - 20 * DPR
         this.showTip(`金钱不足，需要 $${cost}!`, tipX, tipY)
       }
       EventBus.emit('building-place-failed', result.reason)
@@ -557,8 +562,8 @@ export class Game extends Scene {
       // 显示提示消息
       if (result.reason === 'insufficient_money' && building) {
         const cost = this.logic.getUpgradeCost(building.type, building.level)
-        const tipX = this.mapOffsetX + building.position[0] * GRID_SIZE + GRID_SIZE / 2
-        const tipY = this.mapOffsetY + building.position[1] * GRID_SIZE - 20
+        const tipX = this.mapOffsetX + building.position[0] * RENDER_GRID_SIZE + RENDER_GRID_SIZE / 2
+        const tipY = this.mapOffsetY + building.position[1] * RENDER_GRID_SIZE - 20 * DPR
         this.showTip(`金钱不足，需要 $${cost}!`, tipX, tipY)
       }
       EventBus.emit('building-upgrade-failed', result.reason)
@@ -589,8 +594,8 @@ export class Game extends Scene {
     // 绘制格子
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
-        const px = this.mapOffsetX + x * GRID_SIZE
-        const py = this.mapOffsetY + y * GRID_SIZE
+        const px = this.mapOffsetX + x * RENDER_GRID_SIZE
+        const py = this.mapOffsetY + y * RENDER_GRID_SIZE
 
         let fillColor = colors.gridFill
         const isEntrance = x === entrance[0] && y === entrance[1]
@@ -608,24 +613,24 @@ export class Game extends Scene {
         }
 
         g.fillStyle(fillColor, isEntrance || isExit ? 0.5 : 1)
-        g.fillRect(px, py, GRID_SIZE, GRID_SIZE)
+        g.fillRect(px, py, RENDER_GRID_SIZE, RENDER_GRID_SIZE)
 
-        g.lineStyle(1, colors.gridLine, 0.5)
-        g.strokeRect(px, py, GRID_SIZE, GRID_SIZE)
+        g.lineStyle(1 * DPR, colors.gridLine, 0.5)
+        g.strokeRect(px, py, RENDER_GRID_SIZE, RENDER_GRID_SIZE)
       }
     }
 
     // 入口标记
-    const entranceX = this.mapOffsetX + entrance[0] * GRID_SIZE + GRID_SIZE / 2
-    const entranceY = this.mapOffsetY + entrance[1] * GRID_SIZE + GRID_SIZE / 2
-    g.lineStyle(2, colors.entrance, 1)
-    g.strokeCircle(entranceX, entranceY, GRID_SIZE / 3)
+    const entranceX = this.mapOffsetX + entrance[0] * RENDER_GRID_SIZE + RENDER_GRID_SIZE / 2
+    const entranceY = this.mapOffsetY + entrance[1] * RENDER_GRID_SIZE + RENDER_GRID_SIZE / 2
+    g.lineStyle(2 * DPR, colors.entrance, 1)
+    g.strokeCircle(entranceX, entranceY, RENDER_GRID_SIZE / 3)
 
     // 出口标记
-    const exitX = this.mapOffsetX + exit[0] * GRID_SIZE + GRID_SIZE / 2
-    const exitY = this.mapOffsetY + exit[1] * GRID_SIZE + GRID_SIZE / 2
-    g.lineStyle(2, colors.exit, 1)
-    g.strokeCircle(exitX, exitY, GRID_SIZE / 3)
+    const exitX = this.mapOffsetX + exit[0] * RENDER_GRID_SIZE + RENDER_GRID_SIZE / 2
+    const exitY = this.mapOffsetY + exit[1] * RENDER_GRID_SIZE + RENDER_GRID_SIZE / 2
+    g.lineStyle(2 * DPR, colors.exit, 1)
+    g.strokeCircle(exitX, exitY, RENDER_GRID_SIZE / 3)
   }
 
   /** 渲染路径 */
@@ -638,9 +643,9 @@ export class Game extends Scene {
     g.fillStyle(colors.path, 0.3)
 
     for (const [x, y] of path) {
-      const px = this.mapOffsetX + x * GRID_SIZE
-      const py = this.mapOffsetY + y * GRID_SIZE
-      g.fillRect(px + 2, py + 2, GRID_SIZE - 4, GRID_SIZE - 4)
+      const px = this.mapOffsetX + x * RENDER_GRID_SIZE
+      const py = this.mapOffsetY + y * RENDER_GRID_SIZE
+      g.fillRect(px + 2 * DPR, py + 2 * DPR, RENDER_GRID_SIZE - 4 * DPR, RENDER_GRID_SIZE - 4 * DPR)
     }
   }
 
@@ -652,10 +657,10 @@ export class Game extends Scene {
 
     for (const building of buildings) {
       const [x, y] = building.position
-      const px = this.mapOffsetX + x * GRID_SIZE
-      const py = this.mapOffsetY + y * GRID_SIZE
-      const centerX = px + GRID_SIZE / 2
-      const centerY = py + GRID_SIZE / 2
+      const px = this.mapOffsetX + x * RENDER_GRID_SIZE
+      const py = this.mapOffsetY + y * RENDER_GRID_SIZE
+      const centerX = px + RENDER_GRID_SIZE / 2
+      const centerY = py + RENDER_GRID_SIZE / 2
       const isSelected = building.id === this.uiState.selectedBuildingId
 
       // 获取建筑当前目标位置（由 Building 实体维护，包含最后目标位置）
@@ -668,7 +673,7 @@ export class Game extends Scene {
         level: building.level,
         centerX,
         centerY,
-        gridSize: GRID_SIZE,
+        gridSize: RENDER_GRID_SIZE,
         isSelected,
         targetPosition,
       }
@@ -678,15 +683,15 @@ export class Game extends Scene {
       // 激光射线渲染（与旧实现一致: td-obj-building.js:361-376）
       // 只有当有实际目标时才渲染激光线
       if (building.type === 'laser_gun' && building.hasActiveTarget() && targetPosition) {
-        const targetX = this.mapOffsetX + targetPosition[0] * GRID_SIZE + GRID_SIZE / 2
-        const targetY = this.mapOffsetY + targetPosition[1] * GRID_SIZE + GRID_SIZE / 2
+        const targetX = this.mapOffsetX + targetPosition[0] * RENDER_GRID_SIZE + RENDER_GRID_SIZE / 2
+        const targetY = this.mapOffsetY + targetPosition[1] * RENDER_GRID_SIZE + RENDER_GRID_SIZE / 2
 
         // 外层激光线（蓝色半透明）
-        this.buildingRenderCtx.lineStyle(3, 0x3232c8, 0.5)
+        this.buildingRenderCtx.lineStyle(3 * DPR, 0x3232c8, 0.5)
         this.buildingRenderCtx.lineBetween(centerX, centerY, targetX, targetY)
 
         // 内层激光线（亮蓝色）
-        this.buildingRenderCtx.lineStyle(1, 0x9696ff, 0.5)
+        this.buildingRenderCtx.lineStyle(1 * DPR, 0x9696ff, 0.5)
         this.buildingRenderCtx.lineBetween(centerX, centerY, targetX, targetY)
       }
 
@@ -695,7 +700,7 @@ export class Game extends Scene {
         const selectionData: SelectionRenderData = {
           centerX,
           centerY,
-          gridSize: GRID_SIZE,
+          gridSize: RENDER_GRID_SIZE,
           range: building.getRange(),
           isWeapon: building.type !== 'wall',
           position: building.position,
@@ -719,14 +724,14 @@ export class Game extends Scene {
       if (!monster.isValid || monster.progress < 0) continue
 
       const pos = monster.getPixelPosition()
-      const x = this.mapOffsetX + pos.x
-      const y = this.mapOffsetY + pos.y
+      const x = this.mapOffsetX + pos.x * DPR
+      const y = this.mapOffsetY + pos.y * DPR
 
       const data: MonsterRenderData = {
         id: monster.id,
         x,
         y,
-        radius: monster.radius,
+        radius: monster.radius * DPR,
         color: monster.color,
         currentLife: monster.currentLife,
         maxLife: monster.maxLife,
@@ -746,13 +751,13 @@ export class Game extends Scene {
     for (const bullet of bullets) {
       if (!bullet.isValid) continue
 
-      const x = this.mapOffsetX + bullet.x
-      const y = this.mapOffsetY + bullet.y
+      const x = this.mapOffsetX + bullet.x * DPR
+      const y = this.mapOffsetY + bullet.y * DPR
 
       const data: BulletRenderData = {
         x,
         y,
-        radius: bullet.radius,
+        radius: bullet.radius * DPR,
         vx: bullet.vx,
         vy: bullet.vy,
       }
@@ -781,25 +786,25 @@ export class Game extends Scene {
     }
 
     const [hx, hy] = previewPos
-    const px = this.mapOffsetX + hx * GRID_SIZE
-    const py = this.mapOffsetY + hy * GRID_SIZE
+    const px = this.mapOffsetX + hx * RENDER_GRID_SIZE
+    const py = this.mapOffsetY + hy * RENDER_GRID_SIZE
 
     const canPlace = this.logic.canPlaceBuilding(previewPos)
     const color = canPlace ? colors.hoverValid : colors.hoverInvalid
 
     // 预览建筑
     g.fillStyle(color, 0.3)
-    g.fillRect(px + 4, py + 4, GRID_SIZE - 8, GRID_SIZE - 8)
+    g.fillRect(px + 4 * DPR, py + 4 * DPR, RENDER_GRID_SIZE - 8 * DPR, RENDER_GRID_SIZE - 8 * DPR)
 
-    g.lineStyle(2, color, 0.8)
-    g.strokeRect(px + 4, py + 4, GRID_SIZE - 8, GRID_SIZE - 8)
+    g.lineStyle(2 * DPR, color, 0.8)
+    g.strokeRect(px + 4 * DPR, py + 4 * DPR, RENDER_GRID_SIZE - 8 * DPR, RENDER_GRID_SIZE - 8 * DPR)
 
     // 射程预览（虚线圆）
     if (this.uiState.selectedBuildingType !== 'wall') {
       const buildingConfig = this.gameConfig.buildings[this.uiState.selectedBuildingType]
-      const range = buildingConfig.range * GRID_SIZE
-      const centerX = px + GRID_SIZE / 2
-      const centerY = py + GRID_SIZE / 2
+      const range = buildingConfig.range * RENDER_GRID_SIZE
+      const centerX = px + RENDER_GRID_SIZE / 2
+      const centerY = py + RENDER_GRID_SIZE / 2
 
       this.strokeDashedCircle(g, centerX, centerY, range, colors.rangeDash, 0.6)
     }
@@ -810,11 +815,11 @@ export class Game extends Scene {
     const { width } = this.scale
 
     this.uiText = this.add
-      .text(width / 2, 10, '', {
+      .text(width / 2, 10 * DPR, '', {
         fontFamily: 'Arial',
-        fontSize: '14px',
+        fontSize: `${14 * DPR}px`,
         color: this.getColors().uiText,
-        wordWrap: { width: width - 20 },
+        wordWrap: { width: width - 20 * DPR },
         align: 'center',
       })
       .setOrigin(0.5, 0)
@@ -839,7 +844,7 @@ export class Game extends Scene {
     this.tipBackground = this.add.graphics()
     this.tipText = this.add.text(0, 0, '', {
       fontFamily: 'Courier New',
-      fontSize: '14px',
+      fontSize: `${14 * DPR}px`,
       color: '#000000',
     })
     this.tipText.setOrigin(0.5, 0.5)
@@ -856,11 +861,11 @@ export class Game extends Scene {
     this.tooltipBackground = this.add.graphics()
     this.tooltipText = this.add.text(0, 0, '', {
       fontFamily: 'Arial',
-      fontSize: '12px',
+      fontSize: `${12 * DPR}px`,
       color: '#ffffff',
-      wordWrap: { width: 200 },
+      wordWrap: { width: 200 * DPR },
       align: 'left',
-      lineSpacing: 2,
+      lineSpacing: 2 * DPR,
     })
     this.tooltipText.setOrigin(0.5, 1)
 
@@ -872,7 +877,7 @@ export class Game extends Scene {
     this.tooltipSource = source
     this.tooltipText.setText(message)
 
-    const padding = 8
+    const padding = 8 * DPR
     const bgWidth = this.tooltipText.width + padding * 2
     const bgHeight = this.tooltipText.height + padding * 2
 
@@ -906,16 +911,16 @@ export class Game extends Scene {
     this.tipText.setText(message)
 
     // 计算背景尺寸
-    const padding = 10
+    const padding = 10 * DPR
     const bgWidth = this.tipText.width + padding * 2
     const bgHeight = this.tipText.height + padding * 2
 
     // 绘制黄色背景（与旧实现一致）
     this.tipBackground.clear()
     this.tipBackground.fillStyle(0xffff00, 0.8)
-    this.tipBackground.lineStyle(2, 0xdede00, 1)
-    this.tipBackground.fillRoundedRect(-bgWidth / 2, -bgHeight / 2, bgWidth, bgHeight, 4)
-    this.tipBackground.strokeRoundedRect(-bgWidth / 2, -bgHeight / 2, bgWidth, bgHeight, 4)
+    this.tipBackground.lineStyle(2 * DPR, 0xdede00, 1)
+    this.tipBackground.fillRoundedRect(-bgWidth / 2, -bgHeight / 2, bgWidth, bgHeight, 4 * DPR)
+    this.tipBackground.strokeRoundedRect(-bgWidth / 2, -bgHeight / 2, bgWidth, bgHeight, 4 * DPR)
 
     // 设置位置
     const posX = x ?? width / 2
@@ -940,18 +945,18 @@ export class Game extends Scene {
   private createBuildingPanel() {
     const { width, height } = this.scale
 
-    this.buildingPanel = this.add.container(width / 2, height - 50)
+    this.buildingPanel = this.add.container(width / 2, height - 50 * DPR)
     this.buildingPanelTexts = []
     this.buildingPanelButtons.clear()
 
     const buildingTypes: BuildingType[] = ['LMG', 'cannon', 'HMG', 'laser_gun', 'wall']
-    const buttonWidth = 70
-    const buttonHeight = 28
-    const gapX = 8
-    const gapY = 6
+    const buttonWidth = 70 * DPR
+    const buttonHeight = 28 * DPR
+    const gapX = 8 * DPR
+    const gapY = 6 * DPR
 
     // 计算每行能放多少个按钮
-    const availableWidth = width - 20
+    const availableWidth = width - 20 * DPR
     const buttonsPerRow = Math.max(2, Math.floor(availableWidth / (buttonWidth + gapX)))
     const rows = Math.ceil(buildingTypes.length / buttonsPerRow)
 
@@ -972,7 +977,7 @@ export class Game extends Scene {
       // 按钮背景
       const buttonColor = BUILDING_COLORS[type].primary
       const button = this.add.rectangle(x, y, buttonWidth, buttonHeight, buttonColor, 0.8)
-      button.setStrokeStyle(2, 0xffffff)
+      button.setStrokeStyle(2 * DPR, 0xffffff)
       button.setInteractive({ useHandCursor: true })
 
       // 存储按钮引用
@@ -995,7 +1000,7 @@ export class Game extends Scene {
           ])
         }
         const panelX = width / 2
-        const panelY = height - 50
+        const panelY = height - 50 * DPR
         const buttonScreenX = panelX + x
         const buttonScreenY = panelY + y - buttonHeight / 2
         this.showTooltip(tooltipText, buttonScreenX, buttonScreenY, 'panel')
@@ -1006,7 +1011,7 @@ export class Game extends Scene {
         const isSelected = this.uiState.selectedBuildingType === type
         button.setFillStyle(buttonColor, 0.8)
         if (isSelected) {
-          button.setStrokeStyle(2, this.getColors().rangeSelected)
+          button.setStrokeStyle(2 * DPR, this.getColors().rangeSelected)
         }
         this.hideTooltip()
       })
@@ -1020,7 +1025,7 @@ export class Game extends Scene {
       const buildingName = this.t(`building_name_${type}`)
       const text = this.add.text(x, y, `${buildingName}\n$${config.cost}`, {
         fontFamily: 'Arial',
-        fontSize: '9px',
+        fontSize: `${9 * DPR}px`,
         color: '#ffffff',
         align: 'center',
       })
@@ -1036,21 +1041,21 @@ export class Game extends Scene {
     const { width, height } = this.scale
 
     // 控制面板位于建筑面板下方
-    this.controlPanel = this.add.container(width / 2, height - 10)
+    this.controlPanel = this.add.container(width / 2, height - 10 * DPR)
 
-    const buttonWidth = 70
-    const buttonHeight = 20
-    const gap = 10
+    const buttonWidth = 70 * DPR
+    const buttonHeight = 20 * DPR
+    const gap = 10 * DPR
 
     // 暂停按钮
     const pauseX = -(buttonWidth + gap) / 2
     this.pauseButton = this.add.rectangle(pauseX, 0, buttonWidth, buttonHeight, 0x4488ff, 0.8)
-    this.pauseButton.setStrokeStyle(1, 0xffffff)
+    this.pauseButton.setStrokeStyle(1 * DPR, 0xffffff)
     this.pauseButton.setInteractive({ useHandCursor: true })
 
     this.pauseButtonText = this.add.text(pauseX, 0, this.t('button_pause_text'), {
       fontFamily: 'Arial',
-      fontSize: '11px',
+      fontSize: `${11 * DPR}px`,
       color: '#ffffff',
     })
     this.pauseButtonText.setOrigin(0.5, 0.5)
@@ -1070,13 +1075,13 @@ export class Game extends Scene {
     // 重启按钮（初始隐藏，仅在暂停时显示）
     const restartX = (buttonWidth + gap) / 2
     this.restartButton = this.add.rectangle(restartX, 0, buttonWidth, buttonHeight, 0xff6644, 0.8)
-    this.restartButton.setStrokeStyle(1, 0xffffff)
+    this.restartButton.setStrokeStyle(1 * DPR, 0xffffff)
     this.restartButton.setInteractive({ useHandCursor: true })
     this.restartButton.setVisible(false)
 
     this.restartButtonText = this.add.text(restartX, 0, this.t('button_restart_text'), {
       fontFamily: 'Arial',
-      fontSize: '11px',
+      fontSize: `${11 * DPR}px`,
       color: '#ffffff',
     })
     this.restartButtonText.setOrigin(0.5, 0.5)
@@ -1108,18 +1113,18 @@ export class Game extends Scene {
     this.buildingActionPanel.setVisible(false)
     this.buildingActionPanel.setDepth(100)
 
-    const buttonWidth = 60
-    const buttonHeight = 22
-    const gap = 6
+    const buttonWidth = 60 * DPR
+    const buttonHeight = 22 * DPR
+    const gap = 6 * DPR
 
     // 升级按钮
     this.upgradeButton = this.add.rectangle(0, 0, buttonWidth, buttonHeight, 0x44aa44, 0.9)
-    this.upgradeButton.setStrokeStyle(1, 0xffffff)
+    this.upgradeButton.setStrokeStyle(1 * DPR, 0xffffff)
     this.upgradeButton.setInteractive({ useHandCursor: true })
 
     this.upgradeButtonText = this.add.text(0, 0, '', {
       fontFamily: 'Arial',
-      fontSize: '10px',
+      fontSize: `${10 * DPR}px`,
       color: '#ffffff',
     })
     this.upgradeButtonText.setOrigin(0.5, 0.5)
@@ -1144,12 +1149,12 @@ export class Game extends Scene {
     // 出售按钮
     const sellX = buttonWidth + gap
     this.sellButton = this.add.rectangle(sellX, 0, buttonWidth, buttonHeight, 0xcc4444, 0.9)
-    this.sellButton.setStrokeStyle(1, 0xffffff)
+    this.sellButton.setStrokeStyle(1 * DPR, 0xffffff)
     this.sellButton.setInteractive({ useHandCursor: true })
 
     this.sellButtonText = this.add.text(sellX, 0, '', {
       fontFamily: 'Arial',
-      fontSize: '10px',
+      fontSize: `${10 * DPR}px`,
       color: '#ffffff',
     })
     this.sellButtonText.setOrigin(0.5, 0.5)
@@ -1197,10 +1202,10 @@ export class Game extends Scene {
     }
 
     const panelPos = this.buildingActionPanel.getWorldTransformMatrix()
-    const buttonWidth = 60
-    const gap = 6
+    const buttonWidth = 60 * DPR
+    const gap = 6 * DPR
     const buttonX = action === 'upgrade' ? 0 : buttonWidth + gap
-    this.showTooltip(tooltipText, panelPos.tx + buttonX, panelPos.ty - 20, 'panel')
+    this.showTooltip(tooltipText, panelPos.tx + buttonX, panelPos.ty - 20 * DPR, 'panel')
   }
 
   /** 获取出售收入（调用 BuildingSystem） */
@@ -1239,8 +1244,8 @@ export class Game extends Scene {
 
     // 计算面板位置（建筑格子上方）
     const [bx, by] = building.position
-    const panelX = this.mapOffsetX + bx * GRID_SIZE + GRID_SIZE / 2 - 30
-    const panelY = this.mapOffsetY + by * GRID_SIZE - 30
+    const panelX = this.mapOffsetX + bx * RENDER_GRID_SIZE + RENDER_GRID_SIZE / 2 - 30 * DPR
+    const panelY = this.mapOffsetY + by * RENDER_GRID_SIZE - 30 * DPR
 
     this.buildingActionPanel.setPosition(panelX, panelY)
 

@@ -3,12 +3,13 @@
  */
 
 import type { RenderContext, BuildingRenderData } from './types'
+import { DPR } from '../dpr'
 
 /** 选中建筑的高亮颜色 */
 const SELECTED_COLOR = 0x00ffff
 
-/** 像素单位大小 */
-const PIXEL_SIZE = 2
+/** 像素单位大小（DPR 缩放） */
+const PIXEL_SIZE = 2 * DPR
 
 /** 像素风格建筑颜色配置 */
 const PIXEL_COLORS = {
@@ -81,17 +82,17 @@ function renderWall(ctx: RenderContext, data: BuildingRenderData): void {
   const { centerX, centerY, gridSize, isSelected } = data
   const gs2 = gridSize / 2
   const colors = PIXEL_COLORS.wall
-  const startX = centerX - gs2 + 2
-  const startY = centerY - gs2 + 2
-  const size = gridSize - 4
+  const startX = centerX - gs2 + 2 * DPR
+  const startY = centerY - gs2 + 2 * DPR
+  const size = gridSize - 4 * DPR
 
   // 背景砂浆色
   ctx.fillStyle(colors.mortar, 1)
   ctx.fillRect(startX, startY, size, size)
 
   // 绘制砖块纹理（交错排列）
-  const brickW = 6
-  const brickH = 3
+  const brickW = 6 * DPR
+  const brickH = 3 * DPR
   for (let row = 0; row < Math.floor(size / brickH); row++) {
     const offset = row % 2 === 0 ? 0 : brickW / 2
     for (let col = -1; col < Math.ceil(size / brickW) + 1; col++) {
@@ -107,12 +108,12 @@ function renderWall(ctx: RenderContext, data: BuildingRenderData): void {
   }
 
   // 黑色边框
-  ctx.lineStyle(2, 0x000000, 1)
+  ctx.lineStyle(2 * DPR, 0x000000, 1)
   ctx.strokeRect(startX, startY, size, size)
 
   // 选中高亮
   if (isSelected) {
-    ctx.lineStyle(2, SELECTED_COLOR, 1)
+    ctx.lineStyle(2 * DPR, SELECTED_COLOR, 1)
     ctx.strokeRect(centerX - gs2, centerY - gs2, gridSize, gridSize)
   }
 }
@@ -127,7 +128,7 @@ function renderCannon(ctx: RenderContext, data: BuildingRenderData): void {
   const p = PIXEL_SIZE
 
   // 底座（大方块）
-  const baseSize = 16
+  const baseSize = 16 * DPR
   const baseX = centerX - baseSize / 2
   const baseY = centerY - baseSize / 2
 
@@ -146,7 +147,7 @@ function renderCannon(ctx: RenderContext, data: BuildingRenderData): void {
 
   // 炮管（指向目标）
   const barrelLength = gs2
-  const barrelWidth = 4
+  const barrelWidth = 4 * DPR
   let angle = 0
 
   if (targetPosition) {
@@ -167,16 +168,16 @@ function renderCannon(ctx: RenderContext, data: BuildingRenderData): void {
 
   // 中心炮座
   ctx.fillStyle(colors.dark, 1)
-  ctx.fillRect(centerX - 3, centerY - 3, 6, 6)
+  ctx.fillRect(centerX - 3 * DPR, centerY - 3 * DPR, 6 * DPR, 6 * DPR)
 
   // 黑色边框
-  ctx.lineStyle(1, 0x000000, 1)
+  ctx.lineStyle(1 * DPR, 0x000000, 1)
   ctx.strokeRect(baseX, baseY, baseSize, baseSize)
 
   // 选中高亮
   if (isSelected) {
-    ctx.lineStyle(2, SELECTED_COLOR, 1)
-    ctx.strokeRect(centerX - gs2 + 2, centerY - gs2 + 2, gridSize - 4, gridSize - 4)
+    ctx.lineStyle(2 * DPR, SELECTED_COLOR, 1)
+    ctx.strokeRect(centerX - gs2 + 2 * DPR, centerY - gs2 + 2 * DPR, gridSize - 4 * DPR, gridSize - 4 * DPR)
   }
 }
 
@@ -190,7 +191,7 @@ function renderLMG(ctx: RenderContext, data: BuildingRenderData): void {
   const p = PIXEL_SIZE
 
   // 底座（较小方块）
-  const baseSize = 12
+  const baseSize = 12 * DPR
   const baseX = centerX - baseSize / 2
   const baseY = centerY - baseSize / 2
 
@@ -208,7 +209,7 @@ function renderLMG(ctx: RenderContext, data: BuildingRenderData): void {
   ctx.fillRect(baseX + p, baseY + p * 2, p, p)
 
   // 枪管（细长）
-  const barrelLength = gs2 + 2
+  const barrelLength = gs2 + 2 * DPR
   let angle = 0
 
   if (targetPosition) {
@@ -221,24 +222,24 @@ function renderLMG(ctx: RenderContext, data: BuildingRenderData): void {
   // 绘制细长像素枪管
   const steps = Math.floor(barrelLength / p)
   for (let i = 0; i < steps; i++) {
-    const bx = centerX + Math.cos(angle) * i * p - 1
-    const by = centerY + Math.sin(angle) * i * p - 1
+    const bx = centerX + Math.cos(angle) * i * p - 1 * DPR
+    const by = centerY + Math.sin(angle) * i * p - 1 * DPR
     ctx.fillStyle(colors.barrel, 1)
-    ctx.fillRect(Math.round(bx), Math.round(by), 2, 2)
+    ctx.fillRect(Math.round(bx), Math.round(by), 2 * DPR, 2 * DPR)
   }
 
   // 中心点
   ctx.fillStyle(colors.dark, 1)
-  ctx.fillRect(centerX - 2, centerY - 2, 4, 4)
+  ctx.fillRect(centerX - 2 * DPR, centerY - 2 * DPR, 4 * DPR, 4 * DPR)
 
   // 黑色边框
-  ctx.lineStyle(1, 0x000000, 1)
+  ctx.lineStyle(1 * DPR, 0x000000, 1)
   ctx.strokeRect(baseX, baseY, baseSize, baseSize)
 
   // 选中高亮
   if (isSelected) {
-    ctx.lineStyle(2, SELECTED_COLOR, 1)
-    ctx.strokeRect(centerX - gs2 + 4, centerY - gs2 + 4, gridSize - 8, gridSize - 8)
+    ctx.lineStyle(2 * DPR, SELECTED_COLOR, 1)
+    ctx.strokeRect(centerX - gs2 + 4 * DPR, centerY - gs2 + 4 * DPR, gridSize - 8 * DPR, gridSize - 8 * DPR)
   }
 }
 
@@ -252,7 +253,7 @@ function renderHMG(ctx: RenderContext, data: BuildingRenderData): void {
   const p = PIXEL_SIZE
 
   // 底座（大方块）
-  const baseSize = 20
+  const baseSize = 20 * DPR
   const baseX = centerX - baseSize / 2
   const baseY = centerY - baseSize / 2
 
@@ -274,8 +275,8 @@ function renderHMG(ctx: RenderContext, data: BuildingRenderData): void {
   ctx.fillRect(baseX + p, baseY + p * 2, p * 2, p)
 
   // 粗枪管
-  const barrelLength = gs2 + 4
-  const barrelWidth = 6
+  const barrelLength = gs2 + 4 * DPR
+  const barrelWidth = 6 * DPR
   let angle = 0
 
   if (targetPosition) {
@@ -296,18 +297,18 @@ function renderHMG(ctx: RenderContext, data: BuildingRenderData): void {
 
   // 中心炮座
   ctx.fillStyle(colors.dark, 1)
-  ctx.fillRect(centerX - 4, centerY - 4, 8, 8)
+  ctx.fillRect(centerX - 4 * DPR, centerY - 4 * DPR, 8 * DPR, 8 * DPR)
   ctx.fillStyle(0x660000, 1)
-  ctx.fillRect(centerX - 2, centerY - 2, 4, 4)
+  ctx.fillRect(centerX - 2 * DPR, centerY - 2 * DPR, 4 * DPR, 4 * DPR)
 
   // 黑色边框
-  ctx.lineStyle(1, 0x000000, 1)
+  ctx.lineStyle(1 * DPR, 0x000000, 1)
   ctx.strokeRect(baseX, baseY, baseSize, baseSize)
 
   // 选中高亮
   if (isSelected) {
-    ctx.lineStyle(2, SELECTED_COLOR, 1)
-    ctx.strokeRect(centerX - gs2 + 1, centerY - gs2 + 1, gridSize - 2, gridSize - 2)
+    ctx.lineStyle(2 * DPR, SELECTED_COLOR, 1)
+    ctx.strokeRect(centerX - gs2 + 1 * DPR, centerY - gs2 + 1 * DPR, gridSize - 2 * DPR, gridSize - 2 * DPR)
   }
 }
 
@@ -321,9 +322,9 @@ function renderLaserGun(ctx: RenderContext, data: BuildingRenderData): void {
   const p = PIXEL_SIZE
 
   // 紫色底座
-  const baseSize = 14
+  const baseSize = 14 * DPR
   const baseX = centerX - baseSize / 2
-  const baseY = centerY - baseSize / 2 + 2
+  const baseY = centerY - baseSize / 2 + 2 * DPR
 
   ctx.fillStyle(colors.base, 1)
   ctx.fillRect(baseX, baseY, baseSize, baseSize)
@@ -333,11 +334,11 @@ function renderLaserGun(ctx: RenderContext, data: BuildingRenderData): void {
 
   // 像素化红色水晶（金字塔形状）
   const crystalLevels = [
-    { width: 2, yOffset: -10 },
-    { width: 4, yOffset: -8 },
-    { width: 6, yOffset: -6 },
-    { width: 8, yOffset: -4 },
-    { width: 10, yOffset: -2 },
+    { width: 2 * DPR, yOffset: -10 * DPR },
+    { width: 4 * DPR, yOffset: -8 * DPR },
+    { width: 6 * DPR, yOffset: -6 * DPR },
+    { width: 8 * DPR, yOffset: -4 * DPR },
+    { width: 10 * DPR, yOffset: -2 * DPR },
   ]
 
   for (const level of crystalLevels) {
@@ -346,7 +347,7 @@ function renderLaserGun(ctx: RenderContext, data: BuildingRenderData): void {
     ctx.fillStyle(colors.crystal, 1)
     ctx.fillRect(lx, ly, level.width, p)
     // 高光
-    if (level.width > 2) {
+    if (level.width > 2 * DPR) {
       ctx.fillStyle(colors.crystalLight, 1)
       ctx.fillRect(lx, ly, p, p)
     }
@@ -354,22 +355,22 @@ function renderLaserGun(ctx: RenderContext, data: BuildingRenderData): void {
 
   // 水晶顶端高光
   ctx.fillStyle(0xffffff, 1)
-  ctx.fillRect(centerX - 1, centerY - 10, 2, 2)
+  ctx.fillRect(centerX - 1 * DPR, centerY - 10 * DPR, 2 * DPR, 2 * DPR)
 
   // 中心能量核心
   ctx.fillStyle(0x000000, 1)
-  ctx.fillRect(centerX - 3, centerY, 6, 6)
+  ctx.fillRect(centerX - 3 * DPR, centerY, 6 * DPR, 6 * DPR)
   ctx.fillStyle(colors.crystal, 1)
-  ctx.fillRect(centerX - 2, centerY + 1, 4, 4)
+  ctx.fillRect(centerX - 2 * DPR, centerY + 1 * DPR, 4 * DPR, 4 * DPR)
 
   // 底座边框
-  ctx.lineStyle(1, 0x000000, 1)
+  ctx.lineStyle(1 * DPR, 0x000000, 1)
   ctx.strokeRect(baseX, baseY, baseSize, baseSize)
 
   // 选中高亮
   if (isSelected) {
-    ctx.lineStyle(2, SELECTED_COLOR, 1)
-    ctx.strokeRect(centerX - gs2 + 3, centerY - gs2 + 3, gridSize - 6, gridSize - 6)
+    ctx.lineStyle(2 * DPR, SELECTED_COLOR, 1)
+    ctx.strokeRect(centerX - gs2 + 3 * DPR, centerY - gs2 + 3 * DPR, gridSize - 6 * DPR, gridSize - 6 * DPR)
   }
 }
 
