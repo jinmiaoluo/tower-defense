@@ -232,6 +232,99 @@ describe('GameSceneLogic', () => {
       expect(result.success).toBe(false)
       expect(result.reason).toBe('building_not_found')
     })
+
+    it('出售 1 级建筑返回正确金额（建造成本 x 0.5）', () => {
+      // 初始金钱 500，cannon 花费 300，剩余 200
+      const { buildingId } = logic.placeBuilding([1, 1], 'cannon')
+      expect(logic.getState().money).toBe(200)
+
+      logic.sellBuilding(buildingId!)
+
+      // 出售回收 = floor(300 x 0.5) = 150
+      // 最终金钱 = 200 + 150 = 350
+      expect(logic.getState().money).toBe(350)
+    })
+
+    it('出售升级后的建筑返回更多金钱', () => {
+      // 使用 LMG（cost=100）方便计算
+      // 初始 500，建造 -100 = 400
+      const { buildingId } = logic.placeBuilding([1, 1], 'LMG')
+      expect(logic.getState().money).toBe(400)
+
+      // 升级到 2 级：升级成本 = floor(100 x 0.75) = 75
+      // 升级后金钱 = 400 - 75 = 325
+      logic.upgradeBuilding(buildingId!)
+      expect(logic.getState().money).toBe(325)
+      expect(logic.getBuilding(buildingId!)?.level).toBe(2)
+
+      // 出售 2 级 LMG：累计花费 = 100 + 75 = 175
+      // 出售回收 = floor(175 x 0.5) = 87
+      logic.sellBuilding(buildingId!)
+      expect(logic.getState().money).toBe(325 + 87)
+    })
+
+    it('出售操作被记录到 WaveRecorder', () => {
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 50, speed: 3, shield: 0, money: 5 }],
+      })
+
+      const { buildingId } = logic.placeBuilding([1, 1], 'cannon')
+
+      // 更新几帧让帧号增加
+      logic.update()
+      logic.update()
+
+      logic.sellBuilding(buildingId!)
+
+      const recorder = logic.getWaveRecorder()
+      const actions = recorder.getActions()
+
+      // 应该有 BUILD 和 SELL 两个操作
+      expect(actions.length).toBe(2)
+      expect(actions[0].type).toBe('BUILD')
+      expect(actions[1].type).toBe('SELL')
+      expect(actions[1].buildingId).toBe(buildingId)
+      expect(actions[1].frame).toBeGreaterThan(0)
+    })
+
+    it('出售后格子可以重新放置建筑', () => {
+      const position: [number, number] = [1, 1]
+      const { buildingId } = logic.placeBuilding(position, 'cannon')
+
+      // 出售建筑
+      logic.sellBuilding(buildingId!)
+
+      // 同一位置应该可以再次放置建筑
+      const result = logic.placeBuilding(position, 'LMG')
+      expect(result.success).toBe(true)
+      expect(logic.getBuildings()).toHaveLength(1)
+    })
+
+    it('出售后建筑从列表中移除', () => {
+      const { buildingId: id1 } = logic.placeBuilding([1, 1], 'cannon')
+      const { buildingId: id2 } = logic.placeBuilding([2, 2], 'LMG')
+
+      expect(logic.getBuildings()).toHaveLength(2)
+
+      // 出售第一个建筑
+      logic.sellBuilding(id1!)
+
+      expect(logic.getBuildings()).toHaveLength(1)
+      expect(logic.getBuilding(id1!)).toBeNull()
+      expect(logic.getBuilding(id2!)).not.toBeNull()
+    })
+
+    it('wall 出售最少返回 1 金币', () => {
+      // wall 建造成本 5，出售 = floor(5 x 0.5) = 2
+      const { buildingId } = logic.placeBuilding([1, 1], 'wall')
+      const moneyBefore = logic.getState().money
+
+      logic.sellBuilding(buildingId!)
+
+      // 出售回收至少 1 金币（实际是 2）
+      expect(logic.getState().money).toBeGreaterThanOrEqual(moneyBefore + 1)
+    })
   })
 
   // ============================================================================

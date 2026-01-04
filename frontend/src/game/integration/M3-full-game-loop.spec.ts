@@ -296,6 +296,80 @@ describe('M3: 完整游戏循环', () => {
       // 建筑应被移除
       expect(logic.getBuilding(buildingId)).toBeNull()
     })
+
+    it('出售后可用金钱购买新建筑', () => {
+      // 初始金钱 500，放置 cannon（300）后剩余 200
+      const { buildingId } = logic.placeBuilding([3, 3], 'cannon')
+      expect(logic.getState().money).toBe(200)
+
+      // 此时无法购买另一个 cannon
+      const failResult = logic.placeBuilding([5, 5], 'cannon')
+      expect(failResult.success).toBe(false)
+      expect(failResult.reason).toBe('insufficient_money')
+
+      // 出售 cannon，获得 150（300 x 0.5）
+      logic.sellBuilding(buildingId!)
+      expect(logic.getState().money).toBe(350)
+
+      // 现在仍然无法购买 cannon（需要 300，只有 350 勉强够）
+      // 实际上 350 >= 300，可以购买
+      const successResult = logic.placeBuilding([5, 5], 'cannon')
+      expect(successResult.success).toBe(true)
+    })
+
+    it('出售升级后的建筑返回累计投资的一半', () => {
+      // 放置 LMG (100) 并升级两次
+      const { buildingId } = logic.placeBuilding([5, 5], 'LMG')
+      // 金钱: 500 - 100 = 400
+
+      // 第一次升级: 花费 floor(100 x 0.75) = 75
+      logic.upgradeBuilding(buildingId!)
+      // 金钱: 400 - 75 = 325
+
+      // 第二次升级: 花费 floor((100+75) x 0.75) = floor(131.25) = 131
+      logic.upgradeBuilding(buildingId!)
+      // 金钱: 325 - 131 = 194
+
+      const building = logic.getBuilding(buildingId!)!
+      expect(building.level).toBe(3)
+      expect(logic.getState().money).toBe(194)
+
+      // 出售 3 级 LMG
+      // 累计花费 = 100 + 75 + 131 = 306
+      // 出售回收 = floor(306 x 0.5) = 153
+      logic.sellBuilding(buildingId!)
+      expect(logic.getState().money).toBe(194 + 153)
+    })
+
+    it('出售后位置可立即重新使用', () => {
+      const position: [number, number] = [5, 5]
+
+      // 放置并出售
+      const { buildingId } = logic.placeBuilding(position, 'LMG')
+      logic.sellBuilding(buildingId!)
+
+      // 同一位置放置不同类型的建筑
+      const result = logic.placeBuilding(position, 'cannon')
+      expect(result.success).toBe(true)
+      expect(logic.getBuildings()).toHaveLength(1)
+      expect(logic.getBuilding(result.buildingId!)?.type).toBe('cannon')
+    })
+
+    it('波次中出售建筑后怪物路径可能变化', () => {
+      // 放置 wall 阻挡部分路径
+      const { buildingId } = logic.placeBuilding([1, 0], 'wall')
+
+      const pathWithWall = logic.getCurrentPath()
+
+      // 出售 wall
+      logic.sellBuilding(buildingId!)
+
+      const pathWithoutWall = logic.getCurrentPath()
+
+      // 路径可能变化（如果 wall 影响了路径）
+      // 至少确保路径仍然有效
+      expect(pathWithoutWall.length).toBeGreaterThan(0)
+    })
   })
 
   describe('游戏结束', () => {
