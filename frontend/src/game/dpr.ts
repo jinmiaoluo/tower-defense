@@ -5,4 +5,11 @@
  */
 
 // 获取设备像素比，限制最大为 2 以避免性能问题
-export const DPR = Math.min(window.devicePixelRatio || 1, 2)
+// 在 Node 测试环境中默认使用 1
+const getDevicePixelRatio = (): number => {
+  if (typeof window !== 'undefined' && window.devicePixelRatio) {
+    return window.devicePixelRatio
+  }
+  return 1
+}
+export const DPR = Math.min(getDevicePixelRatio(), 2)
