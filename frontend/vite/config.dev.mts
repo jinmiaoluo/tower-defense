@@ -11,6 +11,23 @@ export default defineConfig({
     }
   },
   server: {
-    port: 8080
+    port: 8080,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq, req) => {
+            console.log(`[Proxy] ${req.method} ${req.url} -> ${proxyReq.path}`)
+          })
+          proxy.on('proxyRes', (proxyRes, req) => {
+            console.log(`[Proxy] ${req.method} ${req.url} <- ${proxyRes.statusCode}`)
+          })
+          proxy.on('error', (err, req) => {
+            console.error(`[Proxy Error] ${req.method} ${req.url}:`, err.message)
+          })
+        }
+      }
+    }
   }
 })
