@@ -3,7 +3,7 @@
  * 基于 TDD 方式编写，测试先于实现
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { createMonster, type MonsterDependencies } from './Monster'
 import type { MonsterCreateParams, Path } from '@/types/entities'
 import type { MonsterTypeId, Position } from '@/types'
@@ -437,6 +437,10 @@ describe('Monster', () => {
   })
 
   describe('移动连续性（防止跳跃）', () => {
+    afterEach(() => {
+      vi.restoreAllMocks()
+    })
+
     it('重新寻路时像素位置应保持连续（参考旧实现）', () => {
       // 模拟重新寻路时路径方向改变的情况
       // 旧实现通过追踪像素位置 (cx, cy) 保持连续性
@@ -471,11 +475,10 @@ describe('Monster', () => {
         getEntrance: () => [0, 0] as Position,
       }
 
-      // 使用较高速度，确保能穿越足够多格子触发 10% 重新寻路
+      // 使用较高速度，确保能穿越足够多格子触发重新寻路
       // speed=128, GLOBAL_SPEED=0.1, OLD_FPS/FPS=0.4
       // 每帧移动 = 128 * 0.1 * 0.4 = 5.12 像素
       // 穿越一个格子 (32 像素) 约需 6-7 帧
-      // 10% 重新寻路只在到达格子中心时触发
       const monster = createMonster(createTestMonsterParams({ speed: 128 }), repathDeps)
 
       // 移动若干帧，让怪物进入路径中段
@@ -483,12 +486,24 @@ describe('Monster', () => {
         monster.update()
       }
 
-      // 触发重新寻路（通过多次 update，10% 概率在格子交接点触发）
+      // Mock Math.random() 来确定性地触发 10% 重新寻路
+      // 返回 0.05 < 0.1 会触发重新寻路
+      let randomCallCount = 0
+      vi.spyOn(Math, 'random').mockImplementation(() => {
+        randomCallCount++
+        // 第一次到达格子中心时触发重新寻路（返回 0.05 < 0.1）
+        if (randomCallCount === 1) {
+          return 0.05
+        }
+        // 之后返回 0.5 不触发重新寻路
+        return 0.5
+      })
+
       const initialPathCallCount = pathCallCount
       let repathOccurred = false
 
-      // 增加帧数以确保穿越足够多格子来触发 10% 重新寻路
-      for (let i = 0; i < 500 && !repathOccurred && monster.isValid; i++) {
+      // 继续移动直到触发重新寻路或到达终点
+      for (let i = 0; i < 100 && !repathOccurred && monster.isValid; i++) {
         const posBeforeUpdate = monster.getPixelPosition()
         monster.update()
         const posAfterUpdate = monster.getPixelPosition()
@@ -497,7 +512,7 @@ describe('Monster', () => {
           repathOccurred = true
 
           // 关键断言：重新寻路后像素位置变化应该很小
-          // 每帧最大移动距离约 1.28 像素，不应该有大幅跳跃
+          // 每帧最大移动距离约 5.12 像素，不应该有大幅跳跃
           const dx = Math.abs(posAfterUpdate.x - posBeforeUpdate.x)
           const dy = Math.abs(posAfterUpdate.y - posBeforeUpdate.y)
           const distance = Math.sqrt(dx * dx + dy * dy)
