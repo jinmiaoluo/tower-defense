@@ -128,9 +128,12 @@ export function createGameSceneLogic(config: GameConfig): GameSceneLogic {
 
   // 怪物依赖
   const monsterDeps: MonsterDependencies = {
-    getPath: () => gridSystem.getCurrentPath(),
+    generatePathFrom: (startPosition) =>
+      pathSystem.generatePathFrom(startPosition, gridSystem.getMapConfig()),
     getPositionAtProgress: (path, progress) =>
       pathSystem.getPositionAtProgress(path, progress),
+    isPassable: (position) => gridSystem.isPassable(position),
+    getEntrance: () => gridSystem.getMapConfig().entrance,
   }
 
   // 建筑依赖

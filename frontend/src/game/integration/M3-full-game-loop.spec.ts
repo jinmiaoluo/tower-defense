@@ -86,14 +86,15 @@ describe('M3: 完整游戏循环', () => {
 
   describe('建筑攻击流程', () => {
     it('建筑应攻击射程内的怪物', () => {
-      // 放置 LMG 在路径附近
-      logic.placeBuilding([5, 5], 'LMG')
+      // 放置 LMG 在入口附近，确保无论路径如何随机都能覆盖怪物
+      // 入口在 [0,0]，怪物必然从这里出发
+      logic.placeBuilding([1, 1], 'LMG')
 
       // 开始波次
       const waveConfig = createWaveConfig([{ life: 100, speed: 3 }])
       logic.startWave(waveConfig)
 
-      // 运行足够帧数让怪物进入射程
+      // 运行足够帧数让怪物进入射程并被攻击
       for (let i = 0; i < 500; i++) {
         logic.update()
       }
@@ -147,7 +148,8 @@ describe('M3: 完整游戏循环', () => {
       logic.startWave(waveConfig)
 
       // 运行直到波次完成
-      let maxFrames = 2000
+      // 怪物速度慢（0.12 像素/帧），需要足够帧数确保到达建筑射程
+      let maxFrames = 5000
       while (!logic.isWaveComplete() && maxFrames > 0) {
         logic.update()
         maxFrames--
@@ -430,8 +432,10 @@ describe('M3: 完整游戏循环', () => {
       const waveConfig = createWaveConfig([{ life: 200, speed: 3, shield: 0 }])
       logic.startWave(waveConfig)
 
-      // 运行足够帧数让子弹有时间命中
-      for (let i = 0; i < 1000; i++) {
+      // 运行足够帧数让怪物进入射程并被攻击
+      // 怪物速度慢（speed * GLOBAL_SPEED * FPS_RATIO = 0.12 像素/帧）
+      // 需要足够时间让怪物移动到建筑射程内
+      for (let i = 0; i < 2000; i++) {
         logic.update()
       }
 

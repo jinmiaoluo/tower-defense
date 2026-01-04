@@ -19,6 +19,15 @@ export interface PathSystem {
   generatePath(mapConfig: MapConfig): Position[]
 
   /**
+   * 从指定位置生成到出口的路径
+   * 用于怪物独立寻路
+   * @param startPosition 起始位置
+   * @param mapConfig 地图配置（包含当前障碍物）
+   * @returns 路径点数组，如果路径被阻塞返回空数组
+   */
+  generatePathFrom(startPosition: Position, mapConfig: MapConfig): Position[]
+
+  /**
    * 根据进度获取路径上的像素位置
    * @param path 路径点数组
    * @param progress 进度 (0-1)
@@ -147,18 +156,29 @@ class PathFinder {
 
       const neighbors = this.getNeighbors(x, y)
       let minVal = Infinity
-      let nextPos: Position | null = null
 
-      // 找到距离最小的相邻格子
+      // 第一遍：找到最小距离值
       for (const [nx, ny] of neighbors) {
         const val = this.getVal(nx, ny)
         if (val >= 0 && val < minVal) {
           minVal = val
-          nextPos = [nx, ny]
         }
       }
 
-      if (!nextPos) break
+      // 第二遍：收集所有具有最小距离值的邻格
+      const closestNeighbors: Position[] = []
+      for (const [nx, ny] of neighbors) {
+        const val = this.getVal(nx, ny)
+        if (val === minVal) {
+          closestNeighbors.push([nx, ny])
+        }
+      }
+
+      // 随机选择一个（与旧实现一致）
+      if (closestNeighbors.length === 0) break
+      const randomIndex =
+        closestNeighbors.length > 1 ? Math.floor(Math.random() * closestNeighbors.length) : 0
+      const nextPos = closestNeighbors[randomIndex]
       ;[x, y] = nextPos
     }
 
@@ -213,6 +233,16 @@ export function createPathSystem(): PathSystem {
   return {
     generatePath(mapConfig: MapConfig): Position[] {
       const finder = new PathFinder(mapConfig)
+      return finder.findPath()
+    },
+
+    generatePathFrom(startPosition: Position, mapConfig: MapConfig): Position[] {
+      // 创建临时配置，将起点设为指定位置
+      const tempConfig: MapConfig = {
+        ...mapConfig,
+        entrance: startPosition,
+      }
+      const finder = new PathFinder(tempConfig)
       return finder.findPath()
     },
 

@@ -109,10 +109,14 @@ function createBuildingDeps(buildingSystem: BuildingSystem): BuildingDependencie
 /** 创建 Monster 依赖 */
 function createMonsterDeps(gridSystem: GridSystem, pathSystem: PathSystem): MonsterDependencies {
   return {
-    getPath: () => gridSystem.getCurrentPath(),
+    generatePathFrom: (startPosition) => {
+      return pathSystem.generatePathFrom(startPosition, gridSystem.getMapConfig())
+    },
     getPositionAtProgress: (path: Path, progress: number) => {
       return pathSystem.getPositionAtProgress(path, progress)
     },
+    isPassable: (position) => gridSystem.isPassable(position),
+    getEntrance: () => gridSystem.getMapConfig().entrance,
   }
 }
 
