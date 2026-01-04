@@ -144,7 +144,7 @@ describe('BulletSystem', () => {
         building,
         target,
         damage: 12,
-        speed: 10, // 配置值，实际速度 = 10 × 20 × 0.1 = 20 像素/帧
+        speed: 10, // 配置值
         startX: 16, // 格子中心
         startY: 16,
         targetX: 3 * 32 + 16, // 112
@@ -152,11 +152,12 @@ describe('BulletSystem', () => {
       })
 
       // 方向向量 (96, 128)，长度 160
-      // 实际速度 = 10 × 20 × 0.1 = 20 (旧实现: 20 * speed * global_speed)
-      // vx = 96 * 20 / 160 = 12
-      // vy = 128 * 20 / 160 = 16
-      expect(bullet.vx).toBeCloseTo(12)
-      expect(bullet.vy).toBeCloseTo(16)
+      // 旧实现 (24 FPS): 实际速度 = 10 × 20 × 0.1 = 20
+      // 新实现 (60 FPS): 实际速度 = 10 × 20 × 0.1 × (24/60) = 8
+      // vx = 96 * 8 / 160 = 4.8
+      // vy = 128 * 8 / 160 = 6.4
+      expect(bullet.vx).toBeCloseTo(4.8)
+      expect(bullet.vy).toBeCloseTo(6.4)
     })
 
     it('应记录原始目标信息', () => {
@@ -409,6 +410,87 @@ describe('BulletSystem', () => {
       bulletSystem.update([invalidMonster], createTestMapBounds(), mockRecorder, 1)
 
       expect(invalidMonster.takeDamage).not.toHaveBeenCalled()
+    })
+
+    it('命中后应更新建筑的 damageDealt 统计', () => {
+      const building = createMockBuilding({ damageDealt: 0 })
+      const target = createMockMonster()
+
+      bulletSystem.createBullet({
+        building,
+        target,
+        damage: 12,
+        speed: 100,
+        startX: 6 * 32 + 16,
+        startY: 5 * 32 + 16,
+        targetX: 6 * 32 + 16,
+        targetY: 5 * 32 + 16,
+      })
+
+      const hitMonster = createMockMonster({
+        takeDamage: vi.fn(() => 10), // 返回实际伤害 10
+      })
+      ;(hitMonster as unknown as { x: number; y: number }).x = 6 * 32 + 16
+      ;(hitMonster as unknown as { x: number; y: number }).y = 5 * 32 + 16
+
+      bulletSystem.update([hitMonster], createTestMapBounds(), mockRecorder, 1)
+
+      expect(building.damageDealt).toBe(10)
+    })
+
+    it('击杀怪物后应更新建筑的 kills 统计', () => {
+      const building = createMockBuilding({ kills: 0 })
+      const target = createMockMonster()
+
+      bulletSystem.createBullet({
+        building,
+        target,
+        damage: 50,
+        speed: 100,
+        startX: 6 * 32 + 16,
+        startY: 5 * 32 + 16,
+        targetX: 6 * 32 + 16,
+        targetY: 5 * 32 + 16,
+      })
+
+      const dyingMonster = createMockMonster({
+        takeDamage: vi.fn(() => 50),
+        isDead: () => true, // 被击杀
+      })
+      ;(dyingMonster as unknown as { x: number; y: number }).x = 6 * 32 + 16
+      ;(dyingMonster as unknown as { x: number; y: number }).y = 5 * 32 + 16
+
+      bulletSystem.update([dyingMonster], createTestMapBounds(), mockRecorder, 1)
+
+      expect(building.kills).toBe(1)
+    })
+
+    it('未击杀怪物时不应增加 kills 统计', () => {
+      const building = createMockBuilding({ kills: 0 })
+      const target = createMockMonster()
+
+      bulletSystem.createBullet({
+        building,
+        target,
+        damage: 10,
+        speed: 100,
+        startX: 6 * 32 + 16,
+        startY: 5 * 32 + 16,
+        targetX: 6 * 32 + 16,
+        targetY: 5 * 32 + 16,
+      })
+
+      const survivingMonster = createMockMonster({
+        takeDamage: vi.fn(() => 10),
+        isDead: () => false, // 未被击杀
+      })
+      ;(survivingMonster as unknown as { x: number; y: number }).x = 6 * 32 + 16
+      ;(survivingMonster as unknown as { x: number; y: number }).y = 5 * 32 + 16
+
+      bulletSystem.update([survivingMonster], createTestMapBounds(), mockRecorder, 1)
+
+      expect(building.damageDealt).toBe(10) // 伤害统计应更新
+      expect(building.kills).toBe(0) // 击杀统计不应更新
     })
   })
 

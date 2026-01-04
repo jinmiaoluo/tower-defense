@@ -9,7 +9,10 @@ import type { IWaveRecorder } from '@/types/recorder'
 import type { Position } from '@/types'
 import { GAME_CONSTANTS } from '@/types'
 
-const { GRID_SIZE, GLOBAL_SPEED } = GAME_CONSTANTS
+const { GRID_SIZE, GLOBAL_SPEED, FPS } = GAME_CONSTANTS
+
+/** 旧实现的帧率（用于速度换算） */
+const OLD_FPS = 24
 
 /**
  * 子弹速度因子
@@ -169,9 +172,9 @@ export function createBulletSystem(): BulletSystem {
       const distance = Math.sqrt(dx * dx + dy * dy)
 
       // 计算实际像素速度
-      // 旧实现: speed = 20 * this.speed * TD.global_speed (global_speed = 0.1)
-      // 等价于: 20 * bullet_speed * 0.1 = 2 * bullet_speed
-      const actualSpeed = speed * BULLET_SPEED_FACTOR * GLOBAL_SPEED
+      // 旧实现 (24 FPS): speed = 20 * this.speed * TD.global_speed (global_speed = 0.1)
+      // 新实现 (60 FPS): 需要乘以帧率比例 (24/60) 以保持相同的每秒移动距离
+      const actualSpeed = speed * BULLET_SPEED_FACTOR * GLOBAL_SPEED * (OLD_FPS / FPS)
 
       // 计算速度分量（如果距离为 0，默认向右）
       let vx: number, vy: number
@@ -238,6 +241,12 @@ export function createBulletSystem(): BulletSystem {
         if (hitMonster) {
           // 命中怪物
           const actualDamage = hitMonster.takeDamage(bullet.damage)
+
+          // 更新建筑统计
+          bullet.building.damageDealt += actualDamage
+          if (hitMonster.isDead()) {
+            bullet.building.kills += 1
+          }
 
           // 记录攻击事件
           recorder.recordAttack({
