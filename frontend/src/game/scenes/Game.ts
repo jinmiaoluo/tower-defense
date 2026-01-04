@@ -16,11 +16,13 @@ import {
   renderBuilding,
   renderMonster,
   renderBullet,
+  renderBuildingSelection,
   BUILDING_COLORS,
   type RenderContext,
   type BuildingRenderData,
   type MonsterRenderData,
   type BulletRenderData,
+  type SelectionRenderData,
 } from '../render'
 import { getTranslator } from '@/i18n'
 import { getTheme, darkTheme } from '@/theme'
@@ -101,12 +103,22 @@ export class Game extends Scene {
   // 建筑面板按钮文字（用于语言切换时更新）
   private buildingPanelTexts: Phaser.GameObjects.Text[] = []
 
+  // 建筑面板按钮（用于选中状态更新）
+  private buildingPanelButtons: Map<BuildingType, Phaser.GameObjects.Rectangle> = new Map()
+
   // 控制面板（暂停/重启按钮）
   private controlPanel!: Phaser.GameObjects.Container
   private pauseButton!: Phaser.GameObjects.Rectangle
   private pauseButtonText!: Phaser.GameObjects.Text
   private restartButton!: Phaser.GameObjects.Rectangle
   private restartButtonText!: Phaser.GameObjects.Text
+
+  // 建筑操作面板（升级/出售按钮，选中建筑时显示）
+  private buildingActionPanel!: Phaser.GameObjects.Container
+  private upgradeButton!: Phaser.GameObjects.Rectangle
+  private upgradeButtonText!: Phaser.GameObjects.Text
+  private sellButton!: Phaser.GameObjects.Rectangle
+  private sellButtonText!: Phaser.GameObjects.Text
 
   constructor() {
     super('Game')
@@ -181,6 +193,7 @@ export class Game extends Scene {
       this.renderPath()
       this.createBuildingPanel()
       this.createControlPanel()
+      this.createBuildingActionPanel()
 
       // 通知 Vue 场景已就绪
       EventBus.emit('current-scene-ready', this)
@@ -246,10 +259,29 @@ export class Game extends Scene {
         // 点击地图外且不在 UI 上，取消选择
         this.uiState.selectedBuildingType = null
         this.uiState.selectedBuildingId = null
+        this.updateBuildingActionPanel()
+        this.updateBuildingPanelButtonStates()
         return
       }
 
-      // 如果选中了建筑类型，尝试放置
+      // 先检查是否点击了已有建筑（优先级高于放置新建筑）
+      const buildings = this.logic.getBuildings()
+      const clickedBuilding = buildings.find(
+        (b) => b.position[0] === gridPos[0] && b.position[1] === gridPos[1],
+      )
+
+      if (clickedBuilding) {
+        // 点击已有建筑：选中该建筑，取消放置模式
+        this.uiState.selectedBuildingType = null
+        this.uiState.selectedBuildingId = clickedBuilding.id
+        this.uiState.mobilePreviewPosition = null
+        this.updateBuildingActionPanel()
+        this.updateBuildingPanelButtonStates()
+        EventBus.emit('building-selected', clickedBuilding)
+        return
+      }
+
+      // 如果选中了建筑类型且点击的是空地，尝试放置
       if (this.uiState.selectedBuildingType) {
         if (this.isMobile) {
           const preview = this.uiState.mobilePreviewPosition
@@ -265,56 +297,17 @@ export class Game extends Scene {
         return
       }
 
-      // 否则检查是否点击了已有建筑
-      const buildings = this.logic.getBuildings()
-      const clickedBuilding = buildings.find(
-        (b) => b.position[0] === gridPos[0] && b.position[1] === gridPos[1],
-      )
-
-      if (clickedBuilding) {
-        this.uiState.selectedBuildingId = clickedBuilding.id
-        EventBus.emit('building-selected', clickedBuilding)
-      } else {
-        this.uiState.selectedBuildingId = null
-      }
+      // 点击空地且未选中建筑类型：取消选中
+      this.uiState.selectedBuildingId = null
+      this.updateBuildingActionPanel()
     })
 
     // 键盘快捷键
     this.input.keyboard?.on('keydown-ESC', () => {
       this.uiState.selectedBuildingType = null
       this.uiState.selectedBuildingId = null
-    })
-
-    this.input.keyboard?.on('keydown-ONE', () => {
-      this.selectBuildingType('LMG')
-    })
-
-    this.input.keyboard?.on('keydown-TWO', () => {
-      this.selectBuildingType('cannon')
-    })
-
-    this.input.keyboard?.on('keydown-THREE', () => {
-      this.selectBuildingType('HMG')
-    })
-
-    this.input.keyboard?.on('keydown-FOUR', () => {
-      this.selectBuildingType('laser_gun')
-    })
-
-    this.input.keyboard?.on('keydown-FIVE', () => {
-      this.selectBuildingType('wall')
-    })
-
-    this.input.keyboard?.on('keydown-U', () => {
-      if (this.uiState.selectedBuildingId) {
-        this.tryUpgradeBuilding(this.uiState.selectedBuildingId)
-      }
-    })
-
-    this.input.keyboard?.on('keydown-S', () => {
-      if (this.uiState.selectedBuildingId) {
-        this.trySellBuilding(this.uiState.selectedBuildingId)
-      }
+      this.updateBuildingActionPanel()
+      this.updateBuildingPanelButtonStates()
     })
 
     this.input.keyboard?.on('keydown-SPACE', () => {
@@ -505,7 +498,25 @@ export class Game extends Scene {
     this.uiState.selectedBuildingType = type
     this.uiState.selectedBuildingId = null
     this.uiState.mobilePreviewPosition = null
+    this.updateBuildingActionPanel()
+    this.updateBuildingPanelButtonStates()
     EventBus.emit('building-type-selected', type)
+  }
+
+  /** 更新建筑面板按钮选中状态 */
+  private updateBuildingPanelButtonStates() {
+    const selectedType = this.uiState.selectedBuildingType
+    const colors = this.getColors()
+
+    this.buildingPanelButtons.forEach((button, type) => {
+      if (type === selectedType) {
+        // 选中状态：金色边框
+        button.setStrokeStyle(2, colors.rangeSelected)
+      } else {
+        // 非选中状态：白色边框
+        button.setStrokeStyle(2, 0xffffff)
+      }
+    })
   }
 
   /** 尝试放置建筑 */
@@ -559,6 +570,7 @@ export class Game extends Scene {
     const result = this.logic.sellBuilding(buildingId)
     if (result.success) {
       this.uiState.selectedBuildingId = null
+      this.updateBuildingActionPanel()
       this.renderPath()
       EventBus.emit('building-sold', buildingId)
     } else {
@@ -678,11 +690,21 @@ export class Game extends Scene {
         this.buildingRenderCtx.lineBetween(centerX, centerY, targetX, targetY)
       }
 
-      // 射程指示（选中时显示）
-      if (isSelected && building.type !== 'wall') {
-        const range = building.getRange() * GRID_SIZE
-        this.buildingRenderCtx.lineStyle(1, this.getColors().selected, 0.3)
-        this.buildingRenderCtx.strokeCircle(centerX, centerY, range)
+      // 选中效果（金色范围圆 + 格子高亮，与旧实现一致）
+      if (isSelected) {
+        const selectionData: SelectionRenderData = {
+          centerX,
+          centerY,
+          gridSize: GRID_SIZE,
+          range: building.getRange(),
+          isWeapon: building.type !== 'wall',
+          position: building.position,
+        }
+        const colors = this.getColors()
+        renderBuildingSelection(this.buildingRenderCtx, selectionData, {
+          rangeSelected: colors.rangeSelected,
+          gridHighlight: colors.gridHighlight,
+        })
       }
     }
   }
@@ -920,6 +942,7 @@ export class Game extends Scene {
 
     this.buildingPanel = this.add.container(width / 2, height - 50)
     this.buildingPanelTexts = []
+    this.buildingPanelButtons.clear()
 
     const buildingTypes: BuildingType[] = ['LMG', 'cannon', 'HMG', 'laser_gun', 'wall']
     const buttonWidth = 70
@@ -952,6 +975,9 @@ export class Game extends Scene {
       button.setStrokeStyle(2, 0xffffff)
       button.setInteractive({ useHandCursor: true })
 
+      // 存储按钮引用
+      this.buildingPanelButtons.set(type, button)
+
       button.on('pointerover', () => {
         button.setFillStyle(buttonColor, 1)
         // 显示建筑介绍 tooltip
@@ -976,7 +1002,12 @@ export class Game extends Scene {
       })
 
       button.on('pointerout', () => {
+        // 如果当前按钮是选中状态，保持选中边框
+        const isSelected = this.uiState.selectedBuildingType === type
         button.setFillStyle(buttonColor, 0.8)
+        if (isSelected) {
+          button.setStrokeStyle(2, this.getColors().rangeSelected)
+        }
         this.hideTooltip()
       })
 
@@ -1071,6 +1102,158 @@ export class Game extends Scene {
     ])
   }
 
+  /** 创建建筑操作面板（选中建筑时显示升级/出售按钮） */
+  private createBuildingActionPanel() {
+    this.buildingActionPanel = this.add.container(0, 0)
+    this.buildingActionPanel.setVisible(false)
+    this.buildingActionPanel.setDepth(100)
+
+    const buttonWidth = 60
+    const buttonHeight = 22
+    const gap = 6
+
+    // 升级按钮
+    this.upgradeButton = this.add.rectangle(0, 0, buttonWidth, buttonHeight, 0x44aa44, 0.9)
+    this.upgradeButton.setStrokeStyle(1, 0xffffff)
+    this.upgradeButton.setInteractive({ useHandCursor: true })
+
+    this.upgradeButtonText = this.add.text(0, 0, '', {
+      fontFamily: 'Arial',
+      fontSize: '10px',
+      color: '#ffffff',
+    })
+    this.upgradeButtonText.setOrigin(0.5, 0.5)
+
+    this.upgradeButton.on('pointerover', () => {
+      this.upgradeButton.setFillStyle(0x44aa44, 1)
+      this.showBuildingActionTooltip('upgrade')
+    })
+
+    this.upgradeButton.on('pointerout', () => {
+      this.upgradeButton.setFillStyle(0x44aa44, 0.9)
+      this.hideTooltip('panel')
+    })
+
+    this.upgradeButton.on('pointerdown', () => {
+      if (this.uiState.selectedBuildingId) {
+        this.tryUpgradeBuilding(this.uiState.selectedBuildingId)
+        this.updateBuildingActionPanel()
+      }
+    })
+
+    // 出售按钮
+    const sellX = buttonWidth + gap
+    this.sellButton = this.add.rectangle(sellX, 0, buttonWidth, buttonHeight, 0xcc4444, 0.9)
+    this.sellButton.setStrokeStyle(1, 0xffffff)
+    this.sellButton.setInteractive({ useHandCursor: true })
+
+    this.sellButtonText = this.add.text(sellX, 0, '', {
+      fontFamily: 'Arial',
+      fontSize: '10px',
+      color: '#ffffff',
+    })
+    this.sellButtonText.setOrigin(0.5, 0.5)
+
+    this.sellButton.on('pointerover', () => {
+      this.sellButton.setFillStyle(0xcc4444, 1)
+      this.showBuildingActionTooltip('sell')
+    })
+
+    this.sellButton.on('pointerout', () => {
+      this.sellButton.setFillStyle(0xcc4444, 0.9)
+      this.hideTooltip('panel')
+    })
+
+    this.sellButton.on('pointerdown', () => {
+      if (this.uiState.selectedBuildingId) {
+        this.trySellBuilding(this.uiState.selectedBuildingId)
+      }
+    })
+
+    this.buildingActionPanel.add([
+      this.upgradeButton,
+      this.upgradeButtonText,
+      this.sellButton,
+      this.sellButtonText,
+    ])
+  }
+
+  /** 显示建筑操作的 Tooltip */
+  private showBuildingActionTooltip(action: 'upgrade' | 'sell') {
+    if (!this.uiState.selectedBuildingId) return
+
+    const building = this.logic.getBuilding(this.uiState.selectedBuildingId)
+    if (!building) return
+
+    const buildingName = this.t(`building_name_${building.type}`)
+    let tooltipText: string
+
+    if (action === 'upgrade') {
+      const cost = this.logic.getUpgradeCost(building.type, building.level)
+      tooltipText = this.t('upgrade_tooltip', [buildingName, building.level + 1, cost])
+    } else {
+      const income = this.getSellIncome(building.type, building.level)
+      tooltipText = this.t('sell_tooltip', [buildingName, income])
+    }
+
+    const panelPos = this.buildingActionPanel.getWorldTransformMatrix()
+    const buttonWidth = 60
+    const gap = 6
+    const buttonX = action === 'upgrade' ? 0 : buttonWidth + gap
+    this.showTooltip(tooltipText, panelPos.tx + buttonX, panelPos.ty - 20, 'panel')
+  }
+
+  /** 获取出售收入（调用 BuildingSystem） */
+  private getSellIncome(type: string, level: number): number {
+    const buildingConfig = this.gameConfig.buildings[type as BuildingType]
+    const totalCost = this.getTotalCost(type as BuildingType, level)
+    const income = Math.floor(totalCost * buildingConfig.sellRatio)
+    return Math.max(income, 1)
+  }
+
+  /** 获取建筑累计花费 */
+  private getTotalCost(type: BuildingType, level: number): number {
+    const buildingConfig = this.gameConfig.buildings[type]
+    let total = buildingConfig.cost
+    for (let l = 1; l < level; l++) {
+      total += Math.floor(total * buildingConfig.upgradeCostRatio)
+    }
+    return total
+  }
+
+  /** 更新建筑操作面板的显示状态和位置 */
+  private updateBuildingActionPanel() {
+    // 面板尚未创建时跳过
+    if (!this.buildingActionPanel) return
+
+    if (!this.uiState.selectedBuildingId) {
+      this.buildingActionPanel.setVisible(false)
+      return
+    }
+
+    const building = this.logic.getBuilding(this.uiState.selectedBuildingId)
+    if (!building) {
+      this.buildingActionPanel.setVisible(false)
+      return
+    }
+
+    // 计算面板位置（建筑格子上方）
+    const [bx, by] = building.position
+    const panelX = this.mapOffsetX + bx * GRID_SIZE + GRID_SIZE / 2 - 30
+    const panelY = this.mapOffsetY + by * GRID_SIZE - 30
+
+    this.buildingActionPanel.setPosition(panelX, panelY)
+
+    // 更新按钮文字
+    const upgradeCost = this.logic.getUpgradeCost(building.type, building.level)
+    this.upgradeButtonText.setText(`${this.t('button_upgrade_text')} $${upgradeCost}`)
+
+    const sellIncome = this.getSellIncome(building.type, building.level)
+    this.sellButtonText.setText(`${this.t('button_sell_text')} $${sellIncome}`)
+
+    this.buildingActionPanel.setVisible(true)
+  }
+
   /** 处理暂停按钮点击 */
   private handlePauseClick() {
     const state = this.logic.getState()
@@ -1100,20 +1283,17 @@ export class Game extends Scene {
     }
 
     const state = this.logic.getState()
+    const buildings = this.logic.getBuildings()
     const monsters = this.logic.getMonsters()
     const aliveMonsters = monsters.filter((m) => m.isValid).length
 
-    let statusText = `${this.t('wave_info', [state.wave])} | ${this.t('panel_money_title')}${state.money} | ${this.t('panel_life_title')}${state.life} | ${this.t('panel_score_title')}${state.score} | ${this.t('panel_monster_title')}${aliveMonsters}`
-
-    if (this.uiState.waveIntervalCounter > 0) {
-      const secondsLeft = Math.ceil(this.uiState.waveIntervalCounter / 60)
-      statusText += ` | ${this.t('next_wave_in', [secondsLeft])}`
-    }
-
-    if (this.uiState.selectedBuildingType) {
-      const buildingName = this.t(`building_name_${this.uiState.selectedBuildingType}`)
-      statusText += ` | ${this.t('selected', [buildingName])}`
-    }
+    const statusText = [
+      `${this.t('panel_money_title')}${state.money}`,
+      `${this.t('panel_score_title')}${state.score}`,
+      `${this.t('panel_life_title')}${state.life}`,
+      `${this.t('panel_building_title')}${buildings.length}`,
+      `${this.t('panel_monster_title')}${aliveMonsters}`,
+    ].join(' | ')
 
     this.uiText.setText(statusText)
   }
@@ -1259,6 +1439,12 @@ export class Game extends Scene {
     this.pauseButtonText.setText(this.t('button_pause_text'))
     this.restartButton.setVisible(false)
     this.restartButtonText.setVisible(false)
+
+    // 隐藏建筑操作面板
+    this.updateBuildingActionPanel()
+
+    // 重置建筑面板按钮选中状态
+    this.updateBuildingPanelButtonStates()
 
     // 清除渲染
     this.buildingGraphics.clear()

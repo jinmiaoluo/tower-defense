@@ -47,6 +47,8 @@ export const en: Record<MessageKey, string> = {
   upgrade: 'Upgrade ${0} to level ${1}, cost $${2}.',
   sell: 'Sell ${0} for $${1}',
   upgrade_success: 'Upgrade success! ${0} upgraded to level ${1}. Next upgrade costs $${2}.',
+  upgrade_tooltip: 'Upgrade ${0} to level ${1}\nCost: $${2}',
+  sell_tooltip: 'Sell ${0}\nReceive: $${1}',
 
   // 怪物信息
   monster_info: 'Monster: Life ${0}, Shield ${1}, Speed ${2}, Damage ${3}',
