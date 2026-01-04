@@ -1113,7 +1113,7 @@ export class Game extends Scene {
     this.buildingActionPanel.setVisible(false)
     this.buildingActionPanel.setDepth(100)
 
-    const buttonWidth = 60 * DPR
+    const buttonWidth = 80 * DPR
     const buttonHeight = 22 * DPR
     const gap = 6 * DPR
 
@@ -1202,7 +1202,7 @@ export class Game extends Scene {
     }
 
     const panelPos = this.buildingActionPanel.getWorldTransformMatrix()
-    const buttonWidth = 60 * DPR
+    const buttonWidth = 80 * DPR
     const gap = 6 * DPR
     const buttonX = action === 'upgrade' ? 0 : buttonWidth + gap
     this.showTooltip(tooltipText, panelPos.tx + buttonX, panelPos.ty - 20 * DPR, 'panel')
@@ -1244,7 +1244,7 @@ export class Game extends Scene {
 
     // 计算面板位置（建筑格子上方）
     const [bx, by] = building.position
-    const panelX = this.mapOffsetX + bx * RENDER_GRID_SIZE + RENDER_GRID_SIZE / 2 - 30 * DPR
+    const panelX = this.mapOffsetX + bx * RENDER_GRID_SIZE + RENDER_GRID_SIZE / 2 - 40 * DPR
     const panelY = this.mapOffsetY + by * RENDER_GRID_SIZE - 30 * DPR
 
     this.buildingActionPanel.setPosition(panelX, panelY)
