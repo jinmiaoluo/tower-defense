@@ -7,7 +7,7 @@
 import { Scene } from 'phaser'
 import { EventBus } from '../EventBus'
 import { AppEventBus } from '@/utils/EventEmitter'
-import { createGameSceneLogic, type GameSceneLogic } from '../systems'
+import { createGameSceneLogic, type GameSceneLogic, createScoreSystem, type ScoreSystem } from '../systems'
 import { gameApi } from '@/api'
 import type { GameConfig, WaveConfig, Position, BuildingType, GameColors, ResolvedTheme } from '@/types'
 import { GAME_CONSTANTS } from '@/types'
@@ -55,6 +55,7 @@ const TIP_DURATION = 2000
 export class Game extends Scene {
   // 核心逻辑
   private logic!: GameSceneLogic
+  private scoreSystem!: ScoreSystem
 
   // UI 状态
   private uiState!: UIState
@@ -66,7 +67,6 @@ export class Game extends Scene {
 
   // 渲染对象
   private mapGraphics!: Phaser.GameObjects.Graphics
-  private pathGraphics!: Phaser.GameObjects.Graphics
   private buildingGraphics!: Phaser.GameObjects.Graphics
   private monsterGraphics!: Phaser.GameObjects.Graphics
   private bulletGraphics!: Phaser.GameObjects.Graphics
@@ -186,6 +186,7 @@ export class Game extends Scene {
 
       // 创建核心逻辑
       this.logic = createGameSceneLogic(this.gameConfig)
+      this.scoreSystem = createScoreSystem()
 
       // 开始第一波
       this.logic.startWave(this.currentWaveConfig)
@@ -194,7 +195,6 @@ export class Game extends Scene {
 
       // 渲染静态元素
       this.renderMap()
-      this.renderPath()
       this.createBuildingPanel()
       this.createControlPanel()
       this.createBuildingActionPanel()
@@ -220,7 +220,6 @@ export class Game extends Scene {
   /** 创建渲染对象 */
   private createRenderObjects() {
     this.mapGraphics = this.add.graphics()
-    this.pathGraphics = this.add.graphics()
     this.buildingGraphics = this.add.graphics()
     this.monsterGraphics = this.add.graphics()
     this.bulletGraphics = this.add.graphics()
@@ -344,7 +343,6 @@ export class Game extends Scene {
     // 重新渲染需要主题颜色的元素
     if (!this.uiState.isLoading) {
       this.renderMap()
-      this.renderPath()
       // 更新 UI 文本颜色
       this.uiText.setColor(this.gameColors.uiText)
     }
@@ -539,7 +537,6 @@ export class Game extends Scene {
         type: this.uiState.selectedBuildingType,
         position,
       })
-      this.renderPath()
     } else {
       // 显示提示消息
       if (result.reason === 'insufficient_money') {
@@ -576,7 +573,6 @@ export class Game extends Scene {
     if (result.success) {
       this.uiState.selectedBuildingId = null
       this.updateBuildingActionPanel()
-      this.renderPath()
       EventBus.emit('building-sold', buildingId)
     } else {
       EventBus.emit('building-sell-failed', result.reason)
@@ -631,22 +627,6 @@ export class Game extends Scene {
     const exitY = this.mapOffsetY + exit[1] * RENDER_GRID_SIZE + RENDER_GRID_SIZE / 2
     g.lineStyle(2 * DPR, colors.exit, 1)
     g.strokeCircle(exitX, exitY, RENDER_GRID_SIZE / 3)
-  }
-
-  /** 渲染路径 */
-  private renderPath() {
-    const g = this.pathGraphics
-    const path = this.logic.getCurrentPath()
-    const colors = this.getColors()
-
-    g.clear()
-    g.fillStyle(colors.path, 0.3)
-
-    for (const [x, y] of path) {
-      const px = this.mapOffsetX + x * RENDER_GRID_SIZE
-      const py = this.mapOffsetY + y * RENDER_GRID_SIZE
-      g.fillRect(px + 2 * DPR, py + 2 * DPR, RENDER_GRID_SIZE - 4 * DPR, RENDER_GRID_SIZE - 4 * DPR)
-    }
   }
 
   /** 渲染所有建筑 */
@@ -1318,7 +1298,6 @@ export class Game extends Scene {
 
       if (this.uiState.waveIntervalCounter === 0) {
         this.logic.startWave(this.currentWaveConfig)
-        this.renderPath()
       }
     }
   }
@@ -1371,6 +1350,14 @@ export class Game extends Scene {
     // 获取最后一波结果
     const lastWaveResult = waveRecorder.getResult()
 
+    // 计算最终得分（包含波次/生命/金币奖励）
+    const finalScore = this.scoreSystem.calculateFinalScore({
+      accumulatedScore: state.score,
+      wavesCompleted: state.wave,
+      remainingLife: state.life,
+      remainingMoney: state.money,
+    })
+
     // 转换建筑列表为快照格式
     const buildingSnapshots = buildings.map((b) => ({
       id: b.id,
@@ -1381,9 +1368,9 @@ export class Game extends Scene {
       kills: 0,
     }))
 
-    // 发送游戏结束事件到 Vue 层（不再在画布上绘制文字）
+    // 发送游戏结束事件到 Vue 层
     EventBus.emit('game-over', {
-      score: state.score,
+      score: finalScore,
       wave: state.wave,
       sessionId: this.sessionId,
       lastWaveResult,
@@ -1475,7 +1462,6 @@ export class Game extends Scene {
 
       // 重新渲染静态元素
       this.renderMap()
-      this.renderPath()
 
       // 通知重新开始完成
       EventBus.emit('game-restarted')
