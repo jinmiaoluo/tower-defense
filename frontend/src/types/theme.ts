@@ -65,6 +65,12 @@ export interface GameColors {
   // 攻击范围虚线
   rangeDash: number
 
+  // 选中建筑的攻击范围（金色）
+  rangeSelected: number
+
+  // 格子高亮
+  gridHighlight: number
+
   // UI 文本
   uiText: string
 }
