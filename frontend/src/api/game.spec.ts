@@ -15,6 +15,10 @@ import type {
   GameEndRequest,
   GameEndResponse,
   LeaderboardResponse,
+  BuildingType,
+  BuildingConfig,
+  MonsterTypeId,
+  MonsterDisplayConfig,
 } from '@/types'
 
 // Mock 网络请求
@@ -229,8 +233,8 @@ describe('GameApi', () => {
       const mockResponse: GameStartResponse = {
         sessionId: 'test-session-id',
         config: {
-          buildings: {},
-          monsters: {},
+          buildings: {} as Record<BuildingType, BuildingConfig>,
+          monsters: {} as Record<MonsterTypeId, MonsterDisplayConfig>,
           map: { width: 16, height: 16, entrance: [0, 0], exit: [15, 15], obstacles: [] },
           initial: { money: 500, life: 100, difficulty: 1 },
         },

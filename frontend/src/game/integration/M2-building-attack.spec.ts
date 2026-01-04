@@ -17,10 +17,10 @@ import { createBuildingSystem, type BuildingSystem } from '../systems/BuildingSy
 import { createBulletSystem, type BulletSystem, type Rect } from '../systems/BulletSystem'
 import { createDamageSystem, type DamageSystem } from '../systems/DamageSystem'
 import { createBuilding, type BuildingDependencies, type IBuildingRuntime } from '../entities/Building'
-import { createMonster, type MonsterDependencies, type IMonsterRuntime } from '../entities/Monster'
-import type { IBuilding, IMonster, Path } from '@/types/entities'
+import { createMonster, type MonsterDependencies } from '../entities/Monster'
+import type { IBuilding, Path } from '@/types/entities'
 import type { IWaveRecorder, AttackRecordData } from '@/types/recorder'
-import type { MapConfig, MonsterTypeId, Position, BuildingType } from '@/types'
+import type { MapConfig, MonsterTypeId, BuildingType } from '@/types'
 import { GAME_CONSTANTS } from '@/types'
 import { MOCK_GAME_CONFIG, MOCK_BUILDINGS } from '@/mocks'
 

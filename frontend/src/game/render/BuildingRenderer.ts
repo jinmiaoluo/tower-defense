@@ -283,7 +283,7 @@ function renderHMG(ctx: RenderContext, data: BuildingRenderData): void {
  * 渲染激光枪 - 三角形 + 脉冲动画
  */
 function renderLaserGun(ctx: RenderContext, data: BuildingRenderData): void {
-  const { centerX, centerY, gridSize, isSelected, frame = 0 } = data
+  const { centerX, centerY, isSelected, frame = 0 } = data
   const colors = COLORS.laser_gun
   const size = 12 * DPR
 

@@ -15,19 +15,19 @@ import { GAME_CONSTANTS } from '@/types'
 import type { IMonster, IBuilding } from '@/types/entities'
 import type { IWaveRecorder } from '@/types/recorder'
 
-import { createGridSystem, type GridSystem } from './GridSystem'
-import { createPathSystem, type PathSystem } from './PathSystem'
-import { createWaveManager, type WaveManager } from './WaveManager'
-import { createWaveRecorder, type WaveRecorder } from './WaveRecorder'
-import { createBuildingSystem, type BuildingSystem } from './BuildingSystem'
-import { createBulletSystem, type BulletSystem, type Rect, type Bullet } from './BulletSystem'
+import { createGridSystem } from './GridSystem'
+import { createPathSystem } from './PathSystem'
+import { createWaveManager } from './WaveManager'
+import { createWaveRecorder } from './WaveRecorder'
+import { createBuildingSystem } from './BuildingSystem'
+import { createBulletSystem, type Rect, type Bullet } from './BulletSystem'
 // 注意: DamageSystem 的伤害计算在 Monster 实体的 takeDamage 方法中完成
 // 注意: EconomySystem 的生命奖励功能由服务端计算并通过 API 返回
 // 客户端在 Game.ts 中根据服务端响应的 lifeReward 应用奖励
 import { createMonster, type MonsterDependencies, type IMonsterRuntime } from '../entities/Monster'
 import { createBuilding, type BuildingDependencies, type IBuildingRuntime } from '../entities/Building'
 
-const { GRID_SIZE, GLOBAL_SPEED } = GAME_CONSTANTS
+const { GRID_SIZE } = GAME_CONSTANTS
 
 /** 游戏状态 */
 export interface GameState {

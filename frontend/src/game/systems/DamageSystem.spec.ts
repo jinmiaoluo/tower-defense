@@ -30,6 +30,7 @@ function createMockMonster(overrides: Partial<IMonster> = {}): IMonster {
     isDead: () => false,
     reachedExit: () => false,
     getGridPosition: () => [0, 0],
+    getPixelPosition: () => ({ x: 0, y: 0 }),
     ...overrides,
   }
 }

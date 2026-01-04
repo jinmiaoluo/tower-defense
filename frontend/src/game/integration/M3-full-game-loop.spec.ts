@@ -138,8 +138,6 @@ describe('M3: 完整游戏循环', () => {
       logic.placeBuilding([7, 7], 'LMG')
       logic.placeBuilding([9, 9], 'LMG')
 
-      const moneyAfterBuilding = logic.getState().money
-
       // 开始波次（低生命值怪物便于测试击杀）
       const waveConfig = createWaveConfig([
         { life: 20, speed: 3, money: 10 },
@@ -360,8 +358,6 @@ describe('M3: 完整游戏循环', () => {
     it('波次中出售建筑后怪物路径可能变化', () => {
       // 放置 wall 阻挡部分路径
       const { buildingId } = logic.placeBuilding([1, 0], 'wall')
-
-      const pathWithWall = logic.getCurrentPath()
 
       // 出售 wall
       logic.sellBuilding(buildingId!)

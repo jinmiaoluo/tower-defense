@@ -7,7 +7,6 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
   createWaveManager,
   type WaveManager,
-  type WaveState,
 } from './WaveManager'
 import type { WaveConfig, MonsterConfig } from '@/types'
 import type { IMonster } from '@/types/entities'
@@ -64,6 +63,7 @@ function createMockMonster(id: string, overrides: Partial<IMonster> = {}): IMons
     isDead: () => false,
     reachedExit: () => false,
     getGridPosition: () => [0, 0] as Position,
+    getPixelPosition: () => ({ x: 0, y: 0 }),
     ...overrides,
   }
 }

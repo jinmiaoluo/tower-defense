@@ -427,7 +427,7 @@ describe('GameSceneLogic', () => {
 
       // 检查是否有攻击记录
       const recorder = logic.getWaveRecorder()
-      const attacks = recorder.getAttacks()
+      expect(recorder.getAttacks()).toBeDefined()
       // 取决于怪物是否进入射程
     })
 

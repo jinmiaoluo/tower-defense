@@ -90,6 +90,7 @@ function createMockMonster(overrides?: Partial<IMonster>): IMonster {
     isDead: vi.fn(() => false),
     reachedExit: vi.fn(() => false),
     getGridPosition: vi.fn((): Position => [5, 5]),
+    getPixelPosition: vi.fn(() => ({ x: 160, y: 160 })),
     ...overrides,
   }
 }

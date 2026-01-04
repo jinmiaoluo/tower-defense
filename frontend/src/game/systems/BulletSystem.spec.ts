@@ -33,6 +33,8 @@ function createMockBuilding(overrides: Partial<IBuilding> = {}): IBuilding {
     getRange: () => 4,
     getAttackSpeed: () => 30,
     resetWaveStats: vi.fn(),
+    getCurrentTargetPosition: () => null,
+    hasActiveTarget: () => false,
     ...overrides,
   }
 }
@@ -58,6 +60,7 @@ function createMockMonster(overrides: Partial<IMonster> = {}): IMonster {
     isDead: () => false,
     reachedExit: () => false,
     getGridPosition: () => [8, 5] as Position,
+    getPixelPosition: () => ({ x: 256, y: 160 }),
     ...overrides,
   }
 }

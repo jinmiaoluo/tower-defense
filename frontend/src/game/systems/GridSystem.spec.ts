@@ -5,7 +5,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest'
 import { GridSystem, createGridSystem } from './GridSystem'
-import type { MapConfig } from '@/types'
+import type { MapConfig, Position } from '@/types'
 
 describe('GridSystem', () => {
   let gridSystem: GridSystem
@@ -618,11 +618,7 @@ describe('GridSystem', () => {
       // 重置后路径可能会更短（因为没有建筑了）
       expect(pathAfterReset.length).toBeLessThanOrEqual(pathWithBuilding.length)
 
-      // 确保路径不包含之前的建筑位置（或者可以经过）
-      const hasOriginalBuildingPosition = pathAfterReset.some(
-        (p) => p[0] === 1 && p[1] === 0,
-      )
-      // 重置后可以经过该位置（如果最短路径需要的话）
+      // 重置后可以经过原建筑位置（如果最短路径需要的话）
       // 这里只验证路径有效
       expect(pathAfterReset.length).toBeGreaterThan(0)
       expect(pathAfterReset[0]).toEqual([0, 0])

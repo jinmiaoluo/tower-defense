@@ -2,12 +2,11 @@
  * i18n 多语言模块测试
  */
 
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import {
   createI18n,
   detectBrowserLocale,
   type I18n,
-  type Locale,
 } from './i18n'
 
 describe('i18n', () => {

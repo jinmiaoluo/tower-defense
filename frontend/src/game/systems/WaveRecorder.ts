@@ -19,7 +19,7 @@ import type {
   WaveRequest,
   WaveResult,
 } from '@/types'
-import { createEmptyMutableResult, mapToRecord, toImmutableResult } from '@/types'
+import { createEmptyMutableResult, toImmutableResult } from '@/types'
 
 /** WaveRecorder 类型别名 */
 export type WaveRecorder = IWaveRecorder
