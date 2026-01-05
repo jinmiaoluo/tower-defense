@@ -79,6 +79,7 @@ export interface GameSceneLogic {
   // 游戏控制
   update(): void
   togglePause(): void
+  setGameOver(): void
   reset(): void
 }
 
@@ -479,6 +480,11 @@ export function createGameSceneLogic(config: GameConfig): GameSceneLogic {
 
     togglePause(): void {
       state.isPaused = !state.isPaused
+    },
+
+    setGameOver(): void {
+      state.isGameOver = true
+      state.isPlaying = false
     },
 
     reset(): void {

@@ -503,6 +503,90 @@ describe('GameSceneLogic', () => {
 
       expect(lowLifeLogic.getState().isGameOver).toBe(true)
     })
+
+    it('调用 setGameOver 后游戏停止更新', () => {
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 50, speed: 3, shield: 0, money: 5 }],
+      })
+
+      // 运行几帧
+      logic.update()
+      logic.update()
+      const frameBefore = logic.getState().frame
+
+      // 调用 setGameOver
+      logic.setGameOver()
+
+      // 确认状态已设置
+      expect(logic.getState().isGameOver).toBe(true)
+      expect(logic.getState().isPlaying).toBe(false)
+
+      // 继续调用 update，帧号不应增加
+      logic.update()
+      logic.update()
+      logic.update()
+
+      expect(logic.getState().frame).toBe(frameBefore)
+    })
+
+    it('调用 setGameOver 后怪物不再移动', () => {
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 50, speed: 3, shield: 0, money: 5 }],
+      })
+
+      // 生成怪物并移动几帧
+      for (let i = 0; i < 10; i++) {
+        logic.update()
+      }
+
+      const monsters = logic.getMonsters()
+      expect(monsters.length).toBeGreaterThan(0)
+
+      const positionBefore = monsters[0].getGridPosition()
+
+      // 调用 setGameOver
+      logic.setGameOver()
+
+      // 继续调用 update
+      for (let i = 0; i < 100; i++) {
+        logic.update()
+      }
+
+      // 怪物位置不应改变
+      const positionAfter = monsters[0].getGridPosition()
+      expect(positionAfter).toEqual(positionBefore)
+    })
+
+    it('调用 setGameOver 后建筑不再攻击', () => {
+      // 放置建筑
+      logic.placeBuilding([3, 3], 'laser_gun')
+
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 500, speed: 1, shield: 0, money: 5 }],
+      })
+
+      // 运行让怪物进入射程并被攻击
+      for (let i = 0; i < 200; i++) {
+        logic.update()
+      }
+
+      const attacksBefore = logic.getWaveRecorder().getAttacks().length
+
+      // 调用 setGameOver
+      logic.setGameOver()
+
+      // 继续调用 update
+      for (let i = 0; i < 200; i++) {
+        logic.update()
+      }
+
+      // 攻击次数不应增加
+      const attacksAfter = logic.getWaveRecorder().getAttacks().length
+      expect(attacksAfter).toBe(attacksBefore)
+    })
   })
 
   // ============================================================================
@@ -543,6 +627,37 @@ describe('GameSceneLogic', () => {
       logic.update()
 
       expect(logic.getState().frame).toBe(frameBefore + 1)
+    })
+
+    it('暂停时波次完成状态不变（用于 UI 层检查）', () => {
+      // 这个测试验证暂停时 isWaveComplete() 状态保持不变
+      // UI 层（Game.ts）应该在暂停时跳过波次间隔处理
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 50, speed: 100, shield: 0, money: 5 }],
+      })
+
+      // 运行直到波次完成
+      for (let i = 0; i < 500; i++) {
+        logic.update()
+        if (logic.isWaveComplete()) break
+      }
+
+      expect(logic.isWaveComplete()).toBe(true)
+      const waveBefore = logic.getState().wave
+
+      // 暂停后波次号不应改变
+      logic.togglePause()
+      expect(logic.getState().isPaused).toBe(true)
+
+      // 多次调用 update
+      for (let i = 0; i < 100; i++) {
+        logic.update()
+      }
+
+      // 波次号应该保持不变（因为暂停时不更新）
+      expect(logic.getState().wave).toBe(waveBefore)
+      expect(logic.isWaveComplete()).toBe(true)
     })
   })
 
