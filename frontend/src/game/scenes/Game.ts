@@ -9,7 +9,7 @@ import { EventBus } from '../EventBus'
 import { AppEventBus } from '@/utils/EventEmitter'
 import { createGameSceneLogic, type GameSceneLogic, createScoreSystem, type ScoreSystem } from '../systems'
 import { gameApi } from '@/api'
-import type { GameConfig, WaveConfig, Position, BuildingType, GameColors, ResolvedTheme } from '@/types'
+import type { GameConfig, WaveConfig, Position, BuildingType, GameColors, Theme } from '@/types'
 import { GAME_CONSTANTS, isWeaponBuilding } from '@/types'
 import {
   createPhaserAdapter,
@@ -43,6 +43,7 @@ interface UIState {
   waveIntervalCounter: number
   isSubmittingWave: boolean
   waitingForFirstWeapon: boolean
+  currentWaveSubmitted: boolean
   selectedBuildingType: BuildingType | null
   selectedBuildingId: string | null
   hoverPosition: Position | null
@@ -200,6 +201,7 @@ export class Game extends Scene {
       waveIntervalCounter: 0,
       isSubmittingWave: false,
       waitingForFirstWeapon: true,
+      currentWaveSubmitted: false,
       selectedBuildingType: null,
       selectedBuildingId: null,
       hoverPosition: null,
@@ -316,7 +318,7 @@ export class Game extends Scene {
 
     // 监听主题变化（来自 Vue 层的 AppEventBus）
     AppEventBus.on('theme-changed', (theme: unknown) => {
-      this.handleThemeChange(theme as ResolvedTheme)
+      this.handleThemeChange(theme as Theme)
     })
 
     // 监听语言变化（来自 Vue 层的 AppEventBus）
@@ -326,7 +328,7 @@ export class Game extends Scene {
   }
 
   /** 处理主题变化 */
-  private handleThemeChange(theme: ResolvedTheme) {
+  private handleThemeChange(theme: Theme) {
     this.gameColors = getTheme(theme).gameColors
     // 更新 canvas 背景色
     this.cameras.main.setBackgroundColor(this.gameColors.canvasBackground)
@@ -531,6 +533,7 @@ export class Game extends Scene {
     // 确保 BUILD action 记录到 wave 1 的 recorder 中
     if (this.uiState.waitingForFirstWeapon && isWeaponBuilding(buildingType)) {
       this.uiState.waitingForFirstWeapon = false
+      this.uiState.currentWaveSubmitted = false
       this.logic.startWave(this.currentWaveConfig)
     }
 
@@ -1112,7 +1115,7 @@ export class Game extends Scene {
     })
 
     this.endGameButton.on('pointerdown', () => {
-      this.gameOver()
+      this.handleEndGameClick()
     })
 
     this.controlPanel.add([
@@ -1302,6 +1305,22 @@ export class Game extends Scene {
     EventBus.emit('game-paused', this.logic.getState().isPaused)
   }
 
+  /** 处理结束游戏按钮点击 */
+  private handleEndGameClick() {
+    // 波次提交期间不允许结束（避免竞态条件）
+    if (this.uiState.isSubmittingWave) {
+      console.warn('Cannot end game: wave submission in progress')
+      return
+    }
+
+    // 判断是否为"波次已提交后的提前结束"
+    // 这种情况下 lastWave 已通过 /wave 提交，不需要再发送
+    // 其他情况（波次进行中、波次完成未提交）都需要发送 lastWave
+    const isEarlyEnd = this.uiState.currentWaveSubmitted && this.uiState.waveIntervalCounter > 0
+
+    this.gameOver(isEarlyEnd)
+  }
+
   /** 更新 UI 显示 */
   private updateUI() {
     if (this.uiState.isLoading) {
@@ -1339,6 +1358,8 @@ export class Game extends Scene {
       this.uiState.waveIntervalCounter--
 
       if (this.uiState.waveIntervalCounter === 0) {
+        // 新波次开始，重置提交标记
+        this.uiState.currentWaveSubmitted = false
         this.logic.startWave(this.currentWaveConfig)
       }
     }
@@ -1369,13 +1390,17 @@ export class Game extends Scene {
       }
 
       // 检查游戏是否结束
+      // 波次已通过 /wave 提交，调用 gameOver(true) 避免重复提交 lastWave
       if (state.life <= 0 || !response.nextWave) {
-        this.gameOver()
+        this.gameOver(true)
         return
       }
 
       // 保存下一波配置
       this.currentWaveConfig = response.nextWave
+
+      // 标记当前波次已提交
+      this.uiState.currentWaveSubmitted = true
 
       // 开始波次间隔倒计时
       this.uiState.waveIntervalCounter = WAVE_INTERVAL_FRAMES
@@ -1383,14 +1408,13 @@ export class Game extends Scene {
     })
   }
 
-  /** 游戏结束 */
-  private gameOver() {
+  /**
+   * 游戏结束
+   * @param isEarlyEnd 是否为提前结束（波次已通过 /wave 提交，不需要再发送 lastWave）
+   */
+  private gameOver(isEarlyEnd: boolean = false) {
     const state = this.logic.getState()
-    const waveRecorder = this.logic.getWaveRecorder()
     const buildings = this.logic.getBuildings()
-
-    // 获取最后一波结果
-    const lastWaveResult = waveRecorder.getResult()
 
     // 计算最终得分（包含波次/生命/金币奖励）
     const finalScore = this.scoreSystem.calculateFinalScore({
@@ -1400,24 +1424,51 @@ export class Game extends Scene {
       remainingMoney: state.money,
     })
 
-    // 转换建筑列表为快照格式
-    const buildingSnapshots = buildings.map((b) => ({
-      id: b.id,
-      type: b.type,
-      position: b.position,
-      level: b.level,
-      damageDealt: 0,
-      kills: 0,
-    }))
-
     // 发送游戏结束事件到 Vue 层
-    EventBus.emit('game-over', {
-      score: finalScore,
-      wave: state.wave,
-      sessionId: this.sessionId,
-      lastWaveResult,
-      buildings: buildingSnapshots,
-    })
+    if (isEarlyEnd) {
+      // 提前结束：lastWave 已通过 /wave 提交，不需要再发送
+      EventBus.emit('game-over', {
+        score: finalScore,
+        wave: state.wave,
+        sessionId: this.sessionId,
+        isEarlyEnd: true,
+      })
+    } else {
+      // 正常结束：需要发送 lastWave 数据
+      const waveRecorder = this.logic.getWaveRecorder()
+
+      // 记录场上剩余的怪物（提前结束时需要，用于服务端验证）
+      const monsters = this.logic.getMonsters()
+      for (const monster of monsters) {
+        if (monster.isValid) {
+          waveRecorder.recordRemainingMonster(monster.id)
+        }
+      }
+
+      const lastWaveActions = waveRecorder.getActions()
+      const lastWaveAttacks = waveRecorder.getAttacks()
+      const lastWaveResult = waveRecorder.getResult()
+
+      const buildingSnapshots = buildings.map((b) => ({
+        id: b.id,
+        type: b.type,
+        position: b.position,
+        level: b.level,
+        damageDealt: b.damageDealt,
+        kills: b.kills,
+      }))
+
+      EventBus.emit('game-over', {
+        score: finalScore,
+        wave: state.wave,
+        sessionId: this.sessionId,
+        lastWaveActions,
+        lastWaveAttacks,
+        lastWaveResult,
+        buildings: buildingSnapshots,
+        isEarlyEnd: false,
+      })
+    }
   }
 
   /** 游戏主循环 */
@@ -1501,6 +1552,7 @@ export class Game extends Scene {
 
       // 等待玩家放置第一个武器后再开始第一波
       this.uiState.waitingForFirstWeapon = true
+      this.uiState.currentWaveSubmitted = false
 
       this.uiState.isLoading = false
 

@@ -120,6 +120,10 @@ export interface WaveResult {
   killedByType: Partial<Record<MonsterTypeId, number>>
   /** 穿过终点的怪物数 */
   passed: number
+  /** 提前结束时场上剩余的怪物数（可选，默认 0） */
+  remaining?: number
+  /** 提前结束时场上剩余怪物的 ID 列表（可选） */
+  remainingMonsterIds?: string[]
   /** 获得分数 */
   scoreGained: number
   /** 获得金钱 */
@@ -176,8 +180,8 @@ export interface ServerState {
 export interface GameEndRequest {
   sessionId: string
   nickname: string
-  /** 最后一波数据 */
-  lastWave: {
+  /** 最后一波数据（可选，提前结束时不提供） */
+  lastWave?: {
     waveNumber: number
     actions: Action[]
     attacks: AttackEvent[]

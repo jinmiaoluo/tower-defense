@@ -107,12 +107,8 @@ export {
 
 // 主题类型
 export type {
-  ThemeMode,
-  ResolvedTheme,
+  Theme,
   ThemeColors,
   GameColors,
   ThemeConfig,
-  ThemeState,
 } from './theme'
-
-export { STORAGE_KEY as THEME_STORAGE_KEY } from './theme'
