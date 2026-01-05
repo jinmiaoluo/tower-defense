@@ -2,13 +2,6 @@
 
 塔防游戏后端 API 服务。
 
-## 技术栈
-
-- Django 5.2
-- Django REST Framework 3.16
-- PostgreSQL 15
-- pytest
-
 ## 开发环境设置
 
 ```bash
@@ -29,10 +22,14 @@ python manage.py migrate
 
 # 启动开发服务器
 python manage.py runserver
-```
 
-## 测试
-
-```bash
+# 测试
 pytest
 ```
+
+## 开发指南
+
+详细开发文档请参考：
+
+- [后端开发指南](../docs/BACKEND_GUIDE.md)
+- [技术规范](../docs/SPEC.md)

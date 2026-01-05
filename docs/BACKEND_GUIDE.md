@@ -55,7 +55,7 @@ backend/
 - P0 项目初始化: Django + DRF + PostgreSQL + pytest
 - P0 数据模型: GameSession, WaveRecord, LeaderboardEntry
 - P0 游戏配置: 建筑配置、怪物基础属性、地图配置
-- P1 计算器 (TDD): calc_total_cost, process_actions, calc_new_difficulty, calc_monster_attrs, calc_actual_damage, calc_hit_score, calc_life_reward
+- P1 计算器 (TDD): calc_total_cost, process_actions, build_validation_buildings, calc_new_difficulty, calc_monster_attrs, calc_actual_damage, calc_hit_score, calc_life_reward
 - P1 波次生成器 (TDD): generate_wave, generate_first_wave
 - P2 验证器 (TDD): Level 1, Level 2, Level 2+, Level 4
 - P2 API 视图 (TDD): 创建会话, 提交波次, 游戏结束, 排行榜

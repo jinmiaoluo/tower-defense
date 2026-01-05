@@ -1214,13 +1214,18 @@ import math
 
 def validate_attacks(
     attacks: list[dict],
-    buildings: list[dict],
+    buildings: list[dict],  # 验证用建筑列表（包含波次中所有曾存在的建筑，不执行 SELL）
     result: dict,
     building_config: dict,
     map_config: dict,
     monsters_config: dict,  # 服务端下发的怪物配置 {id: {type, life, ...}}
 ) -> tuple[bool, str]:
-    """攻击事件验证：伤害一致性、射程验证、路径合理性、累计伤害验证"""
+    """攻击事件验证：伤害一致性、射程验证、路径合理性、累计伤害验证
+
+    注意：buildings 参数应使用 build_validation_buildings() 构建，
+    而非 submitted_buildings。因为攻击可能发生在建筑被出售之前，
+    验证时需要保留所有曾参与攻击的建筑。
+    """
 
     building_map = {b["id"]: b for b in buildings}
 
