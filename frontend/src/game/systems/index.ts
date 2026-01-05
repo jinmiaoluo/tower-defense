@@ -15,12 +15,7 @@ export {
 } from './BulletSystem'
 export { createEconomySystem, type EconomySystem } from './EconomySystem'
 export { createWaveRecorder, type WaveRecorder } from './WaveRecorder'
-export {
-  createScoreSystem,
-  type ScoreSystem,
-  type FinalScoreInput,
-  type FinalScoreBreakdown,
-} from './ScoreSystem'
+export { createScoreSystem, type ScoreSystem } from './ScoreSystem'
 export { createWaveManager, type WaveManager, type WaveState } from './WaveManager'
 export {
   createGameSceneLogic,

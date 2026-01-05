@@ -4,7 +4,7 @@ import type { RankingInfo } from '@/types'
 
 interface GameOverData {
   score: number
-  wave: number
+  wavesCompleted: number
   sessionId: string
 }
 
@@ -91,7 +91,7 @@ defineExpose({
         </div>
         <div class="stat-item">
           <span class="stat-label">Waves Completed</span>
-          <span class="stat-value">{{ gameData.wave - 1 }}</span>
+          <span class="stat-value">{{ gameData.wavesCompleted }}</span>
         </div>
       </div>
 

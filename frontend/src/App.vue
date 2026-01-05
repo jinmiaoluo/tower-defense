@@ -13,7 +13,7 @@ import type { WaveResult, BuildingSnapshot, Action, AttackEvent } from './types'
 
 interface GameOverData {
   score: number
-  wave: number
+  wavesCompleted: number
   sessionId: string
   isEarlyEnd: boolean
 }
@@ -118,7 +118,7 @@ onMounted(() => {
   // 监听游戏结束事件
   EventBus.on('game-over', (data: {
     score: number
-    wave: number
+    wavesCompleted: number
     sessionId: string
     isEarlyEnd: boolean
     lastWaveActions?: Action[]
@@ -128,15 +128,16 @@ onMounted(() => {
   }) => {
     gameOverData.value = {
       score: data.score,
-      wave: data.wave,
+      wavesCompleted: data.wavesCompleted,
       sessionId: data.sessionId,
       isEarlyEnd: data.isEarlyEnd,
     }
 
     // 只有非提前结束时才设置 lastWaveData
+    // 注意: waveNumber 是当前波次号 (wavesCompleted + 1)，用于 API 提交
     if (!data.isEarlyEnd && data.lastWaveActions && data.lastWaveResult && data.buildings) {
       lastWaveData.value = {
-        waveNumber: data.wave,
+        waveNumber: data.wavesCompleted + 1,
         actions: data.lastWaveActions,
         attacks: data.lastWaveAttacks || [],
         result: data.lastWaveResult,

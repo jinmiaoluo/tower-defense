@@ -7,7 +7,7 @@
 import { Scene } from 'phaser'
 import { EventBus } from '../EventBus'
 import { AppEventBus } from '@/utils/EventEmitter'
-import { createGameSceneLogic, type GameSceneLogic, createScoreSystem, type ScoreSystem } from '../systems'
+import { createGameSceneLogic, type GameSceneLogic } from '../systems'
 import { gameApi, ApiError } from '@/api'
 import type { GameConfig, WaveConfig, Position, BuildingType, GameColors, Theme } from '@/types'
 import { GAME_CONSTANTS, isWeaponBuilding } from '@/types'
@@ -56,7 +56,6 @@ const TIP_DURATION = 2000
 export class Game extends Scene {
   // 核心逻辑
   private logic!: GameSceneLogic
-  private scoreSystem!: ScoreSystem
 
   // UI 状态
   private uiState!: UIState
@@ -176,7 +175,6 @@ export class Game extends Scene {
 
       // 创建核心逻辑
       this.logic = createGameSceneLogic(this.gameConfig)
-      this.scoreSystem = createScoreSystem()
 
       // 等待玩家放置第一个武器后再开始第一波
       // 与旧实现一致: wave == 0 && !has_weapon 时不开始
@@ -1284,6 +1282,12 @@ export class Game extends Scene {
   private handlePauseClick() {
     const state = this.logic.getState()
 
+    // 游戏已结束时，点击继续按钮会重启游戏
+    if (state.isGameOver) {
+      this.restart()
+      return
+    }
+
     if (state.isPaused) {
       // 当前是暂停状态，点击继续游戏
       this.logic.togglePause()
@@ -1347,6 +1351,11 @@ export class Game extends Scene {
   /** 检查波次是否结束并处理 */
   private checkWaveComplete() {
     if (this.uiState.isSubmittingWave) return
+
+    // 暂停时不处理波次完成和间隔计数
+    // 与旧实现一致: td.js step() 方法在 is_paused 时直接 return
+    const state = this.logic.getState()
+    if (state.isPaused) return
 
     if (this.logic.isWaveComplete()) {
       if (this.uiState.waveIntervalCounter === 0) {
@@ -1442,23 +1451,26 @@ export class Game extends Scene {
    * @param isEarlyEnd 是否为提前结束（波次已通过 /wave 提交，不需要再发送 lastWave）
    */
   private gameOver(isEarlyEnd: boolean = false) {
+    // 设置游戏结束状态，停止游戏逻辑更新
+    this.logic.setGameOver()
+
     const state = this.logic.getState()
     const buildings = this.logic.getBuildings()
 
-    // 计算最终得分（包含波次/生命/金币奖励）
-    const finalScore = this.scoreSystem.calculateFinalScore({
-      accumulatedScore: state.score,
-      wavesCompleted: state.wave,
-      remainingLife: state.life,
-      remainingMoney: state.money,
-    })
+    // 计算已完成波次数
+    // - isEarlyEnd = true: 当前波次已通过 /wave 提交，state.wave 即为已完成波次
+    // - isEarlyEnd = false: 当前波次进行中或刚完成未提交，已完成波次为 state.wave - 1
+    const wavesCompleted = isEarlyEnd ? state.wave : Math.max(0, state.wave - 1)
+
+    // 最终得分 = 累计命中得分（无额外奖励）
+    const finalScore = state.score
 
     // 发送游戏结束事件到 Vue 层
     if (isEarlyEnd) {
       // 提前结束：lastWave 已通过 /wave 提交，不需要再发送
       EventBus.emit('game-over', {
         score: finalScore,
-        wave: state.wave,
+        wavesCompleted,
         sessionId: this.sessionId,
         isEarlyEnd: true,
       })
@@ -1489,7 +1501,7 @@ export class Game extends Scene {
 
       EventBus.emit('game-over', {
         score: finalScore,
-        wave: state.wave,
+        wavesCompleted,
         sessionId: this.sessionId,
         lastWaveActions,
         lastWaveAttacks,

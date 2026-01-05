@@ -1,9 +1,6 @@
 /**
  * EconomySystem 测试用例
  * 测试游戏过程中的波次生命恢复奖励计算
- *
- * 注意：这里测试的是游戏过程中的资源恢复（每 5/10 波恢复生命值），
- * 与 ScoreSystem 中的 calculateLifeBonus()（游戏结束时的得分计算）不同。
  */
 
 import { beforeEach, describe, expect, it } from 'vitest'

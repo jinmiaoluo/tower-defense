@@ -2,10 +2,6 @@
  * EconomySystem - 经济系统
  * 负责游戏过程中的波次生命恢复奖励计算
  *
- * 注意区分：
- * - EconomySystem.getLifeReward(): 游戏过程中的资源恢复（每 5/10 波恢复生命值）
- * - ScoreSystem.calculateLifeBonus(): 游戏结束时的得分计算（剩余生命转换为分数）
- *
  * 参考旧实现：html5-tower-defense/src/js/td-data-stage-1.js 第 62-73 行
  */
 
@@ -15,10 +11,7 @@ import { GAME_CONSTANTS } from '@/types'
 /** EconomySystem 接口定义 */
 export interface EconomySystem {
   /**
-   * 计算波次生命恢复奖励（游戏过程中的资源恢复，非得分）
-   *
-   * 这是游戏过程中每完成一定波次后恢复的生命值，用于帮助玩家持续游戏。
-   * 与 ScoreSystem.calculateLifeBonus() 不同，后者是游戏结束时的得分计算。
+   * 计算波次生命恢复奖励（游戏过程中的资源恢复）
    *
    * 规则：
    * - 每 10 波：+10 生命
