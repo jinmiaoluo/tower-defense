@@ -400,6 +400,72 @@ describe('WaveRecorder', () => {
   })
 
   // ============================================================================
+  // recordRemainingMonster - 记录在场剩余怪物
+  // ============================================================================
+
+  describe('recordRemainingMonster', () => {
+    it('记录单个在场剩余怪物', () => {
+      recorder.recordRemainingMonster('uuid-1')
+
+      const ids = recorder.getRemainingMonsterIds()
+      expect(ids).toHaveLength(1)
+      expect(ids[0]).toBe('uuid-1')
+    })
+
+    it('记录多个在场剩余怪物', () => {
+      recorder.recordRemainingMonster('uuid-1')
+      recorder.recordRemainingMonster('uuid-2')
+      recorder.recordRemainingMonster('uuid-3')
+
+      const ids = recorder.getRemainingMonsterIds()
+      expect(ids).toHaveLength(3)
+      expect(ids).toContain('uuid-1')
+      expect(ids).toContain('uuid-2')
+      expect(ids).toContain('uuid-3')
+    })
+
+    it('getResult 包含 remaining 字段（当有剩余怪物时）', () => {
+      recorder.recordRemainingMonster('uuid-1')
+      recorder.recordRemainingMonster('uuid-2')
+
+      const result = recorder.getResult()
+      expect(result.remaining).toBe(2)
+      expect(result.remainingMonsterIds).toEqual(['uuid-1', 'uuid-2'])
+    })
+
+    it('getResult 不包含 remaining 字段（当没有剩余怪物时）', () => {
+      // 不记录任何剩余怪物
+      const result = recorder.getResult()
+      expect(result.remaining).toBeUndefined()
+      expect(result.remainingMonsterIds).toBeUndefined()
+    })
+
+    it('reset 后清空剩余怪物列表', () => {
+      recorder.recordRemainingMonster('uuid-1')
+      recorder.recordRemainingMonster('uuid-2')
+
+      recorder.reset(2, 1000)
+
+      const ids = recorder.getRemainingMonsterIds()
+      expect(ids).toHaveLength(0)
+
+      const result = recorder.getResult()
+      expect(result.remaining).toBeUndefined()
+    })
+
+    it('toWaveRequest 包含正确的 remaining 数据', () => {
+      recorder.recordRemainingMonster('uuid-1')
+      recorder.recordRemainingMonster('uuid-2')
+      recorder.setDuration(1000)
+
+      const request = recorder.toWaveRequest('session-123', [])
+
+      expect(request.result.remaining).toBe(2)
+      expect(request.result.remainingMonsterIds).toEqual(['uuid-1', 'uuid-2'])
+    })
+  })
+
+  // ============================================================================
   // setDuration - 设置波次持续时间
   // ============================================================================
 

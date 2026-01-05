@@ -121,6 +121,20 @@ export function createWaveRecorder(waveNumber: number, startFrame: number): Wave
   }
 
   /**
+   * 记录在场剩余怪物（提前结束时使用）
+   */
+  function recordRemainingMonster(monsterId: string): void {
+    result.remainingMonsterIds.push(monsterId)
+  }
+
+  /**
+   * 获取在场剩余怪物 ID 列表
+   */
+  function getRemainingMonsterIds(): string[] {
+    return [...result.remainingMonsterIds]
+  }
+
+  /**
    * 设置波次持续帧数
    * @param currentFrame 当前绝对帧号，内部会计算相对于波次开始的持续时间
    */
@@ -182,6 +196,8 @@ export function createWaveRecorder(waveNumber: number, startFrame: number): Wave
     recordAttack,
     recordKill,
     recordPassed,
+    recordRemainingMonster,
+    getRemainingMonsterIds,
     setDuration,
     getActions,
     getAttacks,

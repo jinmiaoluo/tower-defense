@@ -73,6 +73,8 @@ function createMockRecorder(): IWaveRecorder {
     recordAttack: vi.fn(),
     recordKill: vi.fn(),
     recordPassed: vi.fn(),
+    recordRemainingMonster: vi.fn(),
+    getRemainingMonsterIds: () => [],
     setDuration: vi.fn(),
     getActions: () => [],
     getAttacks: () => [],

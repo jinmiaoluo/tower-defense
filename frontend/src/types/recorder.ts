@@ -41,6 +41,7 @@ export interface MutableWaveResult {
   killed: number
   killedByType: Map<MonsterTypeId, number>
   passed: number
+  remainingMonsterIds: string[]
   scoreGained: number
   moneyGained: number
   lifeLost: number
@@ -136,6 +137,12 @@ export interface IWaveRecorder {
   /** 记录怪物穿过终点 */
   recordPassed(data: PassedRecordData): void
 
+  /** 记录在场剩余怪物（提前结束时使用） */
+  recordRemainingMonster(monsterId: string): void
+
+  /** 获取在场剩余怪物 ID 列表 */
+  getRemainingMonsterIds(): string[]
+
   /** 设置波次持续帧数 */
   setDuration(frames: number): void
 
@@ -176,6 +183,7 @@ export function createEmptyMutableResult(): MutableWaveResult {
     killed: 0,
     killedByType: new Map(),
     passed: 0,
+    remainingMonsterIds: [],
     scoreGained: 0,
     moneyGained: 0,
     lifeLost: 0,
@@ -189,7 +197,7 @@ export function toImmutableResult(
   mutable: MutableWaveResult,
   waveDurationFrames: number,
 ): WaveResult {
-  return {
+  const result: WaveResult = {
     killed: mutable.killed,
     killedByType: mapToRecord(mutable.killedByType),
     passed: mutable.passed,
@@ -200,4 +208,12 @@ export function toImmutableResult(
     totalLifeDestroyed: mutable.totalLifeDestroyed,
     waveDurationFrames,
   }
+
+  // 只有当有剩余怪物时才添加这些字段
+  if (mutable.remainingMonsterIds.length > 0) {
+    result.remaining = mutable.remainingMonsterIds.length
+    result.remainingMonsterIds = [...mutable.remainingMonsterIds]
+  }
+
+  return result
 }
