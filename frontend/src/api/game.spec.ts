@@ -223,7 +223,7 @@ describe('GameApi', () => {
       expect(response.entries.length).toBeLessThanOrEqual(5)
     })
 
-    it('endGame 应支持提前结束（不带 lastWave）', async () => {
+    it('endGame 应支持提前结束（不带 lastWave，波次间隔期间结束）', async () => {
       const startResponse = await api.createSession()
 
       // 先提交第 1 波
@@ -247,10 +247,48 @@ describe('GameApi', () => {
       }
       await api.submitWave(waveRequest)
 
-      // 提前结束：不带 lastWave
+      // 提前结束：不带 lastWave（波次间隔期间结束，当前波次已通过 /wave 提交）
       const endRequest = {
         sessionId: startResponse.sessionId,
         nickname: 'EarlyEndPlayer',
+      }
+
+      const response = await api.endGame(endRequest)
+
+      expect(response.verified).toBe(true)
+      expect(response.ranking).toBeDefined()
+      expect(response.ranking?.rank).toBeGreaterThan(0)
+    })
+
+    it('endGame 应支持波次进行中结束（带 lastWave 和 remaining）', async () => {
+      const startResponse = await api.createSession()
+
+      // 波次进行中结束：带 lastWave，包含 remaining（场上还有怪物）
+      const endRequest: GameEndRequest = {
+        sessionId: startResponse.sessionId,
+        nickname: 'MidWaveEndPlayer',
+        lastWave: {
+          waveNumber: 1,
+          actions: [],
+          attacks: [],
+          result: {
+            killed: 1,
+            killedByType: { 0: 1 },
+            passed: 0,
+            remaining: 2,
+            remainingMonsterIds: [
+              startResponse.firstWave.monsters[1]?.id || 'mock-id-1',
+              startResponse.firstWave.monsters[2]?.id || 'mock-id-2',
+            ],
+            scoreGained: 5,
+            moneyGained: 5,
+            lifeLost: 0,
+            totalDamageDealt: 50,
+            totalLifeDestroyed: 50,
+            waveDurationFrames: 500,
+          },
+          buildings: [],
+        },
       }
 
       const response = await api.endGame(endRequest)
@@ -407,6 +445,27 @@ describe('GameApi', () => {
       })
 
       await expect(api.createSession()).rejects.toThrow()
+    })
+
+    it('SESSION_NOT_FOUND 错误应包含正确的错误代码', async () => {
+      const { ApiError } = await import('./game')
+
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        json: () => Promise.resolve({
+          error: { code: 'SESSION_NOT_FOUND', message: '会话不存在' },
+        }),
+      })
+
+      try {
+        await api.createSession()
+        expect.fail('Should have thrown')
+      } catch (error) {
+        expect(error).toBeInstanceOf(ApiError)
+        expect((error as InstanceType<typeof ApiError>).code).toBe('SESSION_NOT_FOUND')
+        expect((error as InstanceType<typeof ApiError>).status).toBe(404)
+      }
     })
   })
 })

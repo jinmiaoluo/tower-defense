@@ -7,7 +7,7 @@ import ThemeToggle from './components/ThemeToggle.vue'
 import LocaleToggle from './components/LocaleToggle.vue'
 import LeaderboardButton from './components/LeaderboardButton.vue'
 import { EventBus } from './game/EventBus'
-import { gameApi } from './api'
+import { gameApi, ApiError } from './api'
 import type { Scene } from 'phaser'
 import type { WaveResult, BuildingSnapshot, Action, AttackEvent } from './types'
 
@@ -68,10 +68,20 @@ async function handleSubmitScore(nickname: string) {
     if (response.verified && response.ranking) {
       gameOverModalRef.value?.setRankingResult(response.ranking)
     } else {
-      gameOverModalRef.value?.setError(response.error?.message || 'Verification failed')
+      // Mock 模式下的 SESSION_NOT_FOUND 处理
+      if (response.error?.code === 'SESSION_NOT_FOUND') {
+        gameOverModalRef.value?.setError('Session expired. Please restart the game.')
+      } else {
+        gameOverModalRef.value?.setError(response.error?.message || 'Verification failed')
+      }
     }
-  } catch {
-    gameOverModalRef.value?.setError('Network error')
+  } catch (error) {
+    // 真实 API 模式下的错误处理
+    if (error instanceof ApiError && error.code === 'SESSION_NOT_FOUND') {
+      gameOverModalRef.value?.setError('Session expired. Please restart the game.')
+    } else {
+      gameOverModalRef.value?.setError('Network error')
+    }
   }
 }
 

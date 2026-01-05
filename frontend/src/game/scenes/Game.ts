@@ -8,7 +8,7 @@ import { Scene } from 'phaser'
 import { EventBus } from '../EventBus'
 import { AppEventBus } from '@/utils/EventEmitter'
 import { createGameSceneLogic, type GameSceneLogic, createScoreSystem, type ScoreSystem } from '../systems'
-import { gameApi } from '@/api'
+import { gameApi, ApiError } from '@/api'
 import type { GameConfig, WaveConfig, Position, BuildingType, GameColors, Theme } from '@/types'
 import { GAME_CONSTANTS, isWeaponBuilding } from '@/types'
 import {
@@ -1385,6 +1385,11 @@ export class Game extends Scene {
     ).then((response) => {
       if (!response.valid) {
         console.error('Wave validation failed:', response.error)
+        // 处理 Mock 模式下的 SESSION_NOT_FOUND
+        if (response.error?.code === 'SESSION_NOT_FOUND') {
+          this.handleSessionNotFound()
+          return
+        }
         this.uiState.isSubmittingWave = false
         return
       }
@@ -1405,6 +1410,30 @@ export class Game extends Scene {
       // 开始波次间隔倒计时
       this.uiState.waveIntervalCounter = WAVE_INTERVAL_FRAMES
       this.uiState.isSubmittingWave = false
+    }).catch((error) => {
+      // 处理真实 API 模式下的错误
+      console.error('Submit wave error:', error)
+      this.uiState.isSubmittingWave = false
+
+      if (error instanceof ApiError && error.code === 'SESSION_NOT_FOUND') {
+        this.handleSessionNotFound()
+        return
+      }
+
+      // 其他网络错误，显示提示
+      this.showTip(this.t('error_network'))
+    })
+  }
+
+  /** 处理会话不存在错误 */
+  private handleSessionNotFound() {
+    // 显示提示告知用户会话已失效
+    const { width, height } = this.scale
+    this.showTip(this.t('error_session_expired'), width / 2, height / 2)
+
+    // 延迟后自动重启游戏
+    this.time.delayedCall(2000, () => {
+      this.restart()
     })
   }
 

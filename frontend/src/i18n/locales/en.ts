@@ -74,6 +74,8 @@ export const en: Record<MessageKey, string> = {
   blocked: "Can't build here, it will block the way from entrance to exit!",
   monster_be_blocked: "Can't build here, some monsters will be blocked!",
   entrance_or_exit_be_blocked: "Can't build on the entrance or exit!",
+  error_session_expired: 'Session expired, restarting...',
+  error_network: 'Network error, please try again',
 
   // 游戏结束
   game_over: 'GAME OVER',
