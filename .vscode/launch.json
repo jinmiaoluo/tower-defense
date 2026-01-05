@@ -1,0 +1,30 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "frontend",
+            "request": "launch",
+            "runtimeArgs": [
+                "run",
+                "dev"
+            ],
+            "runtimeExecutable": "npm",
+            "cwd": "${workspaceFolder}/frontend",
+            "type": "node",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "backend",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "manage.py",
+            "args": [
+                "runserver",
+                "0.0.0.0:8000"
+            ],
+            "django": true,
+            "cwd": "${workspaceFolder}/backend",
+            "console": "integratedTerminal"
+        }
+    ]
+}
