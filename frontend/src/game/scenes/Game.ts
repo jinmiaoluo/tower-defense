@@ -1037,33 +1037,8 @@ export class Game extends Scene {
     const buttonHeight = 20 * DPR
     const gap = 10 * DPR
 
-    // 暂停按钮（左侧）
-    const pauseX = -(buttonWidth + gap)
-    this.pauseButton = this.add.rectangle(pauseX, 0, buttonWidth, buttonHeight, 0x4488ff, 0.8)
-    this.pauseButton.setStrokeStyle(1 * DPR, 0xffffff)
-    this.pauseButton.setInteractive({ useHandCursor: true })
-
-    this.pauseButtonText = this.add.text(pauseX, 0, this.t('button_pause_text'), {
-      fontFamily: 'Arial',
-      fontSize: `${11 * DPR}px`,
-      color: '#ffffff',
-    })
-    this.pauseButtonText.setOrigin(0.5, 0.5)
-
-    this.pauseButton.on('pointerover', () => {
-      this.pauseButton.setFillStyle(0x4488ff, 1)
-    })
-
-    this.pauseButton.on('pointerout', () => {
-      this.pauseButton.setFillStyle(0x4488ff, 0.8)
-    })
-
-    this.pauseButton.on('pointerdown', () => {
-      this.handlePauseClick()
-    })
-
-    // 重启按钮（中间，初始隐藏，仅在暂停时显示）
-    const restartX = 0
+    // 重启按钮（左侧，初始隐藏，仅在暂停时显示）
+    const restartX = -(buttonWidth + gap)
     this.restartButton = this.add.rectangle(restartX, 0, buttonWidth, buttonHeight, 0xff6644, 0.8)
     this.restartButton.setStrokeStyle(1 * DPR, 0xffffff)
     this.restartButton.setInteractive({ useHandCursor: true })
@@ -1087,6 +1062,31 @@ export class Game extends Scene {
 
     this.restartButton.on('pointerdown', () => {
       this.restart()
+    })
+
+    // 暂停按钮（中间）
+    const pauseX = 0
+    this.pauseButton = this.add.rectangle(pauseX, 0, buttonWidth, buttonHeight, 0x4488ff, 0.8)
+    this.pauseButton.setStrokeStyle(1 * DPR, 0xffffff)
+    this.pauseButton.setInteractive({ useHandCursor: true })
+
+    this.pauseButtonText = this.add.text(pauseX, 0, this.t('button_pause_text'), {
+      fontFamily: 'Arial',
+      fontSize: `${11 * DPR}px`,
+      color: '#ffffff',
+    })
+    this.pauseButtonText.setOrigin(0.5, 0.5)
+
+    this.pauseButton.on('pointerover', () => {
+      this.pauseButton.setFillStyle(0x4488ff, 1)
+    })
+
+    this.pauseButton.on('pointerout', () => {
+      this.pauseButton.setFillStyle(0x4488ff, 0.8)
+    })
+
+    this.pauseButton.on('pointerdown', () => {
+      this.handlePauseClick()
     })
 
     // 结束按钮（右侧，初始隐藏，仅在暂停时显示）
@@ -1117,10 +1117,10 @@ export class Game extends Scene {
     })
 
     this.controlPanel.add([
-      this.pauseButton,
-      this.pauseButtonText,
       this.restartButton,
       this.restartButtonText,
+      this.pauseButton,
+      this.pauseButtonText,
       this.endGameButton,
       this.endGameButtonText,
     ])
