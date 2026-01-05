@@ -508,9 +508,17 @@ export class Game extends Scene {
     })
   }
 
+  /** 检查是否可以执行建筑操作 (放置/升级/出售) */
+  private canPerformBuildingAction(): boolean {
+    // 波次提交期间或间隔期间不允许建筑操作
+    // 否则操作会记录到已提交的 WaveRecorder 或即将被替换的 recorder 中
+    return !this.uiState.isSubmittingWave && this.uiState.waveIntervalCounter === 0
+  }
+
   /** 尝试放置建筑 */
   private tryPlaceBuilding(position: Position) {
     if (!this.uiState.selectedBuildingType) return
+    if (!this.canPerformBuildingAction()) return
 
     const result = this.logic.placeBuilding(
       position,
@@ -537,6 +545,8 @@ export class Game extends Scene {
 
   /** 尝试升级建筑 */
   tryUpgradeBuilding(buildingId: string) {
+    if (!this.canPerformBuildingAction()) return
+
     const building = this.logic.getBuilding(buildingId)
     const result = this.logic.upgradeBuilding(buildingId)
     if (result.success) {
@@ -555,6 +565,8 @@ export class Game extends Scene {
 
   /** 尝试出售建筑 */
   trySellBuilding(buildingId: string) {
+    if (!this.canPerformBuildingAction()) return
+
     const result = this.logic.sellBuilding(buildingId)
     if (result.success) {
       this.uiState.selectedBuildingId = null
