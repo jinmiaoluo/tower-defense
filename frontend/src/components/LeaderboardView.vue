@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { mockGetLeaderboard } from '@/mocks/api'
+import { gameApi } from '@/api'
 import type { LeaderboardEntry } from '@/types'
 
 defineProps<{
@@ -20,7 +20,7 @@ async function fetchLeaderboard() {
   errorMessage.value = ''
 
   try {
-    const response = await mockGetLeaderboard()
+    const response = await gameApi.getLeaderboard()
     entries.value = response.entries
   } catch {
     errorMessage.value = 'Failed to load leaderboard'

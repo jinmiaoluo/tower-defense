@@ -169,6 +169,9 @@ export async function mockSubmitWave(request: WaveRequest): Promise<WaveResponse
 
 /**
  * POST /api/game/sessions/end - 游戏结束
+ * 支持两种模式：
+ * 1. 带 lastWave：提交最后一波数据并结束（正常结束）
+ * 2. 不带 lastWave：直接结束游戏（提前结束），使用已提交的波次数据
  */
 export async function mockEndGame(request: GameEndRequest): Promise<GameEndResponse> {
   await delay()
@@ -185,8 +188,11 @@ export async function mockEndGame(request: GameEndRequest): Promise<GameEndRespo
     }
   }
 
-  // 更新最后一波的状态
-  session.state.score += request.lastWave.result.scoreGained
+  // 如果有 lastWave，更新最后一波的状态
+  if (request.lastWave) {
+    session.state.score += request.lastWave.result.scoreGained
+  }
+  // 如果没有 lastWave（提前结束），使用已提交波次的累计状态
 
   // 模拟排名
   const rank = Math.floor(Math.random() * 100) + 1

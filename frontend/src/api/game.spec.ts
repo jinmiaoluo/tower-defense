@@ -222,6 +222,43 @@ describe('GameApi', () => {
 
       expect(response.entries.length).toBeLessThanOrEqual(5)
     })
+
+    it('endGame 应支持提前结束（不带 lastWave）', async () => {
+      const startResponse = await api.createSession()
+
+      // 先提交第 1 波
+      const waveRequest: WaveRequest = {
+        sessionId: startResponse.sessionId,
+        waveNumber: 1,
+        actions: [],
+        attacks: [],
+        result: {
+          killed: 3,
+          killedByType: { 0: 3 },
+          passed: 0,
+          scoreGained: 15,
+          moneyGained: 15,
+          lifeLost: 0,
+          totalDamageDealt: 150,
+          totalLifeDestroyed: 150,
+          waveDurationFrames: 1000,
+        },
+        buildings: [],
+      }
+      await api.submitWave(waveRequest)
+
+      // 提前结束：不带 lastWave
+      const endRequest = {
+        sessionId: startResponse.sessionId,
+        nickname: 'EarlyEndPlayer',
+      }
+
+      const response = await api.endGame(endRequest)
+
+      expect(response.verified).toBe(true)
+      expect(response.ranking).toBeDefined()
+      expect(response.ranking?.rank).toBeGreaterThan(0)
+    })
   })
 
   describe('真实 API 模式', () => {

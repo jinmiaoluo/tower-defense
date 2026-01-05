@@ -7,14 +7,15 @@ import ThemeToggle from './components/ThemeToggle.vue'
 import LocaleToggle from './components/LocaleToggle.vue'
 import LeaderboardButton from './components/LeaderboardButton.vue'
 import { EventBus } from './game/EventBus'
-import { mockEndGame } from './mocks/api'
+import { gameApi } from './api'
 import type { Scene } from 'phaser'
-import type { WaveResult, BuildingSnapshot } from './types'
+import type { WaveResult, BuildingSnapshot, Action, AttackEvent } from './types'
 
 interface GameOverData {
   score: number
   wave: number
   sessionId: string
+  isEarlyEnd: boolean
 }
 
 const phaserRef = ref<InstanceType<typeof PhaserGame>>()
@@ -28,6 +29,8 @@ const gameOverData = ref<GameOverData | null>(null)
 // 存储最后一波的数据，用于提交
 const lastWaveData = ref<{
   waveNumber: number
+  actions: Action[]
+  attacks: AttackEvent[]
   result: WaveResult
   buildings: BuildingSnapshot[]
 } | null>(null)
@@ -37,20 +40,30 @@ const currentScene = (_scene: Scene) => {
 }
 
 async function handleSubmitScore(nickname: string) {
-  if (!gameOverData.value || !lastWaveData.value) return
+  if (!gameOverData.value) return
 
   try {
-    const response = await mockEndGame({
-      sessionId: gameOverData.value.sessionId,
-      nickname,
-      lastWave: {
-        waveNumber: lastWaveData.value.waveNumber,
-        actions: [],
-        attacks: [],
-        result: lastWaveData.value.result,
-        buildings: lastWaveData.value.buildings,
-      },
-    })
+    // 根据是否提前结束决定是否包含 lastWave 数据
+    const endRequest = gameOverData.value.isEarlyEnd
+      ? {
+          sessionId: gameOverData.value.sessionId,
+          nickname,
+        }
+      : {
+          sessionId: gameOverData.value.sessionId,
+          nickname,
+          lastWave: lastWaveData.value
+            ? {
+                waveNumber: lastWaveData.value.waveNumber,
+                actions: lastWaveData.value.actions,
+                attacks: lastWaveData.value.attacks,
+                result: lastWaveData.value.result,
+                buildings: lastWaveData.value.buildings,
+              }
+            : undefined,
+        }
+
+    const response = await gameApi.endGame(endRequest)
 
     if (response.verified && response.ranking) {
       gameOverModalRef.value?.setRankingResult(response.ranking)
@@ -97,19 +110,32 @@ onMounted(() => {
     score: number
     wave: number
     sessionId: string
-    lastWaveResult: WaveResult
-    buildings: BuildingSnapshot[]
+    isEarlyEnd: boolean
+    lastWaveActions?: Action[]
+    lastWaveAttacks?: AttackEvent[]
+    lastWaveResult?: WaveResult
+    buildings?: BuildingSnapshot[]
   }) => {
     gameOverData.value = {
       score: data.score,
       wave: data.wave,
       sessionId: data.sessionId,
+      isEarlyEnd: data.isEarlyEnd,
     }
-    lastWaveData.value = {
-      waveNumber: data.wave,
-      result: data.lastWaveResult,
-      buildings: data.buildings,
+
+    // 只有非提前结束时才设置 lastWaveData
+    if (!data.isEarlyEnd && data.lastWaveActions && data.lastWaveResult && data.buildings) {
+      lastWaveData.value = {
+        waveNumber: data.wave,
+        actions: data.lastWaveActions,
+        attacks: data.lastWaveAttacks || [],
+        result: data.lastWaveResult,
+        buildings: data.buildings,
+      }
+    } else {
+      lastWaveData.value = null
     }
+
     showGameOver.value = true
   })
 
