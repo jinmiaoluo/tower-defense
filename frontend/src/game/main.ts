@@ -68,6 +68,9 @@ const config: Phaser.Types.Core.GameConfig = {
     roundPixels: false,
     pixelArt: false,
   },
+  audio: {
+    disableWebAudio: true,
+  },
 }
 
 const StartGame = (parent: string) => {
