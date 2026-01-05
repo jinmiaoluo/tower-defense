@@ -10,7 +10,7 @@ import { AppEventBus } from '@/utils/EventEmitter'
 import { createGameSceneLogic, type GameSceneLogic, createScoreSystem, type ScoreSystem } from '../systems'
 import { gameApi } from '@/api'
 import type { GameConfig, WaveConfig, Position, BuildingType, GameColors, ResolvedTheme } from '@/types'
-import { GAME_CONSTANTS } from '@/types'
+import { GAME_CONSTANTS, isWeaponBuilding } from '@/types'
 import {
   createPhaserAdapter,
   renderBuilding,
@@ -42,6 +42,7 @@ interface UIState {
   isLoading: boolean
   waveIntervalCounter: number
   isSubmittingWave: boolean
+  waitingForFirstWeapon: boolean
   selectedBuildingType: BuildingType | null
   selectedBuildingId: string | null
   hoverPosition: Position | null
@@ -174,8 +175,8 @@ export class Game extends Scene {
       this.logic = createGameSceneLogic(this.gameConfig)
       this.scoreSystem = createScoreSystem()
 
-      // 开始第一波
-      this.logic.startWave(this.currentWaveConfig)
+      // 等待玩家放置第一个武器后再开始第一波
+      // 与旧实现一致: wave == 0 && !has_weapon 时不开始
 
       this.uiState.isLoading = false
 
@@ -196,6 +197,7 @@ export class Game extends Scene {
       isLoading: true,
       waveIntervalCounter: 0,
       isSubmittingWave: false,
+      waitingForFirstWeapon: true,
       selectedBuildingType: null,
       selectedBuildingId: null,
       hoverPosition: null,
@@ -520,15 +522,21 @@ export class Game extends Scene {
     if (!this.uiState.selectedBuildingType) return
     if (!this.canPerformBuildingAction()) return
 
-    const result = this.logic.placeBuilding(
-      position,
-      this.uiState.selectedBuildingType,
-    )
+    const buildingType = this.uiState.selectedBuildingType
+
+    // 放置第一个武器时,先开始波次再放置建筑
+    // 确保 BUILD action 记录到 wave 1 的 recorder 中
+    if (this.uiState.waitingForFirstWeapon && isWeaponBuilding(buildingType)) {
+      this.uiState.waitingForFirstWeapon = false
+      this.logic.startWave(this.currentWaveConfig)
+    }
+
+    const result = this.logic.placeBuilding(position, buildingType)
 
     if (result.success) {
       EventBus.emit('building-placed', {
         id: result.buildingId,
-        type: this.uiState.selectedBuildingType,
+        type: buildingType,
         position,
       })
     } else {
@@ -1453,8 +1461,8 @@ export class Game extends Scene {
       // 重置核心逻辑
       this.logic.reset()
 
-      // 开始第一波
-      this.logic.startWave(this.currentWaveConfig)
+      // 等待玩家放置第一个武器后再开始第一波
+      this.uiState.waitingForFirstWeapon = true
 
       this.uiState.isLoading = false
 
