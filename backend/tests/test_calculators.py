@@ -70,7 +70,13 @@ class TestProcessActions:
     def test_build_cannon(self):
         """建造炮台."""
         actions = [
-            {"type": "BUILD", "buildingType": "cannon", "buildingId": "b-001", "frame": 100}
+            {
+                "type": "BUILD",
+                "buildingType": "cannon",
+                "buildingId": "b-001",
+                "position": [5, 5],
+                "frame": 100,
+            }
         ]
         spent, income, buildings = process_actions(actions, [], GAME_CONFIG)
         assert spent == 300
@@ -78,6 +84,7 @@ class TestProcessActions:
         assert len(buildings) == 1
         assert buildings[0]["type"] == "cannon"
         assert buildings[0]["level"] == 1
+        assert buildings[0]["position"] == [5, 5]
 
     def test_upgrade_cannon(self):
         """升级炮台.
@@ -123,7 +130,13 @@ class TestProcessActions:
         3. 出售: income += 525 × 0.5 = 262
         """
         actions = [
-            {"type": "BUILD", "buildingType": "cannon", "buildingId": "b-001", "frame": 100},
+            {
+                "type": "BUILD",
+                "buildingType": "cannon",
+                "buildingId": "b-001",
+                "position": [5, 5],
+                "frame": 100,
+            },
             {"type": "UPGRADE", "buildingId": "b-001", "level": 2, "frame": 200},
             {"type": "SELL", "buildingId": "b-001", "frame": 300},
         ]
@@ -139,7 +152,13 @@ class TestProcessActions:
         """
         actions = [
             {"type": "UPGRADE", "buildingId": "b-001", "level": 2, "frame": 200},
-            {"type": "BUILD", "buildingType": "cannon", "buildingId": "b-001", "frame": 100},
+            {
+                "type": "BUILD",
+                "buildingType": "cannon",
+                "buildingId": "b-001",
+                "position": [5, 5],
+                "frame": 100,
+            },
         ]
         spent, income, buildings = process_actions(actions, [], GAME_CONFIG)
         assert spent == 300 + 225
@@ -148,8 +167,20 @@ class TestProcessActions:
     def test_multiple_buildings(self):
         """多个建筑操作."""
         actions = [
-            {"type": "BUILD", "buildingType": "cannon", "buildingId": "b-001", "frame": 100},
-            {"type": "BUILD", "buildingType": "LMG", "buildingId": "b-002", "frame": 150},
+            {
+                "type": "BUILD",
+                "buildingType": "cannon",
+                "buildingId": "b-001",
+                "position": [5, 5],
+                "frame": 100,
+            },
+            {
+                "type": "BUILD",
+                "buildingType": "LMG",
+                "buildingId": "b-002",
+                "position": [6, 6],
+                "frame": 150,
+            },
         ]
         spent, income, buildings = process_actions(actions, [], GAME_CONFIG)
         assert spent == 300 + 100  # cannon + LMG
@@ -584,6 +615,141 @@ class TestCalcLifeReward:
         assert calc_life_reward(45) == 5   # 45 % 5 == 0, 45 % 10 != 0
         assert calc_life_reward(50) == 10  # 50 % 10 == 0
         assert calc_life_reward(55) == 5   # 55 % 5 == 0, 55 % 10 != 0
+
+
+class TestBuildValidationBuildings:
+    """build_validation_buildings 测试.
+
+    该函数用于构建验证攻击事件用的建筑列表。
+    与 process_actions 的区别是：不执行 SELL 操作，
+    因为攻击可能发生在建筑被出售之前。
+    """
+
+    def test_build_only(self):
+        """成功：只有 BUILD 操作."""
+        from game.calculators import build_validation_buildings
+
+        actions = [
+            {
+                "type": "BUILD",
+                "buildingType": "cannon",
+                "buildingId": "b-001",
+                "position": [5, 5],
+                "frame": 100,
+            }
+        ]
+        buildings = build_validation_buildings(actions, [])
+        assert len(buildings) == 1
+        assert buildings[0]["id"] == "b-001"
+        assert buildings[0]["type"] == "cannon"
+        assert buildings[0]["level"] == 1
+        assert buildings[0]["position"] == [5, 5]
+
+    def test_build_and_upgrade(self):
+        """成功：BUILD + UPGRADE 操作."""
+        from game.calculators import build_validation_buildings
+
+        actions = [
+            {
+                "type": "BUILD",
+                "buildingType": "cannon",
+                "buildingId": "b-001",
+                "position": [5, 5],
+                "frame": 100,
+            },
+            {
+                "type": "UPGRADE",
+                "buildingId": "b-001",
+                "level": 2,
+                "frame": 200,
+            },
+        ]
+        buildings = build_validation_buildings(actions, [])
+        assert len(buildings) == 1
+        assert buildings[0]["level"] == 2
+
+    def test_sell_not_executed(self):
+        """关键：SELL 操作不执行，建筑仍保留在列表中."""
+        from game.calculators import build_validation_buildings
+
+        session_buildings = [
+            {"id": "b-001", "type": "cannon", "level": 1, "position": [5, 5]}
+        ]
+        actions = [{"type": "SELL", "buildingId": "b-001", "frame": 300}]
+        buildings = build_validation_buildings(actions, session_buildings)
+        # 与 process_actions 不同，建筑不会被移除
+        assert len(buildings) == 1
+        assert buildings[0]["id"] == "b-001"
+
+    def test_attack_before_sell(self):
+        """核心场景：攻击发生在出售之前，验证时建筑必须存在.
+
+        这是修复 '未知建筑: b-1' 问题的核心测试。
+        """
+        from game.calculators import build_validation_buildings
+
+        session_buildings = [
+            {"id": "b-1", "type": "LMG", "level": 1, "position": [2, 2]},
+            {"id": "b-2", "type": "cannon", "level": 1, "position": [3, 3]},
+        ]
+        # 攻击在帧 2025-2291，出售在帧 2296
+        actions = [{"type": "SELL", "buildingId": "b-1", "frame": 2296}]
+        buildings = build_validation_buildings(actions, session_buildings)
+        # 两个建筑都必须存在（用于验证攻击）
+        building_ids = {b["id"] for b in buildings}
+        assert "b-1" in building_ids
+        assert "b-2" in building_ids
+
+    def test_from_session_buildings(self):
+        """成功：继承上一波的建筑."""
+        from game.calculators import build_validation_buildings
+
+        session_buildings = [
+            {"id": "b-001", "type": "cannon", "level": 2, "position": [5, 5]}
+        ]
+        actions = []  # 无操作
+        buildings = build_validation_buildings(actions, session_buildings)
+        assert len(buildings) == 1
+        assert buildings[0]["id"] == "b-001"
+        assert buildings[0]["level"] == 2
+        assert buildings[0]["position"] == [5, 5]
+
+    def test_upgrade_existing_building(self):
+        """成功：升级上一波的建筑."""
+        from game.calculators import build_validation_buildings
+
+        session_buildings = [
+            {"id": "b-001", "type": "cannon", "level": 1, "position": [5, 5]}
+        ]
+        actions = [{"type": "UPGRADE", "buildingId": "b-001", "level": 2, "frame": 100}]
+        buildings = build_validation_buildings(actions, session_buildings)
+        assert buildings[0]["level"] == 2
+
+    def test_multiple_operations(self):
+        """复杂场景：多个建筑的混合操作."""
+        from game.calculators import build_validation_buildings
+
+        session_buildings = [
+            {"id": "b-001", "type": "LMG", "level": 1, "position": [2, 2]}
+        ]
+        actions = [
+            {
+                "type": "BUILD",
+                "buildingType": "cannon",
+                "buildingId": "b-002",
+                "position": [3, 3],
+                "frame": 100,
+            },
+            {"type": "UPGRADE", "buildingId": "b-002", "level": 2, "frame": 200},
+            {"type": "SELL", "buildingId": "b-001", "frame": 300},  # 不执行
+        ]
+        buildings = build_validation_buildings(actions, session_buildings)
+        # 两个建筑都在
+        assert len(buildings) == 2
+        building_map = {b["id"]: b for b in buildings}
+        assert "b-001" in building_map
+        assert "b-002" in building_map
+        assert building_map["b-002"]["level"] == 2
 
 
 class TestCalcHitScore:

@@ -58,7 +58,12 @@ def process_actions(
 
         if atype == "BUILD":
             spent += config["buildings"][action["buildingType"]]["cost"]
-            buildings[bid] = {"id": bid, "type": action["buildingType"], "level": 1}
+            buildings[bid] = {
+                "id": bid,
+                "type": action["buildingType"],
+                "level": 1,
+                "position": action["position"],
+            }
 
         elif atype == "UPGRADE":
             b = buildings[bid]
@@ -199,3 +204,40 @@ def calc_hit_score(actual_damage: int) -> int:
         本次命中获得的分数
     """
     return int(math.sqrt(actual_damage))
+
+
+def build_validation_buildings(
+    actions: list[dict[str, Any]],
+    session_buildings: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """构建用于攻击验证的建筑列表.
+
+    与 process_actions 的区别：不执行 SELL 操作。
+    因为攻击可能发生在建筑被出售之前，验证时需要保留所有参与过攻击的建筑。
+
+    Args:
+        actions: 操作列表，每个操作包含 type, buildingId, frame 等字段
+        session_buildings: 当前会话中的建筑列表
+
+    Returns:
+        用于验证的建筑列表（包含 id, type, level, position）
+    """
+    buildings = {b["id"]: b.copy() for b in session_buildings}
+
+    for action in sorted(actions, key=lambda a: a["frame"]):
+        bid, atype = action["buildingId"], action["type"]
+
+        if atype == "BUILD":
+            buildings[bid] = {
+                "id": bid,
+                "type": action["buildingType"],
+                "level": 1,
+                "position": action["position"],
+            }
+
+        elif atype == "UPGRADE":
+            buildings[bid]["level"] += 1
+
+        # SELL 操作被忽略，建筑保留在列表中
+
+    return list(buildings.values())

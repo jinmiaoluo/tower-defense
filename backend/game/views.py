@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from game.calculators import (
+    build_validation_buildings,
     calc_life_reward,
     calc_new_difficulty,
     process_actions,
@@ -149,10 +150,13 @@ class SubmitWaveView(APIView):
             return self._validation_error(msg)
 
         # Level 2+ 攻击事件验证
+        # 使用 validation_buildings 而非 submitted_buildings，
+        # 因为攻击可能发生在建筑被出售之前
+        validation_buildings = build_validation_buildings(actions, session.buildings)
         monsters_config = _get_monsters_config(session.next_wave)
         ok, msg = validate_attacks(
             attacks,
-            submitted_buildings,
+            validation_buildings,
             result,
             GAME_CONFIG["buildings"],
             GAME_CONFIG["map"],
@@ -324,10 +328,13 @@ class EndSessionView(APIView):
         if not ok:
             return self._validation_error(msg)
 
+        # 使用 validation_buildings 而非 submitted_buildings，
+        # 因为攻击可能发生在建筑被出售之前
+        validation_buildings = build_validation_buildings(actions, session.buildings)
         monsters_config = _get_monsters_config(session.next_wave)
         ok, msg = validate_attacks(
             attacks,
-            submitted_buildings,
+            validation_buildings,
             result,
             GAME_CONFIG["buildings"],
             GAME_CONFIG["map"],
