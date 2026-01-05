@@ -110,12 +110,14 @@ export class Game extends Scene {
   // 建筑面板按钮（用于选中状态更新）
   private buildingPanelButtons: Map<BuildingType, Phaser.GameObjects.Rectangle> = new Map()
 
-  // 控制面板（暂停/重启按钮）
+  // 控制面板（暂停/重启/结束按钮）
   private controlPanel!: Phaser.GameObjects.Container
   private pauseButton!: Phaser.GameObjects.Rectangle
   private pauseButtonText!: Phaser.GameObjects.Text
   private restartButton!: Phaser.GameObjects.Rectangle
   private restartButtonText!: Phaser.GameObjects.Text
+  private endGameButton!: Phaser.GameObjects.Rectangle
+  private endGameButtonText!: Phaser.GameObjects.Text
 
   // 建筑操作面板（升级/出售按钮，选中建筑时显示）
   private buildingActionPanel!: Phaser.GameObjects.Container
@@ -364,7 +366,7 @@ export class Game extends Scene {
 
   /** 更新控制面板文字 */
   private updateControlPanelTexts() {
-    if (!this.pauseButtonText || !this.restartButtonText) return
+    if (!this.pauseButtonText || !this.restartButtonText || !this.endGameButtonText) return
 
     const state = this.logic?.getState()
     const isPaused = state?.isPaused ?? false
@@ -374,6 +376,7 @@ export class Game extends Scene {
       isPaused ? this.t('button_continue_text') : this.t('button_pause_text'),
     )
     this.restartButtonText.setText(this.t('button_restart_text'))
+    this.endGameButtonText.setText(this.t('button_endgame_text'))
   }
 
   /** 绘制虚线圆 */
@@ -1022,7 +1025,7 @@ export class Game extends Scene {
     })
   }
 
-  /** 创建控制面板（暂停/重启按钮） */
+  /** 创建控制面板（暂停/重启/结束按钮） */
   private createControlPanel() {
     const { width, height } = this.scale
 
@@ -1033,8 +1036,8 @@ export class Game extends Scene {
     const buttonHeight = 20 * DPR
     const gap = 10 * DPR
 
-    // 暂停按钮
-    const pauseX = -(buttonWidth + gap) / 2
+    // 暂停按钮（左侧）
+    const pauseX = -(buttonWidth + gap)
     this.pauseButton = this.add.rectangle(pauseX, 0, buttonWidth, buttonHeight, 0x4488ff, 0.8)
     this.pauseButton.setStrokeStyle(1 * DPR, 0xffffff)
     this.pauseButton.setInteractive({ useHandCursor: true })
@@ -1058,8 +1061,8 @@ export class Game extends Scene {
       this.handlePauseClick()
     })
 
-    // 重启按钮（初始隐藏，仅在暂停时显示）
-    const restartX = (buttonWidth + gap) / 2
+    // 重启按钮（中间，初始隐藏，仅在暂停时显示）
+    const restartX = 0
     this.restartButton = this.add.rectangle(restartX, 0, buttonWidth, buttonHeight, 0xff6644, 0.8)
     this.restartButton.setStrokeStyle(1 * DPR, 0xffffff)
     this.restartButton.setInteractive({ useHandCursor: true })
@@ -1085,11 +1088,40 @@ export class Game extends Scene {
       this.restart()
     })
 
+    // 结束按钮（右侧，初始隐藏，仅在暂停时显示）
+    const endGameX = buttonWidth + gap
+    this.endGameButton = this.add.rectangle(endGameX, 0, buttonWidth, buttonHeight, 0x888888, 0.8)
+    this.endGameButton.setStrokeStyle(1 * DPR, 0xffffff)
+    this.endGameButton.setInteractive({ useHandCursor: true })
+    this.endGameButton.setVisible(false)
+
+    this.endGameButtonText = this.add.text(endGameX, 0, this.t('button_endgame_text'), {
+      fontFamily: 'Arial',
+      fontSize: `${11 * DPR}px`,
+      color: '#ffffff',
+    })
+    this.endGameButtonText.setOrigin(0.5, 0.5)
+    this.endGameButtonText.setVisible(false)
+
+    this.endGameButton.on('pointerover', () => {
+      this.endGameButton.setFillStyle(0x888888, 1)
+    })
+
+    this.endGameButton.on('pointerout', () => {
+      this.endGameButton.setFillStyle(0x888888, 0.8)
+    })
+
+    this.endGameButton.on('pointerdown', () => {
+      this.gameOver()
+    })
+
     this.controlPanel.add([
       this.pauseButton,
       this.pauseButtonText,
       this.restartButton,
       this.restartButtonText,
+      this.endGameButton,
+      this.endGameButtonText,
     ])
   }
 
@@ -1255,12 +1287,16 @@ export class Game extends Scene {
       this.pauseButtonText.setText(this.t('button_pause_text'))
       this.restartButton.setVisible(false)
       this.restartButtonText.setVisible(false)
+      this.endGameButton.setVisible(false)
+      this.endGameButtonText.setVisible(false)
     } else {
       // 当前是运行状态，点击暂停游戏
       this.logic.togglePause()
       this.pauseButtonText.setText(this.t('button_continue_text'))
       this.restartButton.setVisible(true)
       this.restartButtonText.setVisible(true)
+      this.endGameButton.setVisible(true)
+      this.endGameButtonText.setVisible(true)
     }
 
     EventBus.emit('game-paused', this.logic.getState().isPaused)
@@ -1437,6 +1473,8 @@ export class Game extends Scene {
     this.pauseButtonText.setText(this.t('button_pause_text'))
     this.restartButton.setVisible(false)
     this.restartButtonText.setVisible(false)
+    this.endGameButton.setVisible(false)
+    this.endGameButtonText.setVisible(false)
 
     // 隐藏建筑操作面板
     this.updateBuildingActionPanel()

@@ -59,6 +59,7 @@ export const zh = {
   button_restart_text: '重新开始',
   button_pause_text: '暂停',
   button_continue_text: '继续',
+  button_endgame_text: '结束',
 
   // 按钮描述
   button_pause_desc_0: '游戏暂停',

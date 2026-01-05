@@ -61,6 +61,7 @@ export const en: Record<MessageKey, string> = {
   button_restart_text: 'Restart',
   button_pause_text: 'Pause',
   button_continue_text: 'Continue',
+  button_endgame_text: 'End Game',
 
   // 按钮描述
   button_pause_desc_0: 'Game paused',
