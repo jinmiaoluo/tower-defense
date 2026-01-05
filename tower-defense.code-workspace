@@ -1,27 +1,7 @@
 {
   "folders": [
     {
-      "name": "frontend",
-      "path": "frontend"
-    },
-    {
-      "name": "backend",
-      "path": "backend"
-    },
-    {
-      "name": "docs",
-      "path": "docs"
+      "path": "."
     }
-  ],
-  "settings": {
-    "terminal.integrated.cwd": "${workspaceFolder}/../"
-  },
-  "extensions": {
-    "recommendations": [
-      "Vue.volar",
-      "dbaeumer.vscode-eslint",
-      "esbenp.prettier-vscode",
-      "Vue.vscode-typescript-vue-plugin"
-    ]
-  }
+  ]
 }
