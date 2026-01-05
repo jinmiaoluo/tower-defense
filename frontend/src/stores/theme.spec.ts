@@ -5,23 +5,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useThemeStore } from './theme'
-import { STORAGE_KEY } from '@/types/theme'
-
-const mockStorage: Record<string, string> = {}
-const mockLocalStorage = {
-  getItem: vi.fn((key: string) => mockStorage[key] || null),
-  setItem: vi.fn((key: string, value: string) => {
-    mockStorage[key] = value
-  }),
-  removeItem: vi.fn((key: string) => {
-    delete mockStorage[key]
-  }),
-  clear: vi.fn(() => {
-    Object.keys(mockStorage).forEach((key) => delete mockStorage[key])
-  }),
-  key: vi.fn(),
-  length: 0,
-}
 
 const mockDocument = {
   documentElement: {
@@ -50,9 +33,7 @@ describe('ThemeStore', () => {
   let mockMatchMedia: ReturnType<typeof vi.fn>
 
   beforeEach(() => {
-    vi.stubGlobal('localStorage', mockLocalStorage)
     vi.stubGlobal('document', mockDocument)
-    mockLocalStorage.clear()
 
     mockAddEventListener.mockClear()
     mockRemoveEventListener.mockClear()
@@ -62,7 +43,6 @@ describe('ThemeStore', () => {
     vi.stubGlobal('matchMedia', mockMatchMedia)
     vi.stubGlobal('window', {
       matchMedia: mockMatchMedia,
-      localStorage: mockLocalStorage,
     })
     setActivePinia(createPinia())
   })
@@ -72,70 +52,42 @@ describe('ThemeStore', () => {
   })
 
   describe('初始化', () => {
-    it('默认使用 system 模式', () => {
+    it('默认检测系统主题', () => {
       const store = useThemeStore()
-      expect(store.mode).toBe('system')
+      expect(store.current).toBe('dark')
     })
 
-    it('从 localStorage 恢复主题设置', () => {
-      mockStorage[STORAGE_KEY] = 'light'
+    it('系统亮色主题时检测为 light', () => {
+      mockMatchMedia = vi.fn(() => createMockMediaQueryList(false))
+      vi.stubGlobal('matchMedia', mockMatchMedia)
+      vi.stubGlobal('window', { matchMedia: mockMatchMedia })
       setActivePinia(createPinia())
-      const store = useThemeStore()
-      store.initTheme()
-      expect(store.mode).toBe('light')
-      expect(store.resolved).toBe('light')
-    })
 
-    it('localStorage 中无效值时使用默认 system 模式', () => {
-      mockStorage[STORAGE_KEY] = 'invalid'
-      setActivePinia(createPinia())
       const store = useThemeStore()
-      store.initTheme()
-      expect(store.mode).toBe('system')
-    })
-  })
-
-  describe('setMode', () => {
-    it('设置为 light 模式', () => {
-      const store = useThemeStore()
-      store.setMode('light')
-      expect(store.mode).toBe('light')
-      expect(store.resolved).toBe('light')
-    })
-
-    it('设置为 dark 模式', () => {
-      const store = useThemeStore()
-      store.setMode('dark')
-      expect(store.mode).toBe('dark')
-      expect(store.resolved).toBe('dark')
-    })
-
-    it('设置为 system 模式', () => {
-      const store = useThemeStore()
-      store.setMode('system')
-      expect(store.mode).toBe('system')
-    })
-
-    it('设置主题后保存到 localStorage', () => {
-      const store = useThemeStore()
-      store.setMode('dark')
-      expect(mockStorage[STORAGE_KEY]).toBe('dark')
+      expect(store.current).toBe('light')
     })
   })
 
   describe('toggleTheme', () => {
-    it('从 light 切换到 dark', () => {
-      const store = useThemeStore()
-      store.setMode('light')
-      store.toggleTheme()
-      expect(store.mode).toBe('dark')
-    })
-
     it('从 dark 切换到 light', () => {
       const store = useThemeStore()
-      store.setMode('dark')
+      store.initTheme()
+      expect(store.current).toBe('dark')
       store.toggleTheme()
-      expect(store.mode).toBe('light')
+      expect(store.current).toBe('light')
+    })
+
+    it('从 light 切换到 dark', () => {
+      mockMatchMedia = vi.fn(() => createMockMediaQueryList(false))
+      vi.stubGlobal('matchMedia', mockMatchMedia)
+      vi.stubGlobal('window', { matchMedia: mockMatchMedia })
+      setActivePinia(createPinia())
+
+      const store = useThemeStore()
+      store.initTheme()
+      expect(store.current).toBe('light')
+      store.toggleTheme()
+      expect(store.current).toBe('dark')
     })
   })
 
@@ -153,62 +105,62 @@ describe('ThemeStore', () => {
       expect(mockRemoveEventListener).toHaveBeenCalledWith('change', expect.any(Function))
     })
 
-    it('非 system 模式下不响应系统主题变化', () => {
+    it('系统主题变化时自动切换', () => {
       const store = useThemeStore()
       store.initTheme()
-      store.setMode('dark')
-      expect(store.resolved).toBe('dark')
+      expect(store.current).toBe('dark')
 
       const changeHandler = mockAddEventListener.mock.calls[0][1]
       changeHandler({ matches: false })
-      expect(store.resolved).toBe('dark')
+      expect(store.current).toBe('light')
     })
 
-    it('system 模式下响应系统主题变化', () => {
+    it('系统主题变化时覆盖手动切换', () => {
       const store = useThemeStore()
       store.initTheme()
-      expect(store.mode).toBe('system')
-      expect(store.resolved).toBe('dark')
+      store.toggleTheme()
+      expect(store.current).toBe('light')
 
       const changeHandler = mockAddEventListener.mock.calls[0][1]
-      changeHandler({ matches: false })
-      expect(store.resolved).toBe('light')
+      changeHandler({ matches: true })
+      expect(store.current).toBe('dark')
     })
 
     it('系统事件不重复切换相同主题', () => {
       const store = useThemeStore()
       store.initTheme()
-      store.setMode('dark')
+      expect(store.current).toBe('dark')
 
       const changeHandler = mockAddEventListener.mock.calls[0][1]
       changeHandler({ matches: true })
-      expect(store.resolved).toBe('dark')
+      expect(store.current).toBe('dark')
     })
   })
 
   describe('getters', () => {
     it('isDark 在暗色主题时返回 true', () => {
       const store = useThemeStore()
-      store.setMode('dark')
       expect(store.isDark).toBe(true)
     })
 
     it('isDark 在亮色主题时返回 false', () => {
+      mockMatchMedia = vi.fn(() => createMockMediaQueryList(false))
+      vi.stubGlobal('matchMedia', mockMatchMedia)
+      vi.stubGlobal('window', { matchMedia: mockMatchMedia })
+      setActivePinia(createPinia())
+
       const store = useThemeStore()
-      store.setMode('light')
       expect(store.isDark).toBe(false)
     })
 
     it('isLight 在亮色主题时返回 true', () => {
-      const store = useThemeStore()
-      store.setMode('light')
-      expect(store.isLight).toBe(true)
-    })
+      mockMatchMedia = vi.fn(() => createMockMediaQueryList(false))
+      vi.stubGlobal('matchMedia', mockMatchMedia)
+      vi.stubGlobal('window', { matchMedia: mockMatchMedia })
+      setActivePinia(createPinia())
 
-    it('isSystem 在 system 模式时返回 true', () => {
       const store = useThemeStore()
-      store.setMode('system')
-      expect(store.isSystem).toBe(true)
+      expect(store.isLight).toBe(true)
     })
   })
 })

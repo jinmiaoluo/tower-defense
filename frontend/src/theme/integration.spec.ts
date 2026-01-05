@@ -7,24 +7,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useThemeStore } from '@/stores/theme'
 import { applyThemeToCSSVariables, getTheme, darkTheme, lightTheme, getInitialGameColors } from './colors'
-import { STORAGE_KEY } from '@/types/theme'
-
-const mockStorage: Record<string, string> = {}
-
-const mockLocalStorage = {
-  getItem: vi.fn((key: string) => mockStorage[key] || null),
-  setItem: vi.fn((key: string, value: string) => {
-    mockStorage[key] = value
-  }),
-  removeItem: vi.fn((key: string) => {
-    delete mockStorage[key]
-  }),
-  clear: vi.fn(() => {
-    Object.keys(mockStorage).forEach((key) => delete mockStorage[key])
-  }),
-  key: vi.fn(),
-  length: 0,
-}
 
 describe('Theme Integration', () => {
   let mockMatchMedia: ReturnType<typeof vi.fn>
@@ -36,7 +18,6 @@ describe('Theme Integration', () => {
     cssProperties = {}
     dataTheme = ''
 
-    vi.stubGlobal('localStorage', mockLocalStorage)
     vi.stubGlobal('document', {
       documentElement: {
         style: {
@@ -49,8 +30,6 @@ describe('Theme Integration', () => {
         }),
       },
     })
-
-    mockLocalStorage.clear()
 
     mockMatchMedia = vi.fn((query: string) => {
       const mediaQuery = {
@@ -108,50 +87,30 @@ describe('Theme Integration', () => {
   })
 
   describe('系统主题自动切换', () => {
-    it('system 模式下响应系统主题变化', () => {
+    it('始终响应系统主题变化', () => {
       const store = useThemeStore()
       store.initTheme()
 
-      expect(store.mode).toBe('system')
-      expect(store.resolved).toBe('dark')
+      expect(store.current).toBe('dark')
 
       if (mediaQueryChangeHandler) {
         mediaQueryChangeHandler({ matches: false })
       }
 
-      expect(store.resolved).toBe('light')
+      expect(store.current).toBe('light')
     })
 
-    it('非 system 模式下不响应系统主题变化', () => {
+    it('手动切换后仍响应系统主题变化', () => {
       const store = useThemeStore()
       store.initTheme()
-      store.setMode('dark')
+      store.toggleTheme()
+      expect(store.current).toBe('light')
 
       if (mediaQueryChangeHandler) {
-        mediaQueryChangeHandler({ matches: false })
+        mediaQueryChangeHandler({ matches: true })
       }
 
-      expect(store.resolved).toBe('dark')
-    })
-  })
-
-  describe('主题持久化', () => {
-    it('主题设置保存到 localStorage', () => {
-      const store = useThemeStore()
-      store.setMode('light')
-
-      expect(mockStorage[STORAGE_KEY]).toBe('light')
-    })
-
-    it('从 localStorage 恢复主题设置', () => {
-      mockStorage[STORAGE_KEY] = 'dark'
-      setActivePinia(createPinia())
-
-      const store = useThemeStore()
-      store.initTheme()
-
-      expect(store.mode).toBe('dark')
-      expect(store.resolved).toBe('dark')
+      expect(store.current).toBe('dark')
     })
   })
 
@@ -180,7 +139,7 @@ describe('Theme Integration', () => {
   })
 
   describe('首次加载时 Canvas 主题同步', () => {
-    it('localStorage 为空且系统为暗色主题时返回暗色游戏颜色', () => {
+    it('系统为暗色主题时返回暗色游戏颜色', () => {
       mockMatchMedia = vi.fn(() => ({
         matches: true,
         media: '',
@@ -198,40 +157,7 @@ describe('Theme Integration', () => {
       expect(colors.canvasBackground).toBe(darkTheme.gameColors.canvasBackground)
     })
 
-    it('localStorage 为空且系统为亮色主题时返回亮色游戏颜色', () => {
-      mockMatchMedia = vi.fn(() => ({
-        matches: false,
-        media: '',
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-        onchange: null,
-        addListener: vi.fn(),
-        removeListener: vi.fn(),
-        dispatchEvent: vi.fn(),
-      }))
-      vi.stubGlobal('matchMedia', mockMatchMedia)
-      vi.stubGlobal('window', { matchMedia: mockMatchMedia })
-
-      const colors = getInitialGameColors()
-      expect(colors.canvasBackground).toBe(lightTheme.gameColors.canvasBackground)
-    })
-
-    it('localStorage 保存为 light 时返回亮色游戏颜色', () => {
-      mockStorage[STORAGE_KEY] = 'light'
-
-      const colors = getInitialGameColors()
-      expect(colors.canvasBackground).toBe(lightTheme.gameColors.canvasBackground)
-    })
-
-    it('localStorage 保存为 dark 时返回暗色游戏颜色', () => {
-      mockStorage[STORAGE_KEY] = 'dark'
-
-      const colors = getInitialGameColors()
-      expect(colors.canvasBackground).toBe(darkTheme.gameColors.canvasBackground)
-    })
-
-    it('localStorage 保存为 system 且系统为亮色时返回亮色游戏颜色', () => {
-      mockStorage[STORAGE_KEY] = 'system'
+    it('系统为亮色主题时返回亮色游戏颜色', () => {
       mockMatchMedia = vi.fn(() => ({
         matches: false,
         media: '',

@@ -2,9 +2,7 @@
  * 主题系统类型定义
  */
 
-export type ThemeMode = 'light' | 'dark' | 'system'
-
-export type ResolvedTheme = 'light' | 'dark'
+export type Theme = 'light' | 'dark'
 
 export interface ThemeColors {
   // 背景色
@@ -81,9 +79,3 @@ export interface ThemeConfig {
   gameColors: GameColors
 }
 
-export interface ThemeState {
-  mode: ThemeMode
-  resolved: ResolvedTheme
-}
-
-export const STORAGE_KEY = 'tower-defense-theme'
