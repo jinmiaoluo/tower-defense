@@ -716,7 +716,7 @@ describe('GameSceneLogic', () => {
     })
 
     it('spawned 与怪物数量一致性验证', () => {
-      const waveConfig = {
+      const waveConfig: WaveConfig = {
         waveNumber: 1,
         monsters: [
           { id: 'uuid-1', type: 0, life: 50, speed: 100, shield: 0, money: 5 },
