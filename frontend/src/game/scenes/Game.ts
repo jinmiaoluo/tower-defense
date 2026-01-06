@@ -1510,6 +1510,11 @@ export class Game extends Scene {
         isEarlyEnd: false,
       })
     }
+
+    // 禁用继续按钮（游戏结束后不允许继续）
+    this.pauseButton.disableInteractive()
+    this.pauseButton.setFillStyle(0x666666, 0.5)
+    this.pauseButtonText.setAlpha(0.5)
   }
 
   /** 游戏主循环 */
@@ -1563,6 +1568,9 @@ export class Game extends Scene {
 
     // 重置控制面板状态
     this.pauseButtonText.setText(this.t('button_pause_text'))
+    this.pauseButtonText.setAlpha(1)
+    this.pauseButton.setInteractive({ useHandCursor: true })
+    this.pauseButton.setFillStyle(0x4488ff, 0.8)
     this.restartButton.setVisible(false)
     this.restartButtonText.setVisible(false)
     this.endGameButton.setVisible(false)
