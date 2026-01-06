@@ -16,10 +16,6 @@
 5. 测试通过后，替换 Mock 为真实 API
 ```
 
-## 目录结构
-
-详见 [ARCHITECTURE.md](./ARCHITECTURE.md#目录结构)。
-
 ## 开发优先级
 
 - P0 项目初始化: Vite + Vue 3 + TypeScript + Phaser 3 + Vitest
@@ -356,17 +352,6 @@ export const gameApi = {
 }
 ```
 
-环境变量配置：
-
-```bash
-# .env.development
-VITE_USE_MOCK=true
-
-# .env.production
-VITE_USE_MOCK=false
-VITE_API_BASE_URL=/api
-```
-
 ## Vue 组件
 
 - `GameHeader.vue`: 显示金钱、生命、分数、波次
@@ -378,7 +363,7 @@ VITE_API_BASE_URL=/api
 
 ## 测试规范
 
-使用 Vitest 编写单元测试，测试文件位于 `src/game/systems/__tests__/`。
+使用 Vitest 编写单元测试，测试文件位于 `frontend/src/game/systems/*.spec.ts`。
 
 ## 注意事项
 

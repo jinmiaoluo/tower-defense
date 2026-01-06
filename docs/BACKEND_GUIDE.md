@@ -20,21 +20,20 @@
 7. 实现 API 视图 (views.py)
 ```
 
-## 目录结构
-
-详见 [ARCHITECTURE.md](./ARCHITECTURE.md#目录结构)。
-
 ## 开发优先级
 
 - P0 项目初始化: Django + DRF + PostgreSQL + pytest
 - P0 数据模型: GameSession, WaveRecord, LeaderboardEntry
 - P0 游戏配置: 建筑配置、怪物基础属性、地图配置
-- P1 计算器 (TDD): calc_total_cost, process_actions, build_validation_buildings, calc_new_difficulty, calc_monster_attrs, calc_actual_damage, calc_hit_score, calc_life_reward
+- P1 计算器 (TDD)
+  - calc_total_cost, process_actions, build_validation_buildings
+  - calc_new_difficulty, calc_monster_attrs
+  - calc_actual_damage, calc_hit_score, calc_life_reward
 - P1 波次生成器 (TDD): generate_wave, generate_first_wave
 - P2 验证器 (TDD): Level 1, Level 2, Level 2+, Level 4
 - P2 API 视图 (TDD): 创建会话, 提交波次, 游戏结束, 排行榜
 - P3 管理命令: cleanup_sessions
-- P3 部署配置: Docker, Gunicorn, Nginx
+- P3 部署配置: Docker
 
 ## 游戏配置
 
@@ -195,21 +194,6 @@
 
 获取排行榜，支持 limit 参数，按分数降序返回。
 
-## CORS 跨域配置
-
-开发环境默认允许以下源:
-- `http://localhost:8080`
-- `http://127.0.0.1:8080`
-
-环境变量配置:
-
-```bash
-CORS_ALLOWED_ORIGINS=http://localhost:8080,http://127.0.0.1:8080
-CSRF_TRUSTED_ORIGINS=http://localhost:8080,http://127.0.0.1:8080
-```
-
-生产环境需要配置实际的前端域名。
-
 ## 认证配置
 
 游戏 API 不使用用户认证，因此禁用了 DRF 的默认认证类。
@@ -227,4 +211,3 @@ CSRF_TRUSTED_ORIGINS=http://localhost:8080,http://127.0.0.1:8080
 4. **事务处理**：波次提交应在数据库事务中完成，验证失败时回滚
 5. **状态一致性**：GameSession 的状态必须与所有 WaveRecord 的累计结果一致
 6. **会话清理**：定时任务每小时清理超过 24 小时的过期会话
-7. **跨域配置**：开发环境默认允许 localhost:8080，生产环境需要配置实际域名
