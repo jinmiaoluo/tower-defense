@@ -38,6 +38,8 @@
 
 ## 游戏配置
 
+配置定义在 `game/config.py`，包含 `buildings`、`monsters`、`map`、`initial` 四个部分。
+
 服务端内部使用完整的怪物配置（包含所有属性），API 响应时只返回部分属性：
 
 - name: 服务端配置有，API config.monsters 有，API wave.monsters 无
@@ -53,925 +55,168 @@
 > - `damage` 是静态属性，不受难度影响，放在 `config.monsters` 中
 > - 得分基于每次攻击伤害计算（`√伤害`），不再是怪物的固定属性
 
-```python
-# game/config.py
-# 来源：旧实现 td-cfg-buildings.js
-
-GAME_CONFIG = {
-    "buildings": {
-        "wall": {
-            "name": "路障",
-            "cost": 5,
-            "damage": 0,
-            "range": 0,
-            "max_range": 0,
-            "speed": 0,
-            "bullet_speed": 0,
-            "life": 100,
-            "shield": 500,
-            "upgradeCostRatio": 0.75,
-            "sellRatio": 0.5,
-        },
-        "cannon": {
-            "name": "炮台",
-            "cost": 300,
-            "damage": 12,
-            "range": 4,
-            "max_range": 8,
-            "speed": 2,
-            "bullet_speed": 6,
-            "life": 100,
-            "shield": 100,
-            "upgradeCostRatio": 0.75,
-            "sellRatio": 0.5,
-        },
-        "LMG": {
-            "name": "轻机枪",
-            "cost": 100,
-            "damage": 5,
-            "range": 5,
-            "max_range": 10,
-            "speed": 3,
-            "bullet_speed": 6,
-            "life": 100,
-            "shield": 50,
-            "upgradeCostRatio": 0.75,
-            "sellRatio": 0.5,
-        },
-        "HMG": {
-            "name": "重机枪",
-            "cost": 800,
-            "damage": 30,
-            "range": 3,
-            "max_range": 5,
-            "speed": 3,
-            "bullet_speed": 5,
-            "life": 100,
-            "shield": 200,
-            "upgradeCostRatio": 0.75,
-            "sellRatio": 0.5,
-        },
-        "laser_gun": {
-            "name": "激光枪",
-            "cost": 2000,
-            "damage": 25,
-            "range": 6,
-            "max_range": 10,
-            "speed": 20,
-            "bullet_speed": 0,  # 激光瞬发
-            "life": 100,
-            "shield": 100,
-            "upgradeCostRatio": 0.75,
-            "sellRatio": 0.5,
-        },
-    },
-    "monsters": {
-        0: {"name": "普通怪", "life": 50, "speed": 3, "max_speed": 10, "shield": 0, "damage": 1, "money": 5, "color": "#00ff00"},
-        1: {"name": "稍强怪", "life": 50, "speed": 6, "max_speed": 20, "shield": 1, "damage": 2, "money": 8, "color": "#33ff33"},
-        2: {"name": "速度怪", "life": 50, "speed": 12, "max_speed": 30, "shield": 1, "damage": 3, "money": 10, "color": "#66ff66"},
-        3: {"name": "血量怪", "life": 500, "speed": 5, "max_speed": 10, "shield": 1, "damage": 3, "money": 50, "color": "#ff0000"},
-        4: {"name": "护盾怪", "life": 50, "speed": 5, "max_speed": 10, "shield": 20, "damage": 3, "money": 30, "color": "#0000ff"},
-        5: {"name": "伤害怪", "life": 50, "speed": 7, "max_speed": 14, "shield": 2, "damage": 10, "money": 25, "color": "#ff00ff"},
-        6: {"name": "速度血量怪", "life": 100, "speed": 15, "max_speed": 30, "shield": 3, "damage": 3, "money": 35, "color": "#ffff00"},
-        7: {"name": "极速怪", "life": 30, "speed": 30, "max_speed": 40, "shield": 1, "damage": 4, "money": 20, "color": "#00ffff"},
-        8: {"name": "护盾血量怪", "life": 300, "speed": 3, "max_speed": 10, "shield": 15, "damage": 5, "money": 60, "color": "#ff6600"},
-    },
-    "map": {
-        "width": 16,
-        "height": 16,
-        "entrance": [0, 0],
-        "exit": [15, 15],
-        "obstacles": [],  # 预设障碍物坐标列表，如 [[3, 3], [7, 15]]
-    },
-    "initial": {
-        "money": 500,
-        "life": 100,
-        "difficulty": 1.0,
-    },
-}
-
-# 波次 1-10 的预定义配置
-# 来源：旧实现 td-data-stage-1.js:184-250
-# 前 10 波只使用 type 0/1/2 三种基础怪物，难度渐进
-PREDEFINED_WAVES = {
-    1: [{"type": 0, "count": 1}],
-    2: [{"type": 0, "count": 1}, {"type": 1, "count": 1}],
-    3: [{"type": 0, "count": 2}, {"type": 1, "count": 1}],
-    4: [{"type": 0, "count": 2}, {"type": 1, "count": 1}],
-    5: [{"type": 0, "count": 3}, {"type": 1, "count": 2}],
-    6: [{"type": 0, "count": 4}, {"type": 1, "count": 2}],
-    7: [{"type": 0, "count": 5}, {"type": 1, "count": 3}, {"type": 2, "count": 1}],
-    8: [{"type": 0, "count": 6}, {"type": 1, "count": 4}, {"type": 2, "count": 1}],
-    9: [{"type": 0, "count": 7}, {"type": 1, "count": 3}, {"type": 2, "count": 2}],
-    10: [{"type": 0, "count": 8}, {"type": 1, "count": 4}, {"type": 2, "count": 3}],
-}
-```
-
 ## 核心计算器
+
+详细测试用例见 `tests/test_calculators.py`。
 
 ### calc_total_cost
 
 计算建筑累计花费（建造 + 所有升级）。
 
-```python
-# tests/test_calculators.py
-def test_calc_total_cost_level_1():
-    assert calc_total_cost("cannon", 1, GAME_CONFIG) == 300
-
-def test_calc_total_cost_level_2():
-    # 300 + 300 * 0.75 = 525
-    assert calc_total_cost("cannon", 2, GAME_CONFIG) == 525
-
-def test_calc_total_cost_level_3():
-    # 300 + 225 + 525 * 0.75 = 918
-    assert calc_total_cost("cannon", 3, GAME_CONFIG) == 918
-```
+公式：`累计花费 = 建造成本 + Σ(上一级累计花费 × upgradeCostRatio)`
 
 ### process_actions
 
 处理建筑操作序列，计算花费和收入。
 
-```python
-def test_process_actions_build():
-    actions = [{"type": "BUILD", "buildingType": "cannon", "buildingId": "b-001", "frame": 100}]
-    spent, income, buildings = process_actions(actions, [], GAME_CONFIG)
-    assert spent == 300
-    assert income == 0
-    assert len(buildings) == 1
-
-def test_process_actions_upgrade():
-    session_buildings = [{"id": "b-001", "type": "cannon", "level": 1}]
-    actions = [{"type": "UPGRADE", "buildingId": "b-001", "level": 2, "frame": 200}]
-    spent, income, buildings = process_actions(actions, session_buildings, GAME_CONFIG)
-    assert spent == 225  # 300 * 0.75
-
-def test_process_actions_sell():
-    session_buildings = [{"id": "b-001", "type": "cannon", "level": 1}]
-    actions = [{"type": "SELL", "buildingId": "b-001", "frame": 300}]
-    spent, income, buildings = process_actions(actions, session_buildings, GAME_CONFIG)
-    assert income == 150  # 300 * 0.5
-    assert len(buildings) == 0
-```
+操作类型：
+- BUILD: 花费 = 建造成本
+- UPGRADE: 花费 = 当前累计花费 × upgradeCostRatio
+- SELL: 收入 = 累计花费 × sellRatio
 
 ### calc_new_difficulty
 
-根据上一波受伤情况计算新难度。第 1 波（教学波）不调整难度。
+根据上一波受伤情况计算新难度。
 
-```python
-def test_calc_new_difficulty_wave_1_no_adjustment():
-    # Wave 1 不调整难度
-    assert calc_new_difficulty(1.0, 0, 1) == 1.0
-    assert calc_new_difficulty(2.0, 50, 1) == 2.0
-
-def test_calc_new_difficulty_no_damage_early():
-    assert calc_new_difficulty(1.0, 0, 3) == 1.05
-
-def test_calc_new_difficulty_no_damage_late():
-    assert calc_new_difficulty(1.0, 0, 10) == 1.2
-
-def test_calc_new_difficulty_no_damage_high_difficulty():
-    # 高难度（> 30）时减缓增长
-    assert calc_new_difficulty(31.0, 0, 5) == 34.1  # 31 * 1.1
-
-def test_calc_new_difficulty_heavy_damage():
-    assert calc_new_difficulty(2.0, 50, 5) == 1.2  # 2.0 * 0.6
-
-def test_calc_new_difficulty_min_value():
-    assert calc_new_difficulty(0.5, 50, 5) == 1.0  # 不低于 1.0
-```
+规则：
+- Wave 1（教学波）不调整难度
+- 无伤害时难度增加（早期 +5%~20%，高难度时 +10%）
+- 受伤害时难度降低（最多降至 60%）
+- 最低难度为 1.0
 
 ### calc_monster_attrs
 
 基于难度系数计算怪物实际属性。
 
-约束条件（来源：旧实现 `td-obj-monster.js:27-36`）：
-- `speed`: 最小值 1，最大值 `max_speed`（如有）
-- `life`: 最小值 1
-- `shield`: 最小值 0
+公式：
+- `life = base_life × (difficulty + 1) × 0.5`
+- `speed = base_speed + difficulty / 2`（上限为 max_speed）
+- `shield = base_shield + difficulty / 2`
 
-```python
-def test_calc_monster_attrs_default_difficulty():
-    base = {"life": 50, "speed": 3, "shield": 0, "money": 10}
-    result = calc_monster_attrs(base, 1.0)
-    assert result["life"] == 50   # 50 * (1+1) * 0.5 = 50
-    assert result["speed"] == 3.5  # 3 + 1.0/2
-    assert result["shield"] == 0   # 0 + 1.0/2 = 0.5 -> int = 0
-
-def test_calc_monster_attrs_high_difficulty():
-    base = {"life": 50, "speed": 3, "shield": 0, "money": 10}
-    result = calc_monster_attrs(base, 3.0)
-    assert result["life"] == 100  # 50 * (3+1) * 0.5 = 100
-    assert result["speed"] == 4.5  # 3 + 3.0/2
-
-def test_calc_monster_attrs_max_speed_limit():
-    # 极速怪 base speed=30, max_speed=40, difficulty=30.0
-    # 计算速度 = 30 + 30/2 = 45，被 max_speed 限制为 40
-    base = {"life": 30, "speed": 30, "max_speed": 40, "shield": 1, "money": 20}
-    result = calc_monster_attrs(base, 30.0)
-    assert result["speed"] == 40
-
-def test_calc_monster_attrs_min_values():
-    # 极端情况：验证最小值约束
-    base = {"life": 1, "speed": 0, "max_speed": 10, "shield": -5, "money": 10}
-    result = calc_monster_attrs(base, 0.0)
-    assert result["speed"] == 1   # 最小值 1
-    assert result["life"] == 1    # 最小值 1
-    assert result["shield"] == 0  # 最小值 0
-```
+约束条件：
+- speed: 最小值 1，最大值 max_speed
+- life: 最小值 1
+- shield: 最小值 0
 
 ### calc_actual_damage
 
 计算实际伤害（考虑护盾减伤和最低伤害）。
 
-```python
-# game/calculators.py
-def calc_actual_damage(raw_damage: int, shield: int) -> int:
-    """计算实际伤害 = max(原始伤害 - 护盾, 原始伤害 × 0.1)"""
-    min_damage = math.ceil(raw_damage * 0.1)
-    return max(raw_damage - shield, min_damage)
-```
-
-```python
-# tests/test_calculators.py
-def test_calc_actual_damage_no_shield():
-    assert calc_actual_damage(12, 0) == 12
-
-def test_calc_actual_damage_with_shield():
-    assert calc_actual_damage(12, 5) == 7  # 12 - 5 = 7
-
-def test_calc_actual_damage_high_shield():
-    # 护盾高于伤害时，使用最低伤害（10%）
-    assert calc_actual_damage(12, 20) == 2  # ceil(12 * 0.1) = 2
-
-def test_calc_actual_damage_min_damage():
-    # 最低伤害保证高攻武器对高护盾怪有效
-    assert calc_actual_damage(30, 100) == 3  # ceil(30 * 0.1) = 3
-```
+公式：`实际伤害 = max(原始伤害 - 护盾, 原始伤害 × 0.1)`
 
 ### calc_hit_score
 
 计算命中得分（每次攻击命中时累加）。
 
-```python
-# game/calculators.py
-def calc_hit_score(actual_damage: int) -> int:
-    """计算命中得分 = floor(√实际伤害)"""
-    return int(math.sqrt(actual_damage))
-```
+公式：`得分 = floor(√实际伤害)`
 
-```python
-# tests/test_calculators.py
-def test_calc_hit_score_basic():
-    assert calc_hit_score(1) == 1   # √1 = 1
-    assert calc_hit_score(4) == 2   # √4 = 2
-    assert calc_hit_score(9) == 3   # √9 = 3
-
-def test_calc_hit_score_floor():
-    assert calc_hit_score(10) == 3  # √10 ≈ 3.16 -> 3
-    assert calc_hit_score(15) == 3  # √15 ≈ 3.87 -> 3
-
-def test_calc_hit_score_high_damage():
-    assert calc_hit_score(100) == 10  # √100 = 10
-```
-
-> **设计说明**：得分在每次攻击命中时累加（`√伤害`），而非击杀时加分。这使高攻速武器（如激光枪）在得分上更有价值。
+> **设计说明**：得分在每次攻击命中时累加，而非击杀时加分。这使高攻速武器（如激光枪）在得分上更有价值。
 
 ### calc_life_reward
 
 计算波次生命奖励。
 
-```python
-# game/calculators.py
-def calc_life_reward(wave: int) -> int:
-    """计算波次生命奖励
-
-    - 每 10 波: +10 生命
-    - 每 5 波（非 10 的倍数）: +5 生命
-    - 其他: 0
-    """
-    if wave % 10 == 0:
-        return 10
-    elif wave % 5 == 0:
-        return 5
-    return 0
-```
-
-```python
-# tests/test_calculators.py
-def test_calc_life_reward_normal_wave():
-    assert calc_life_reward(1) == 0
-    assert calc_life_reward(3) == 0
-    assert calc_life_reward(7) == 0
-
-def test_calc_life_reward_every_5_waves():
-    assert calc_life_reward(5) == 5
-    assert calc_life_reward(15) == 5
-    assert calc_life_reward(25) == 5
-
-def test_calc_life_reward_every_10_waves():
-    # 10 的倍数返回 10（覆盖 5 的规则）
-    assert calc_life_reward(10) == 10
-    assert calc_life_reward(20) == 10
-    assert calc_life_reward(30) == 10
-```
+规则：
+- 每 10 波: +10 生命
+- 每 5 波（非 10 的倍数）: +5 生命
+- 其他: 0
 
 ## 波次生成器
+
+详细测试用例见 `tests/test_generators.py`。
 
 ### generate_wave
 
 生成指定波次的怪物配置。
 
-**确定性轮询算法**（波次 11+）：
+**波次 1-10**：使用 `PREDEFINED_WAVES` 预定义配置。
 
-与旧实现的随机算法不同，新实现使用确定性轮询算法：
+**波次 11+**：使用确定性轮询算法：
 - 组大小按 1→2→3→1→2→3... 循环
 - 怪物类型按 0→1→2→...→8→0→1... 轮询
+- 怪物数量 = min(wave^1.1, 100)
 - 相同的 (wave_number, difficulty) 输入始终产生相同的配置输出
 
-这确保服务端可以独立重建波次配置用于验证，无需存储完整的怪物列表。
-
-```python
-# tests/test_generators.py
-def test_generate_wave_predefined():
-    wave = generate_wave(1, 1.0)
-    assert wave["waveNumber"] == 1
-    assert len(wave["monsters"]) == 1  # 第一波只有 1 个怪物
-    assert all(m["type"] == 0 for m in wave["monsters"])
-
-def test_generate_wave_auto():
-    wave = generate_wave(15, 1.0)
-    assert wave["waveNumber"] == 15
-    # 怪物数量 = min(15^1.1, 100) ≈ 19
-    assert len(wave["monsters"]) <= 100
-
-def test_generate_wave_with_difficulty():
-    wave = generate_wave(1, 2.0)
-    # 验证怪物属性已按难度调整
-    for monster in wave["monsters"]:
-        assert monster["life"] > 50  # 基础值 50，难度 2.0 时应增加
-
-def test_generate_wave_monster_ids():
-    wave = generate_wave(1, 1.0)
-    # 每个怪物应有唯一 UUID
-    ids = [m["id"] for m in wave["monsters"]]
-    assert len(ids) == len(set(ids))
-```
+> **设计说明**：确定性算法确保服务端可以独立重建波次配置用于验证，无需存储完整的怪物列表。
 
 ## 验证器
 
-> 伤害和得分计算规则见上方 `calc_actual_damage` 和 `calc_hit_score` 计算器。
+详细测试用例见 `tests/test_validators.py`。
 
-### Level 1：基础验证
+伤害和得分计算规则见上方 `calc_actual_damage` 和 `calc_hit_score` 计算器。
 
-```python
-# tests/test_validators.py
-def test_validate_basic_success():
-    result = {
-        "killed": 3,
-        "killedByType": {0: 3},
-        "passed": 0,
-        "moneyGained": 30,
-        "totalDamageDealt": 150,
-    }
-    wave_config = {
-        "monsters": [{"type": 0, "count": 3, "money": 10, "life": 50}]
-    }
-    ok, err = validate_basic(result, wave_config)
-    assert ok is True
+### Level 1: 基础验证
 
-def test_validate_basic_with_remaining():
-    # 提前结束场景：场上还有怪物
-    result = {
-        "killed": 1,
-        "killedByType": {0: 1},
-        "passed": 0,
-        "remaining": 2,  # 2 只在场怪物
-        "moneyGained": 10,
-        "totalDamageDealt": 50,
-    }
-    wave_config = {
-        "monsters": [{"type": 0, "count": 3, "money": 10, "life": 50}]
-    }
-    ok, err = validate_basic(result, wave_config)
-    assert ok is True
+验证内容：
+- killed + passed + remaining = 波次怪物总数
+- killedByType 各类型击杀数 = 该类型怪物数量
+- moneyGained = Σ(被击杀怪物的 money)
+- spawned <= 波次怪物总数（提前结束场景）
 
-def test_validate_basic_killed_mismatch():
-    result = {"killed": 5, "killedByType": {0: 3}, "passed": 0}
-    wave_config = {"monsters": [{"type": 0, "count": 3}]}
-    ok, err = validate_basic(result, wave_config)
-    assert ok is False
-    assert "击杀数量不一致" in err
+### Level 2: 伤害验证
 
-def test_validate_basic_money_mismatch():
-    result = {
-        "killed": 3,
-        "killedByType": {0: 3},
-        "passed": 0,
-        "moneyGained": 100,  # 错误值
-        "totalDamageDealt": 150,
-    }
-    wave_config = {
-        "monsters": [{"type": 0, "count": 3, "money": 10, "life": 50}]
-    }
-    ok, err = validate_basic(result, wave_config)
-    assert ok is False
-    assert "金钱收益不匹配" in err
+验证内容：
+- totalLifeDestroyed = Σ(被击杀怪物的 life)
+- totalDamageDealt <= 理论最大 DPS × waveDurationFrames
 
-def test_validate_basic_with_spawned():
-    # 提前结束场景：怪物逐帧生成，部分怪物还未生成
-    result = {
-        "killed": 0,
-        "killedByType": {},
-        "passed": 0,
-        "remaining": 1,
-        "spawned": 1,  # 实际只生成了 1 只怪物
-        "moneyGained": 0,
-    }
-    wave_config = {
-        "monsters": [
-            {"type": 0, "count": 1, "money": 5},
-            {"type": 1, "count": 1, "money": 8},
-        ]  # total = 2
-    }
-    ok, err = validate_basic(result, wave_config)
-    assert ok is True
+### Level 2+: 攻击事件验证
 
-def test_validate_basic_spawned_exceeds_total():
-    # 失败：spawned 超过波次配置总数
-    result = {
-        "killed": 3,
-        "killedByType": {0: 3},
-        "passed": 0,
-        "spawned": 10,  # 超过配置的 3 只
-        "moneyGained": 15,
-    }
-    wave_config = {"monsters": [{"type": 0, "count": 3, "money": 5}]}
-    ok, err = validate_basic(result, wave_config)
-    assert ok is False
-    assert "spawned 超过波次怪物总数" in err
-```
+验证内容：
+- 每个攻击事件的 monsterId 必须是服务端下发的 UUID
+- originalTargetPosition 必须在建筑射程内（发射时验证）
+- 累计伤害 >= 怪物生命值时，怪物必须在 killedByType 中
+- remaining 怪物的 ID 必须有效且累计伤害 < 生命值
 
-### Level 2：伤害验证
+> **误伤机制**：只验证 originalTargetPosition 在射程内，不验证实际命中位置（允许子弹命中其他怪物）。
 
-```python
-def test_validate_damage_success():
-    result = {
-        "killedByType": {0: 3},
-        "totalLifeDestroyed": 150,
-        "totalDamageDealt": 180,
-        "waveDurationFrames": 1000,
-    }
-    buildings = [{"type": "cannon", "level": 1}]
-    wave_config = {"monsters": [{"type": 0, "count": 3, "life": 50}]}
-    ok, err = validate_damage(result, buildings, wave_config, GAME_CONFIG["buildings"])
-    assert ok is True
-
-def test_validate_damage_life_pool_mismatch():
-    result = {
-        "killedByType": {0: 3},
-        "totalLifeDestroyed": 200,  # 错误值，应为 150
-        "totalDamageDealt": 200,
-        "waveDurationFrames": 1000,
-    }
-    buildings = [{"type": "cannon", "level": 1}]
-    wave_config = {"monsters": [{"type": 0, "count": 3, "life": 50}]}
-    ok, err = validate_damage(result, buildings, wave_config, GAME_CONFIG["buildings"])
-    assert ok is False
-    assert "生命池验证失败" in err
-
-def test_validate_damage_dps_exceeded():
-    result = {
-        "killedByType": {0: 3},
-        "totalLifeDestroyed": 150,
-        "totalDamageDealt": 10000,  # 不可能的高伤害
-        "waveDurationFrames": 100,
-    }
-    buildings = [{"type": "cannon", "level": 1}]  # DPS = 12/30 = 0.4
-    wave_config = {"monsters": [{"type": 0, "count": 3, "life": 50}]}
-    ok, err = validate_damage(result, buildings, wave_config, GAME_CONFIG["buildings"])
-    assert ok is False
-    assert "DPS 容量超限" in err
-```
-
-### Level 2+：攻击事件验证
-
-```python
-def test_validate_attacks_success():
-    # 攻击事件包含原始目标和实际命中信息（支持"误伤"机制）
-    attacks = [
-        {
-            "frame": 100,
-            "buildingId": "b-001",
-            "originalTargetId": "uuid-1",           # 发射时瞄准的目标
-            "originalTargetPosition": [5, 5],       # 发射时目标位置（用于射程验证）
-            "monsterId": "uuid-1",                  # 实际命中的怪物
-            "monsterPosition": [5, 5],              # 命中时怪物位置
-            "damage": 10,
-        },
-        {
-            "frame": 120,
-            "buildingId": "b-001",
-            "originalTargetId": "uuid-1",
-            "originalTargetPosition": [6, 5],
-            "monsterId": "uuid-1",
-            "monsterPosition": [6, 5],
-            "damage": 10,
-        },
-    ]
-    buildings = [{"id": "b-001", "type": "cannon", "level": 1, "position": [5, 4]}]
-    result = {"totalDamageDealt": 20, "killedByType": {}}
-    monsters_config = {"uuid-1": {"type": 0, "life": 50}}
-    ok, err = validate_attacks(attacks, buildings, result, GAME_CONFIG["buildings"], GAME_CONFIG["map"], monsters_config)
-    assert ok is True
-
-def test_validate_attacks_friendly_fire():
-    # 测试"误伤"场景：瞄准 uuid-1，但命中了 uuid-2
-    attacks = [
-        {
-            "frame": 100,
-            "buildingId": "b-001",
-            "originalTargetId": "uuid-1",           # 原始目标在射程内
-            "originalTargetPosition": [5, 5],
-            "monsterId": "uuid-2",                  # 实际命中了其他怪物
-            "monsterPosition": [7, 7],              # 可能在射程外（允许）
-            "damage": 10,
-        },
-    ]
-    buildings = [{"id": "b-001", "type": "cannon", "level": 1, "position": [5, 4]}]
-    result = {"totalDamageDealt": 10, "killedByType": {}}
-    monsters_config = {"uuid-1": {"type": 0, "life": 50}, "uuid-2": {"type": 0, "life": 50}}
-    # 只验证 originalTargetPosition 在射程内，不验证 monsterPosition
-    ok, err = validate_attacks(attacks, buildings, result, GAME_CONFIG["buildings"], GAME_CONFIG["map"], monsters_config)
-    assert ok is True
-
-def test_validate_attacks_invalid_monster_id():
-    attacks = [
-        {
-            "frame": 100,
-            "buildingId": "b-001",
-            "originalTargetId": "fake-id",
-            "originalTargetPosition": [5, 5],
-            "monsterId": "fake-id",
-            "monsterPosition": [5, 5],
-            "damage": 10,
-        },
-    ]
-    monsters_config = {"uuid-1": {"type": 0, "life": 50}}
-    ok, err = validate_monster_ids(attacks, monsters_config)
-    assert ok is False
-    assert "不是服务端下发的 UUID" in err
-
-def test_validate_cumulative_damage():
-    attacks = [
-        {"monsterId": "uuid-1", "damage": 30, "originalTargetId": "uuid-1", "originalTargetPosition": [3, 3], "monsterPosition": [3, 3]},
-        {"monsterId": "uuid-1", "damage": 25, "originalTargetId": "uuid-1", "originalTargetPosition": [4, 4], "monsterPosition": [4, 4]},  # 累计 55 >= 50，应击杀
-    ]
-    result = {"killedByType": {0: 1}}
-    monsters_config = {"uuid-1": {"type": 0, "life": 50}}
-    ok, err = validate_cumulative_damage(attacks, result, monsters_config)
-    assert ok is True
-
-def test_validate_remaining_monsters_success():
-    # 提前结束场景：2 只怪物在场，累计伤害都不足以击杀
-    attacks = [
-        {"monsterId": "uuid-1", "damage": 30},  # 累计 30 < 50，未击杀
-        {"monsterId": "uuid-2", "damage": 20},  # 累计 20 < 50，未击杀
-    ]
-    result = {
-        "remaining": 2,
-        "remaining_monster_ids": ["uuid-1", "uuid-2"],
-    }
-    monsters_config = {
-        "uuid-1": {"type": 0, "life": 50},
-        "uuid-2": {"type": 0, "life": 50},
-    }
-    ok, err = validate_remaining_monsters(attacks, result, monsters_config)
-    assert ok is True
-
-def test_validate_remaining_monsters_count_mismatch():
-    # 失败：remaining 数量与 ID 列表不一致
-    attacks = []
-    result = {
-        "remaining": 2,
-        "remaining_monster_ids": ["uuid-1"],  # 只有 1 个 ID
-    }
-    monsters_config = {"uuid-1": {"type": 0, "life": 50}}
-    ok, err = validate_remaining_monsters(attacks, result, monsters_config)
-    assert ok is False
-    assert "数量与 remaining 不一致" in err
-
-def test_validate_remaining_monsters_invalid_id():
-    # 失败：remaining 怪物 ID 不是服务端下发的
-    attacks = []
-    result = {
-        "remaining": 1,
-        "remaining_monster_ids": ["fake-id"],
-    }
-    monsters_config = {"uuid-1": {"type": 0, "life": 50}}
-    ok, err = validate_remaining_monsters(attacks, result, monsters_config)
-    assert ok is False
-    assert "不是服务端下发的 UUID" in err
-
-def test_validate_remaining_monsters_should_be_killed():
-    # 失败：remaining 怪物累计伤害 >= 生命值，应被击杀
-    attacks = [
-        {"monsterId": "uuid-1", "damage": 60},  # 累计 60 >= 50，应被击杀
-    ]
-    result = {
-        "remaining": 1,
-        "remaining_monster_ids": ["uuid-1"],
-    }
-    monsters_config = {"uuid-1": {"type": 0, "life": 50}}
-    ok, err = validate_remaining_monsters(attacks, result, monsters_config)
-    assert ok is False
-    assert "应被击杀而非 remaining" in err
-
-def test_validate_remaining_monsters_duplicate_ids():
-    # 失败：remaining 怪物 ID 重复
-    attacks = []
-    result = {
-        "remaining": 2,
-        "remaining_monster_ids": ["uuid-1", "uuid-1"],  # 重复
-    }
-    monsters_config = {"uuid-1": {"type": 0, "life": 50}}
-    ok, err = validate_remaining_monsters(attacks, result, monsters_config)
-    assert ok is False
-    assert "重复" in err
-
-def test_validate_remaining_monsters_zero_remaining():
-    # 成功：remaining 为 0 时跳过验证（向后兼容）
-    attacks = []
-    result = {"remaining": 0}  # 不提供 remaining_monster_ids
-    monsters_config = {}
-    ok, err = validate_remaining_monsters(attacks, result, monsters_config)
-    assert ok is True
-```
-
-> **存储策略**：`remaining_monster_ids` 只用于验证，验证通过后只存储 `remaining` 数量到 `WaveRecord`，ID 列表不持久化。详见 SPEC.md 的"remaining_monster_ids 存储策略"章节。
+> **存储策略**：`remaining_monster_ids` 只用于验证，验证通过后只存储 `remaining` 数量到 `WaveRecord`，ID 列表不持久化。
 
 ## API 视图
 
+详细测试用例见 `tests/test_views.py`。
+
 ### POST /api/game/sessions
 
-```python
-# tests/test_views.py
-@pytest.mark.django_db
-def test_create_session(client):
-    response = client.post("/api/game/sessions", content_type="application/json")
-    assert response.status_code == 200
-    data = response.json()
-    assert "sessionId" in data
-    assert "config" in data
-    assert "firstWave" in data
-    assert data["firstWave"]["waveNumber"] == 1
-
-@pytest.mark.django_db
-def test_create_session_initial_state(client):
-    response = client.post("/api/game/sessions", content_type="application/json")
-    data = response.json()
-    assert data["config"]["initial"]["money"] == 500
-    assert data["config"]["initial"]["life"] == 100
-```
+创建新游戏会话，返回 sessionId、config 和 firstWave。
 
 ### POST /api/game/sessions/wave
 
-```python
-@pytest.mark.django_db
-def test_submit_wave_success(client, game_session):
-    request_data = {
-        "sessionId": str(game_session.id),
-        "waveNumber": 1,
-        "actions": [],
-        "attacks": [],
-        "result": {
-            "killed": 3,
-            "killedByType": {0: 3},
-            "passed": 0,
-            "moneyGained": 30,
-            "scoreGained": 30,
-            "lifeLost": 0,
-            "totalDamageDealt": 150,
-            "totalLifeDestroyed": 150,
-            "waveDurationFrames": 1000,
-        },
-        "buildings": [],
-    }
-    response = client.post("/api/game/sessions/wave", data=request_data, content_type="application/json")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["valid"] is True
-    assert "serverState" in data
-    assert "nextWave" in data
-
-@pytest.mark.django_db
-def test_submit_wave_validation_failed(client, game_session):
-    request_data = {
-        "sessionId": str(game_session.id),
-        "waveNumber": 1,
-        "actions": [],
-        "attacks": [],
-        "result": {
-            "killed": 10,  # 错误值
-            "killedByType": {0: 10},
-            "passed": 0,
-            "moneyGained": 100,
-            "scoreGained": 100,
-            "lifeLost": 0,
-            "totalDamageDealt": 500,
-            "totalLifeDestroyed": 500,
-            "waveDurationFrames": 1000,
-        },
-        "buildings": [],
-    }
-    response = client.post("/api/game/sessions/wave", data=request_data, content_type="application/json")
-    assert response.status_code == 400
-    data = response.json()
-    assert data["valid"] is False
-    assert "error" in data
-
-@pytest.mark.django_db
-def test_submit_wave_session_not_found(client):
-    request_data = {"sessionId": "00000000-0000-0000-0000-000000000000", "waveNumber": 1}
-    response = client.post("/api/game/sessions/wave", data=request_data, content_type="application/json")
-    assert response.status_code == 404
-    assert response.json()["error"]["code"] == "SESSION_NOT_FOUND"
-```
+提交波次数据，验证后返回 serverState 和 nextWave。
 
 ### POST /api/game/sessions/end
 
-支持两种模式：
+结束游戏，支持两种模式：
+- 带 lastWave: 提交最后一波数据并结束（正常结束）
+- 不带 lastWave: 直接结束游戏（提前结束）
 
-- **带 lastWave**：提交最后一波数据并结束（正常结束）
-- **不带 lastWave**：直接结束游戏（提前结束），使用已提交的波次数据
-
-**排行榜最低要求**：最终得分必须大于 0（至少需要击杀一只怪物），0 分不能上榜。
-
-```python
-@pytest.mark.django_db
-def test_end_session_success(client, game_session_with_waves):
-    request_data = {
-        "sessionId": str(game_session_with_waves.id),
-        "nickname": "Player1",
-        "lastWave": {
-            "waveNumber": game_session_with_waves.wave_count + 1,
-            "actions": [],
-            "attacks": [],
-            "result": {...},
-            "buildings": [],
-        },
-    }
-    response = client.post("/api/game/sessions/end", data=request_data, content_type="application/json")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["verified"] is True
-    assert "ranking" in data
-
-@pytest.mark.django_db
-def test_end_session_without_last_wave(client, game_session_with_waves):
-    # 提前结束：不带 lastWave，使用已完成的波次数据
-    request_data = {
-        "sessionId": str(game_session_with_waves.id),
-        "nickname": "Player1",
-    }
-    response = client.post("/api/game/sessions/end", data=request_data, content_type="application/json")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["verified"] is True
-    assert "ranking" in data
-
-@pytest.mark.django_db
-def test_end_session_creates_leaderboard_entry(client, game_session_with_waves):
-    # ... 提交结束请求
-    assert LeaderboardEntry.objects.filter(nickname="Player1").exists()
-
-@pytest.mark.django_db
-def test_end_session_zero_score_rejected(client, db):
-    # 0 分不能提交到排行榜
-    session = GameSession.objects.create(
-        money=500, life=99, score=0, wave_count=1, ...
-    )
-    request_data = {"sessionId": str(session.id), "nickname": "ZeroPlayer"}
-    response = client.post("/api/game/sessions/end", data=request_data, ...)
-    assert response.status_code == 400
-    assert "0 分" in response.json()["error"]["message"]
-```
+**排行榜最低要求**：最终得分必须大于 0，0 分不能上榜。
 
 ### GET /api/game/leaderboard
 
-```python
-@pytest.mark.django_db
-def test_get_leaderboard(client, leaderboard_entries):
-    response = client.get("/api/game/leaderboard?limit=10")
-    assert response.status_code == 200
-    data = response.json()
-    assert len(data["entries"]) <= 10
-    # 验证按分数降序
-    scores = [e["score"] for e in data["entries"]]
-    assert scores == sorted(scores, reverse=True)
-```
-
-## Fixtures
-
-```python
-# tests/conftest.py
-import pytest
-from game.models import GameSession, WaveRecord, LeaderboardEntry
-from game.config import GAME_CONFIG
-from game.generators import generate_wave
-
-@pytest.fixture
-def game_session(db):
-    first_wave = generate_wave(1, 1.0)
-    return GameSession.objects.create(
-        money=500,
-        life=100,
-        difficulty=1.0,
-        wave_count=0,
-        buildings=[],
-        config=GAME_CONFIG,
-        next_wave=first_wave,
-    )
-
-@pytest.fixture
-def game_session_with_waves(game_session):
-    for i in range(1, 6):
-        WaveRecord.objects.create(
-            session=game_session,
-            wave_number=i,
-            killed=3,
-            passed=0,
-            score_gained=30,
-            money_gained=30,
-            life_lost=0,
-            total_damage_dealt=150,
-            wave_duration_frames=1000,
-            money_spent=0,
-            money_income=0,
-            building_count=0,
-            end_money=500 + i * 30,
-            end_score=i * 30,
-            end_life=100,
-            end_difficulty=1.0,
-        )
-    game_session.wave_count = 5
-    game_session.score = 150
-    game_session.save()
-    return game_session
-
-@pytest.fixture
-def leaderboard_entries(db):
-    entries = []
-    for i in range(20):
-        entries.append(LeaderboardEntry.objects.create(
-            nickname=f"Player{i}",
-            score=1000 - i * 50,
-            waves_completed=10 + i,
-        ))
-    return entries
-```
+获取排行榜，支持 limit 参数，按分数降序返回。
 
 ## CORS 跨域配置
-
-前后端分离架构需要配置 CORS（跨域资源共享）以允许浏览器发起跨域请求。
-
-### 默认配置
 
 开发环境默认允许以下源:
 - `http://localhost:8080`
 - `http://127.0.0.1:8080`
 
-### 环境变量配置
+环境变量配置:
 
 ```bash
-# .env 或环境变量
 CORS_ALLOWED_ORIGINS=http://localhost:8080,http://127.0.0.1:8080
 CSRF_TRUSTED_ORIGINS=http://localhost:8080,http://127.0.0.1:8080
 ```
 
-### 生产环境
-
-生产环境需要配置实际的前端域名:
-
-```bash
-CORS_ALLOWED_ORIGINS=https://game.example.com
-CSRF_TRUSTED_ORIGINS=https://game.example.com
-```
+生产环境需要配置实际的前端域名。
 
 ## 认证配置
 
-游戏 API 不使用用户认证，因此禁用了 DRF 的默认认证类:
-
-```python
-REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": [],
-    "DEFAULT_PERMISSION_CLASSES": [],
-    # ...
-}
-```
+游戏 API 不使用用户认证，因此禁用了 DRF 的默认认证类。
 
 这意味着:
 - API 请求无需携带 CSRF token
-- 游戏会话通过 `sessionId`（UUID）标识，而非用户会话
+- 游戏会话通过 sessionId（UUID）标识，而非用户会话
 - 防作弊依赖服务端验证逻辑，而非认证机制
 
 ## 注意事项

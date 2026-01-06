@@ -32,6 +32,8 @@
 
 ## 核心系统
 
+详细测试用例见各模块同目录下的 `*.spec.ts` 文件。
+
 ### PathSystem
 
 负责怪物路径计算。使用动态寻路算法（BFS），与旧实现保持一致。
@@ -49,23 +51,13 @@
 - 每步有 10% 概率自动重新寻路（模拟随机移动）
 - 下一步格子变为不可通行时（如被新建筑占据）
 
-当建筑阻断怪物当前路线时，怪物会自动重新寻路，可能选择更远的绕行路线。
-
 > **来源**: 旧实现 `td-obj-monster.js:184-203` getNextGrid()
 
 ```typescript
-// src/game/systems/PathSystem.ts
 interface PathSystem {
-  // 生成从入口到出口的路径
   generatePath(mapConfig: MapConfig): Position[]
-
-  // 从指定位置生成到出口的路径（用于怪物独立寻路）
   generatePathFrom(startPosition: Position, mapConfig: MapConfig): Position[]
-
-  // 获取路径上指定进度的位置（用于平滑移动）
   getPositionAtProgress(path: Position[], progress: number): { x: number; y: number }
-
-  // 检查从指定位置是否能到达出口
   canReachExit(startPosition: Position, excludePosition?: Position): boolean
 }
 ```
@@ -86,34 +78,14 @@ interface PathSystem {
 > **来源**: 旧实现 `td-obj-grid.js:47-77` checkBlock()
 
 ```typescript
-// src/game/systems/GridSystem.ts
 interface GridSystem {
-  // 检查是否可以在指定位置放置建筑（双层检查）
-  // 1. 检查是否为入口或出口
-  // 2. 检查入口到出口路径是否会被完全阻断
-  // 3. 检查已存在的怪物是否会被完全阻塞
   canPlaceBuilding(position: Position, monsterPositions: Position[]): boolean
-
-  // 检查放置建筑是否会完全阻断入口到出口的路径
   wouldBlockPath(position: Position): boolean
-
-  // 检查放置建筑是否会使指定怪物完全无路可走
-  // 参考旧实现：td-obj-monster.js:211-226 chkIfBlocked()
   wouldBlockMonster(buildPosition: Position, monsterPosition: Position): boolean
-
-  // 检查指定位置是否可通行
   isPassable(position: Position): boolean
-
-  // 在指定位置放置建筑
   placeBuilding(position: Position, buildingId: string): boolean
-
-  // 移除指定位置的建筑
   removeBuilding(position: Position): boolean
-
-  // 从指定位置计算到出口的路径
   findPathFromPosition(position: Position): Position[]
-
-  // 从指定位置计算到出口的路径（排除某个格子，用于建筑放置检查）
   findPathFromPositionExcluding(position: Position, excludePosition: Position): Position[]
 }
 ```
@@ -122,33 +94,15 @@ interface GridSystem {
 
 负责伤害和得分计算。
 
+公式：
+- 实际伤害 = `max(rawDamage - shield, rawDamage × 0.1)`
+- 命中得分 = `floor(√actualDamage)`
+
 ```typescript
-// src/game/systems/DamageSystem.ts
 interface DamageSystem {
-  // 计算实际伤害 = max(rawDamage - shield, rawDamage × 0.1)
-  // 最低伤害为原始伤害的 10%，保证高伤害武器打护盾怪更有效
   calculate(rawDamage: number, shield: number): number
-
-  // 计算命中得分 = floor(√actualDamage)
   calculateScore(actualDamage: number): number
-
   isKilled(monster: Monster, damage: number): boolean
-}
-
-// 实现示例
-const damageSystem: DamageSystem = {
-  calculate(rawDamage: number, shield: number): number {
-    const minDamage = Math.ceil(rawDamage * 0.1)
-    return Math.max(rawDamage - shield, minDamage)
-  },
-
-  calculateScore(actualDamage: number): number {
-    return Math.floor(Math.sqrt(actualDamage))
-  },
-
-  isKilled(monster: Monster, damage: number): boolean {
-    return monster.currentLife - damage <= 0
-  },
 }
 ```
 
@@ -157,19 +111,18 @@ const damageSystem: DamageSystem = {
 负责建筑相关计算，包括成本、伤害、射程和金钱检查。
 
 ```typescript
-// src/game/systems/BuildingSystem.ts
 interface BuildingSystem {
-  getTotalCost(type: string, level: number): number      // 累计花费（建造 + 升级）
-  getUpgradeCost(type: string, level: number): number    // 升级成本
-  getSellIncome(type: string, level: number): number     // 出售回收
-  getDamageAtLevel(type: string, level: number): number  // 等级伤害
-  getRangeAtLevel(type: string, level: number): number   // 等级射程
+  getTotalCost(type: string, level: number): number
+  getUpgradeCost(type: string, level: number): number
+  getSellIncome(type: string, level: number): number
+  getDamageAtLevel(type: string, level: number): number
+  getRangeAtLevel(type: string, level: number): number
   isInRange(building: Building, targetPos: [number, number]): boolean
-  getAttackSpeedFrames(type: string): number             // 攻击间隔帧数
-  canAfford(money: number, type: string): boolean        // 检查建造金钱
-  canAffordUpgrade(money: number, type: string, level: number): boolean  // 检查升级金钱
-  isWeapon(type: string): boolean                        // 是否为武器建筑
-  getBuildingConfig(type: string): BuildingConfig        // 获取配置
+  getAttackSpeedFrames(type: string): number
+  canAfford(money: number, type: string): boolean
+  canAffordUpgrade(money: number, type: string, level: number): boolean
+  isWeapon(type: string): boolean
+  getBuildingConfig(type: string): BuildingConfig
 }
 ```
 
@@ -177,15 +130,14 @@ interface BuildingSystem {
 
 负责波次生命奖励计算。
 
+规则：每 5 波 +5 生命，每 10 波 +10 生命，上限 100。
+
 ```typescript
-// src/game/systems/EconomySystem.ts
 interface EconomySystem {
-  getLifeReward(waveNumber: number): number  // 每 5 波 +5，每 10 波 +10
-  applyLifeReward(currentLife: number, reward: number): number  // 应用奖励，不超过 100
+  getLifeReward(waveNumber: number): number
+  applyLifeReward(currentLife: number, reward: number): number
 }
 ```
-
-> **注意**: `canAfford` 方法已移至 BuildingSystem，与 `canAffordUpgrade` 统一管理建筑成本检查。
 
 ### BulletSystem
 
@@ -197,112 +149,43 @@ interface EconomySystem {
 // 子弹实际速度 = bullet_speed × 20 × GLOBAL_SPEED
 // GLOBAL_SPEED = 0.1，所以实际为: bullet_speed × 2 像素/帧
 // 例如: cannon bullet_speed=6 → 实际速度 = 6 × 20 × 0.1 = 12 像素/帧
-const BULLET_SPEED_FACTOR = 20
-const actualSpeed = bulletSpeed * BULLET_SPEED_FACTOR * GLOBAL_SPEED
 ```
 
 > **与怪物速度的对比**: 怪物速度公式为 `speed × GLOBAL_SPEED`（无 20 倍系数）。子弹额外的 20 倍系数确保子弹飞行速度远快于怪物移动速度。来源: 旧实现 `td-obj-building.js:466`。
 
 ```typescript
-// src/game/systems/BulletSystem.ts
 interface Bullet {
   id: string
-  building: Building                         // 发射的建筑
-  damage: number                             // 伤害值
-  speed: number                              // 飞行速度
-  x: number                                  // 当前位置
+  building: Building
+  damage: number
+  speed: number
+  x: number
   y: number
-  vx: number                                 // 速度向量（发射时计算，之后不变）
+  vx: number
   vy: number
-
-  // 原始目标信息（用于服务端验证射程）
-  originalTargetId: string                   // 发射时瞄准的怪物 ID
-  originalTargetPosition: [number, number]   // 发射时目标的格子坐标
+  originalTargetId: string
+  originalTargetPosition: [number, number]
 }
 
 class BulletSystem {
-  private bullets: Bullet[] = []
-
-  // 创建子弹（发射时计算方向，之后不再追踪）
-  createBullet(config: {
-    building: Building
-    target: Monster
-    damage: number
-    speed: number
-    position: [number, number]
-  }): Bullet
-
-  // 每帧更新：移动子弹、检测碰撞、清理无效子弹
+  createBullet(config: { building, target, damage, speed, position }): Bullet
   update(monsters: Monster[], mapBounds: Rect, recorder: WaveRecorder): void
-
-  // 检测子弹与怪物的碰撞（可命中任意怪物，不只是原目标）
-  private checkCollision(bullet: Bullet, monsters: Monster[]): Monster | null
-
-  // 检测子弹是否飞出地图（miss）
-  private isOutOfBounds(bullet: Bullet, mapBounds: Rect): boolean
-
-  // 获取当前所有子弹（用于渲染）
   getBullets(): Bullet[]
 }
 ```
 
 **核心逻辑**：
 
-```typescript
-update(monsters: Monster[], mapBounds: Rect, recorder: WaveRecorder): void {
-  this.bullets = this.bullets.filter(bullet => {
-    // 1. 检查是否飞出地图（miss）
-    if (this.isOutOfBounds(bullet, mapBounds)) {
-      return false  // 移除子弹，不记录（miss 不计入攻击记录）
-    }
+1. 检查是否飞出地图（miss，不记录攻击事件）
+2. 检查是否命中任意怪物（可命中非原目标，即误伤机制）
+3. 命中时记录攻击事件（包含原始目标和实际命中信息）
+4. 移动子弹
 
-    // 2. 检查是否命中任意怪物
-    const hitMonster = this.checkCollision(bullet, monsters)
-    if (hitMonster) {
-      // 计算实际伤害
-      const actualDamage = hitMonster.takeDamage(bullet.damage)
-
-      // 记录攻击事件（包含原始目标和实际命中信息）
-      recorder.recordAttack({
-        buildingId: bullet.building.id,
-        originalTargetId: bullet.originalTargetId,
-        originalTargetPosition: bullet.originalTargetPosition,
-        monsterId: hitMonster.id,
-        monsterPosition: hitMonster.getGridPosition(),
-        damage: actualDamage,
-        frame: currentFrame,
-      })
-
-      return false  // 移除子弹
-    }
-
-    // 3. 移动子弹
-    bullet.x += bullet.vx
-    bullet.y += bullet.vy
-
-    return true  // 保留子弹
-  })
-}
-```
-
-**碰撞检测**（与旧实现一致）：
+**碰撞检测公式**（与旧实现一致）：
 
 ```typescript
-private checkCollision(bullet: Bullet, monsters: Monster[]): Monster | null {
-  for (const monster of monsters) {
-    if (!monster.isAlive()) continue
-
-    const dx = monster.x - bullet.x
-    const dy = monster.y - bullet.y
-    const distance = Math.sqrt(dx * dx + dy * dy)
-    const hitRadius = (monster.radius + bullet.radius) * Math.sqrt(2)
-
-    if (distance <= hitRadius) {
-      return monster
-    }
-  }
-  return null
-}
+const hitRadius = (monster.radius + bullet.radius) * Math.sqrt(2)
+// 距离 <= hitRadius 时判定命中
 ```
 
 ### WaveManager
@@ -310,40 +193,17 @@ private checkCollision(bullet: Bullet, monsters: Monster[]): Monster | null {
 负责波次状态管理和怪物生成调度。
 
 ```typescript
-// src/game/systems/WaveManager.ts
 type WaveState = 'idle' | 'spawning' | 'fighting' | 'interval' | 'completed'
 
 class WaveManager {
-  state: WaveState = 'idle'
-  private pendingMonsters: WaveMonster[] = []  // 待生成的怪物队列
-  private spawnInterval: number = 30           // 每 30 帧生成一个怪物
-  private waveIntervalFrames: number = 180     // 波次间隔 180 帧（3 秒）
-
-  // 开始新波次（从服务端下发的配置）
-  startWave(waveConfig: WaveConfig): void {
-    this.pendingMonsters = [...waveConfig.monsters]
-    this.state = 'spawning'
-  }
-
-  // 每帧更新，返回需要生成的怪物（或 null）
+  state: WaveState
+  startWave(waveConfig: WaveConfig): void
   update(currentFrame: number): WaveMonster | null
-
-  // 注册怪物到管理器（用于追踪存活状态）
   registerMonster(monster: Monster): void
-
-  // 通知怪物死亡或到达终点
   onMonsterRemoved(monster: Monster): void
-
-  // 检查波次是否结束（所有怪物死亡或穿过）
   isWaveComplete(): boolean
-
-  // 获取当前存活的怪物列表
   getAliveMonsters(): Monster[]
-
-  // 开始波次间隔
   startInterval(): void
-
-  // 检查波次间隔是否结束
   isIntervalComplete(): boolean
 }
 ```
@@ -367,61 +227,50 @@ interval ← (startInterval) ← completed ← (isWaveComplete)
 负责记录所有需要提交给服务端的数据。
 
 ```typescript
-// src/game/systems/WaveRecorder.ts
 class WaveRecorder {
   constructor(waveNumber: number, startFrame: number)
 
-  // 记录建筑操作
-  recordBuild(id: string, type: string, position: [number, number], frame: number): void
-  recordUpgrade(id: string, level: number, frame: number): void
-  recordSell(id: string, frame: number): void
+  // 建筑操作
+  recordBuild(id, type, position, frame): void
+  recordUpgrade(id, level, frame): void
+  recordSell(id, frame): void
 
-  // 记录攻击事件（包含原始目标和实际命中信息）
+  // 攻击事件（包含原始目标和实际命中信息）
   recordAttack(event: {
-    buildingId: string
-    originalTargetId: string              // 发射时瞄准的怪物 ID
-    originalTargetPosition: [number, number]  // 发射时目标的格子坐标
-    monsterId: string                     // 实际命中的怪物 ID
-    monsterPosition: [number, number]     // 命中时怪物的格子坐标
-    damage: number
-    frame: number
+    buildingId, originalTargetId, originalTargetPosition,
+    monsterId, monsterPosition, damage, frame
   }): void
 
-  // 记录战斗结果
-  recordKill(monsterType: number, monsterLife: number): void
-  recordPassed(damage: number): void
-  recordSpawn(): void  // 每生成一只怪物时调用
-  recordRemainingMonster(monsterId: string): void  // 提前结束时记录单个在场怪物 ID
-  addMoney(amount: number): void
-  addScore(amount: number): void
-  setDuration(currentFrame: number): void  // 设置波次持续帧数
+  // 战斗结果
+  recordKill(monsterType, monsterLife): void
+  recordPassed(damage): void
+  recordSpawn(): void
+  recordRemainingMonster(monsterId): void
+  addMoney(amount): void
+  addScore(amount): void
+  setDuration(currentFrame): void
 
-  // 导出数据
+  // 导出
   getActions(): Action[]
   getAttacks(): AttackEvent[]
   getResult(): WaveResult
-  getRemainingMonsterIds(): string[]  // 获取在场怪物 ID 列表
-  toWaveRequest(sessionId: string, buildings: BuildingState[]): WaveRequest
-
-  // 重置记录器（用于下一波）
-  reset(newWaveNumber: number, newStartFrame: number): void
+  getRemainingMonsterIds(): string[]
+  toWaveRequest(sessionId, buildings): WaveRequest
+  reset(newWaveNumber, newStartFrame): void
 }
 ```
 
 **waveDurationFrames 计算**：
 
-- 起点（startFrame）：波次第一个怪物生成的帧号（构造函数或 reset 时传入）
-- 终点（currentFrame）：波次最后一个怪物死亡或穿过时调用 `setDuration(currentFrame)`
-- 计算：`waveDurationFrames = currentFrame - startFrame`
-
-> **注意**：暂停时帧号不增长，因此 `waveDurationFrames` 只记录实际游戏进行的帧数。
+- 起点：波次第一个怪物生成的帧号
+- 终点：波次最后一个怪物死亡或穿过的帧号
+- 暂停时帧号不增长，只记录实际游戏进行的帧数
 
 ## 游戏实体
 
 ### Monster
 
 ```typescript
-// src/game/entities/Monster.ts
 class Monster extends Phaser.GameObjects.Sprite {
   id: string           // 服务端下发的 UUID
   type: number
@@ -430,31 +279,20 @@ class Monster extends Phaser.GameObjects.Sprite {
   speed: number
   shield: number
   money: number
-  damage: number       // 到达终点造成的伤害（从 config.monsters[type].damage 获取）
-  color: string        // 颜色（从 config.monsters[type].color 获取或随机生成）
+  damage: number       // 从 config.monsters[type].damage 获取
+  color: string        // 从 config.monsters[type].color 获取
   progress: number     // 路径进度 0-1
 
-  takeDamage(rawDamage: number): number  // 返回实际伤害
+  takeDamage(rawDamage: number): number
   isDead(): boolean
   reachedExit(): boolean
   getGridPosition(): [number, number]
-}
-
-// 创建怪物时，damage 和 color 从 config 中获取
-function createMonster(monsterData: WaveMonster, config: GameConfig): Monster {
-  const displayConfig = config.monsters[monsterData.type]
-  return new Monster({
-    ...monsterData,
-    damage: displayConfig.damage,  // 从静态配置获取
-    color: displayConfig.color,    // 从静态配置获取
-  })
 }
 ```
 
 ### Building
 
 ```typescript
-// src/game/entities/Building.ts
 class Building extends Phaser.GameObjects.Sprite {
   id: string
   type: string
@@ -475,51 +313,23 @@ class Building extends Phaser.GameObjects.Sprite {
 
 **攻击机制**：
 
-保持与旧实现一致的子弹物理系统：
-
 - 子弹飞行: 有物理轨迹，按固定方向直线飞行
 - 可能 miss: 目标移走后子弹可能飞出地图
 - 误伤机制: 子弹可以命中路径上的任意怪物
 - laser_gun: 即时命中，无子弹飞行
 
-```typescript
-// fire() 方法实现思路
-fire(target: Monster, bulletSystem: BulletSystem): void {
-  if (this.type === 'laser_gun') {
-    // 激光枪：即时命中
-    target.takeDamage(this.getDamage())
-  } else {
-    // 其他武器：发射子弹
-    bulletSystem.createBullet({
-      building: this,
-      target: target,
-      damage: this.getDamage(),
-      speed: this.getBulletSpeed(),
-      position: [this.x, this.y],
-    })
-  }
-}
-```
-
 ## 状态管理
 
 ```typescript
-// src/stores/game.ts
 interface GameState {
   sessionId: string | null
   config: GameConfig | null
-
-  // 游戏状态（与服务端同步）
   money: number
   score: number
   life: number
   difficulty: number
   waveNumber: number
-
-  // 建筑列表
   buildings: BuildingState[]
-
-  // 游戏控制
   isPlaying: boolean
   isPaused: boolean
 }
@@ -538,9 +348,6 @@ interface GameActions {
 ## API 层
 
 ```typescript
-// src/api/game.ts
-const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
-
 export const gameApi = {
   createSession(): Promise<GameStartResponse>
   submitWave(request: WaveRequest): Promise<WaveResponse>
@@ -571,63 +378,7 @@ VITE_API_BASE_URL=/api
 
 ## 测试规范
 
-使用 Vitest 编写单元测试：
-
-```typescript
-// tests/game/WaveRecorder.spec.ts
-describe('WaveRecorder', () => {
-  let recorder: WaveRecorder
-
-  beforeEach(() => {
-    recorder = new WaveRecorder(1)
-  })
-
-  it('should record build action', () => {
-    recorder.recordBuild('b-001', 'cannon', [5, 5], 100)
-    expect(recorder.getActions()).toHaveLength(1)
-    expect(recorder.getActions()[0]).toEqual({
-      type: 'BUILD',
-      buildingId: 'b-001',
-      buildingType: 'cannon',
-      position: [5, 5],
-      frame: 100,
-    })
-  })
-
-  it('should calculate total damage dealt', () => {
-    // 正常命中：原始目标 = 实际命中
-    recorder.recordAttack({
-      buildingId: 'b-001',
-      originalTargetId: 'uuid-1',
-      originalTargetPosition: [3, 3],
-      monsterId: 'uuid-1',
-      monsterPosition: [3, 3],
-      damage: 10,
-      frame: 100,
-    })
-    // 误伤：原始目标是 uuid-2，但命中了 uuid-3
-    recorder.recordAttack({
-      buildingId: 'b-001',
-      originalTargetId: 'uuid-2',
-      originalTargetPosition: [4, 4],
-      monsterId: 'uuid-3',
-      monsterPosition: [5, 5],
-      damage: 15,
-      frame: 120,
-    })
-    expect(recorder.getResult().totalDamageDealt).toBe(25)
-  })
-
-  it('should track kills by type', () => {
-    recorder.recordKill(0, 50)
-    recorder.recordKill(0, 50)
-    recorder.recordKill(1, 100)
-    expect(recorder.getResult().killed).toBe(3)
-    expect(recorder.getResult().killedByType).toEqual({ 0: 2, 1: 1 })
-    expect(recorder.getResult().totalLifeDestroyed).toBe(200)
-  })
-})
-```
+使用 Vitest 编写单元测试，测试文件位于 `src/game/systems/__tests__/`。
 
 ## 注意事项
 
@@ -657,6 +408,6 @@ describe('WaveRecorder', () => {
    - 这些怪物 ID 必须是前 `spawned` 个已生成的怪物（不能使用未生成的怪物 ID）
    - 使用 `WaveRecorder.recordRemainingMonster(monsterId)` 记录在场怪物
 10. **会话过期处理**：当服务端返回 `SESSION_NOT_FOUND` 错误时
-   - 显示提示告知用户会话已失效
-   - 自动重启游戏创建新会话
-   - 详见 SPEC.md 错误处理章节
+    - 显示提示告知用户会话已失效
+    - 自动重启游戏创建新会话
+    - 详见 SPEC.md 错误处理章节
