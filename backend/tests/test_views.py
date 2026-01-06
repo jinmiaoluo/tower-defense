@@ -1783,6 +1783,123 @@ class TestEndSessionView:
         assert data["verified"] is False
         assert "分数累计不一致" in data["error"]["message"]
 
+    # ========== 0 分提交拒绝测试 ==========
+
+    @pytest.mark.django_db
+    def test_end_session_zero_score_rejected(self, api_client: APIClient, db):
+        """测试带 lastWave 时 0 分不能提交到排行榜.
+
+        场景：玩家完成一波但没有击杀任何怪物（全部穿过终点），score = 0。
+        排行榜应记录有意义的成绩，0 分表示没有任何击杀，不应上榜。
+        """
+        wave_1 = generate_wave(1, 1.0)
+        wave_2 = generate_wave(2, 1.0)
+        session = GameSession.objects.create(
+            money=500,
+            life=99,  # 被怪物扣了 1 点
+            score=0,  # 没有击杀任何怪物
+            difficulty=1.0,
+            wave_count=0,
+            buildings=[],
+            config=GAME_CONFIG,
+            next_wave=wave_1,
+        )
+
+        monster_ids = [m["id"] for m in wave_1["monsters"]]
+        total_monsters = len(monster_ids)
+
+        request_data = {
+            "sessionId": str(session.id),
+            "nickname": "ZeroScorePlayer",
+            "lastWave": {
+                "waveNumber": 1,
+                "actions": [],
+                "attacks": [],  # 没有任何攻击
+                "result": {
+                    "killed": 0,
+                    "killedByType": {},
+                    "passed": total_monsters,  # 全部穿过
+                    "scoreGained": 0,
+                    "moneyGained": 0,
+                    "lifeLost": total_monsters,  # 每个怪物造成 1 点伤害
+                    "totalDamageDealt": 0,
+                    "totalLifeDestroyed": 0,
+                    "waveDurationFrames": 1000,
+                },
+                "buildings": [],
+            },
+        }
+
+        response = api_client.post(
+            "/api/game/sessions/end",
+            data=request_data,
+            format="json",
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert data["verified"] is False
+        assert "0 分" in data["error"]["message"] or "零分" in data["error"]["message"]
+
+    @pytest.mark.django_db
+    def test_end_session_without_last_wave_zero_score_rejected(
+        self, api_client: APIClient, db
+    ):
+        """测试不带 lastWave 时 0 分不能提交到排行榜.
+
+        场景：玩家完成了一波但没有击杀任何怪物，想要提前结束游戏。
+        排行榜应记录有意义的成绩，0 分表示没有任何击杀，不应上榜。
+        """
+        wave_2 = generate_wave(2, 1.0)
+        session = GameSession.objects.create(
+            money=500,
+            life=99,
+            score=0,  # 没有击杀任何怪物
+            difficulty=1.0,
+            wave_count=1,  # 已完成 1 波
+            buildings=[],
+            config=GAME_CONFIG,
+            next_wave=wave_2,
+        )
+
+        # 创建一波 0 分的记录
+        WaveRecord.objects.create(
+            session=session,
+            wave_number=1,
+            killed=0,
+            killed_by_type={},
+            passed=1,
+            score_gained=0,  # 0 分
+            money_gained=0,
+            life_lost=1,
+            total_damage_dealt=0,
+            total_life_destroyed=0,
+            wave_duration_frames=1000,
+            money_spent=0,
+            money_income=0,
+            building_count=0,
+            end_money=500,
+            end_score=0,
+            end_life=99,
+            end_difficulty=1.0,
+        )
+
+        request_data = {
+            "sessionId": str(session.id),
+            "nickname": "ZeroScoreEnder",
+        }
+
+        response = api_client.post(
+            "/api/game/sessions/end",
+            data=request_data,
+            format="json",
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert data["verified"] is False
+        assert "0 分" in data["error"]["message"] or "零分" in data["error"]["message"]
+
     # ========== 带 remainingMonsterIds 的提前结束集成测试 ==========
 
     @pytest.fixture

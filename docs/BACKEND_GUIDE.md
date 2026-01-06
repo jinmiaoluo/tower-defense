@@ -830,6 +830,8 @@ def test_submit_wave_session_not_found(client):
 - **带 lastWave**：提交最后一波数据并结束（正常结束）
 - **不带 lastWave**：直接结束游戏（提前结束），使用已提交的波次数据
 
+**排行榜最低要求**：最终得分必须大于 0（至少需要击杀一只怪物），0 分不能上榜。
+
 ```python
 @pytest.mark.django_db
 def test_end_session_success(client, game_session_with_waves):
@@ -867,6 +869,17 @@ def test_end_session_without_last_wave(client, game_session_with_waves):
 def test_end_session_creates_leaderboard_entry(client, game_session_with_waves):
     # ... 提交结束请求
     assert LeaderboardEntry.objects.filter(nickname="Player1").exists()
+
+@pytest.mark.django_db
+def test_end_session_zero_score_rejected(client, db):
+    # 0 分不能提交到排行榜
+    session = GameSession.objects.create(
+        money=500, life=99, score=0, wave_count=1, ...
+    )
+    request_data = {"sessionId": str(session.id), "nickname": "ZeroPlayer"}
+    response = client.post("/api/game/sessions/end", data=request_data, ...)
+    assert response.status_code == 400
+    assert "0 分" in response.json()["error"]["message"]
 ```
 
 ### GET /api/game/leaderboard

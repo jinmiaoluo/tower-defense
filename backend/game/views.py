@@ -424,6 +424,9 @@ class EndSessionView(APIView):
                 if not ok:
                     raise ValueError(msg)
 
+                if new_score <= 0:
+                    raise ValueError("0 分不能提交到排行榜，至少需要击杀一只怪物")
+
                 entry = LeaderboardEntry.objects.create(
                     nickname=data["nickname"],
                     score=new_score,
@@ -464,6 +467,9 @@ class EndSessionView(APIView):
                 ok, msg = validate_game_end(session)
                 if not ok:
                     raise ValueError(msg)
+
+                if session.score <= 0:
+                    raise ValueError("0 分不能提交到排行榜，至少需要击杀一只怪物")
 
                 entry = LeaderboardEntry.objects.create(
                     nickname=data["nickname"],
