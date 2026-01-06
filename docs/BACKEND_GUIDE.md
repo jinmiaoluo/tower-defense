@@ -502,6 +502,39 @@ def test_validate_basic_money_mismatch():
     ok, err = validate_basic(result, wave_config)
     assert ok is False
     assert "金钱收益不匹配" in err
+
+def test_validate_basic_with_spawned():
+    # 提前结束场景：怪物逐帧生成，部分怪物还未生成
+    result = {
+        "killed": 0,
+        "killedByType": {},
+        "passed": 0,
+        "remaining": 1,
+        "spawned": 1,  # 实际只生成了 1 只怪物
+        "moneyGained": 0,
+    }
+    wave_config = {
+        "monsters": [
+            {"type": 0, "count": 1, "money": 5},
+            {"type": 1, "count": 1, "money": 8},
+        ]  # total = 2
+    }
+    ok, err = validate_basic(result, wave_config)
+    assert ok is True
+
+def test_validate_basic_spawned_exceeds_total():
+    # 失败：spawned 超过波次配置总数
+    result = {
+        "killed": 3,
+        "killedByType": {0: 3},
+        "passed": 0,
+        "spawned": 10,  # 超过配置的 3 只
+        "moneyGained": 15,
+    }
+    wave_config = {"monsters": [{"type": 0, "count": 3, "money": 5}]}
+    ok, err = validate_basic(result, wave_config)
+    assert ok is False
+    assert "spawned 超过波次怪物总数" in err
 ```
 
 ### Level 2：伤害验证

@@ -661,6 +661,68 @@ describe('WaveRecorder', () => {
   })
 
   // ============================================================================
+  // recordSpawn - 记录怪物生成
+  // ============================================================================
+
+  describe('recordSpawn', () => {
+    it('记录单次怪物生成', () => {
+      recorder.recordSpawn()
+
+      expect(recorder.getResult().spawned).toBe(1)
+    })
+
+    it('记录多次怪物生成', () => {
+      recorder.recordSpawn()
+      recorder.recordSpawn()
+      recorder.recordSpawn()
+
+      expect(recorder.getResult().spawned).toBe(3)
+    })
+
+    it('初始状态下 spawned 为 0', () => {
+      expect(recorder.getResult().spawned).toBe(0)
+    })
+
+    it('reset 后 spawned 重置为 0', () => {
+      recorder.recordSpawn()
+      recorder.recordSpawn()
+
+      recorder.reset(2, 1000)
+
+      expect(recorder.getResult().spawned).toBe(0)
+    })
+
+    it('toWaveRequest 包含 spawned 字段', () => {
+      recorder.recordSpawn()
+      recorder.recordSpawn()
+      recorder.setDuration(1000)
+
+      const request = recorder.toWaveRequest('session-123', [])
+
+      expect(request.result.spawned).toBe(2)
+    })
+
+    it('spawned 与 killed/passed/remaining 配合使用', () => {
+      // 模拟: 生成 3 只怪物，击杀 1 只，穿过 1 只，剩余 1 只
+      recorder.recordSpawn()
+      recorder.recordSpawn()
+      recorder.recordSpawn()
+      recorder.recordKill({ monsterType: 0, monsterLife: 50, money: 5 })
+      recorder.recordPassed({ damage: 1 })
+      recorder.recordRemainingMonster('uuid-3')
+      recorder.setDuration(1000)
+
+      const result = recorder.getResult()
+      expect(result.spawned).toBe(3)
+      expect(result.killed).toBe(1)
+      expect(result.passed).toBe(1)
+      expect(result.remaining).toBe(1)
+      // 验证公式: killed + passed + remaining == spawned
+      expect(result.killed + result.passed + (result.remaining ?? 0)).toBe(result.spawned)
+    })
+  })
+
+  // ============================================================================
   // 集成测试 - 完整波次模拟
   // ============================================================================
 

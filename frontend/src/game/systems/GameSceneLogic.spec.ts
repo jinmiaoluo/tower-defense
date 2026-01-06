@@ -680,6 +680,62 @@ describe('GameSceneLogic', () => {
       expect(actions.length).toBeGreaterThanOrEqual(1)
       expect(actions[0].type).toBe('BUILD')
     })
+
+    it('记录怪物生成（spawned 字段）', () => {
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [
+          { id: 'uuid-1', type: 0, life: 50, speed: 3, shield: 0, money: 5 },
+          { id: 'uuid-2', type: 0, life: 50, speed: 3, shield: 0, money: 5 },
+          { id: 'uuid-3', type: 0, life: 50, speed: 3, shield: 0, money: 5 },
+        ],
+      })
+
+      // 第一帧生成第一只怪物
+      logic.update()
+      expect(logic.getWaveRecorder().getResult().spawned).toBe(1)
+    })
+
+    it('多只怪物生成时 spawned 递增', () => {
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [
+          { id: 'uuid-1', type: 0, life: 50, speed: 3, shield: 0, money: 5 },
+          { id: 'uuid-2', type: 0, life: 50, speed: 3, shield: 0, money: 5 },
+        ],
+      })
+
+      // 运行足够帧数让两只怪物都生成
+      // 怪物生成间隔默认为 30 帧
+      for (let i = 0; i < 60; i++) {
+        logic.update()
+      }
+
+      const recorder = logic.getWaveRecorder()
+      expect(recorder.getResult().spawned).toBe(2)
+    })
+
+    it('spawned 与怪物数量一致性验证', () => {
+      const waveConfig = {
+        waveNumber: 1,
+        monsters: [
+          { id: 'uuid-1', type: 0, life: 50, speed: 100, shield: 0, money: 5 },
+        ],
+      }
+
+      logic.startWave(waveConfig)
+
+      // 运行到怪物穿过终点
+      for (let i = 0; i < 500; i++) {
+        logic.update()
+        if (logic.isWaveComplete()) break
+      }
+
+      const result = logic.getWaveRecorder().getResult()
+      // 验证公式: killed + passed + remaining == spawned
+      const remaining = result.remaining ?? 0
+      expect(result.killed + result.passed + remaining).toBe(result.spawned)
+    })
   })
 
   // ============================================================================

@@ -128,6 +128,13 @@ export function createWaveRecorder(waveNumber: number, startFrame: number): Wave
   }
 
   /**
+   * 记录怪物生成（每生成一只怪物调用一次）
+   */
+  function recordSpawn(): void {
+    result.spawned += 1
+  }
+
+  /**
    * 获取在场剩余怪物 ID 列表
    */
   function getRemainingMonsterIds(): string[] {
@@ -197,6 +204,7 @@ export function createWaveRecorder(waveNumber: number, startFrame: number): Wave
     recordKill,
     recordPassed,
     recordRemainingMonster,
+    recordSpawn,
     getRemainingMonsterIds,
     setDuration,
     getActions,

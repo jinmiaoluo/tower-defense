@@ -42,6 +42,7 @@ export interface MutableWaveResult {
   killedByType: Map<MonsterTypeId, number>
   passed: number
   remainingMonsterIds: string[]
+  spawned: number
   scoreGained: number
   moneyGained: number
   lifeLost: number
@@ -140,6 +141,9 @@ export interface IWaveRecorder {
   /** 记录在场剩余怪物（提前结束时使用） */
   recordRemainingMonster(monsterId: string): void
 
+  /** 记录怪物生成（每生成一只怪物调用一次） */
+  recordSpawn(): void
+
   /** 获取在场剩余怪物 ID 列表 */
   getRemainingMonsterIds(): string[]
 
@@ -184,6 +188,7 @@ export function createEmptyMutableResult(): MutableWaveResult {
     killedByType: new Map(),
     passed: 0,
     remainingMonsterIds: [],
+    spawned: 0,
     scoreGained: 0,
     moneyGained: 0,
     lifeLost: 0,
@@ -201,6 +206,7 @@ export function toImmutableResult(
     killed: mutable.killed,
     killedByType: mapToRecord(mutable.killedByType),
     passed: mutable.passed,
+    spawned: mutable.spawned,
     scoreGained: mutable.scoreGained,
     moneyGained: mutable.moneyGained,
     lifeLost: mutable.lifeLost,

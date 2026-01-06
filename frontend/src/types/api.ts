@@ -124,6 +124,8 @@ export interface WaveResult {
   remaining?: number
   /** 提前结束时场上剩余怪物的 ID 列表（可选） */
   remainingMonsterIds?: string[]
+  /** 本波次实际生成的怪物数量（用于提前结束时的验证） */
+  spawned: number
   /** 获得分数 */
   scoreGained: number
   /** 获得金钱 */

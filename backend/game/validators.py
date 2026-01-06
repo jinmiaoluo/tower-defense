@@ -49,8 +49,9 @@ def validate_basic(
     1. killed_by_type 总和 == killed
     2. 每种怪物击杀数 <= 配置数量
     3. remaining >= 0（向后兼容，默认为 0）
-    4. killed + passed + remaining == 波次怪物总数
-    5. money_gained == 基于击杀计算的金钱
+    4. spawned >= 0 且 spawned <= total_monsters（向后兼容，默认为 total_monsters）
+    5. killed + passed + remaining == spawned
+    6. money_gained == 基于击杀计算的金钱
 
     Args:
         result: 客户端提交的波次结果
@@ -79,12 +80,19 @@ def validate_basic(
     if remaining < 0:
         return False, "remaining 不能为负数"
 
-    # 4. 总数量一致性验证
+    # 4. spawned 字段验证（向后兼容，默认为 total_monsters）
     total_monsters = sum(m["count"] for m in wave_config["monsters"])
-    if result["killed"] + result["passed"] + remaining != total_monsters:
+    spawned = result.get("spawned", total_monsters)
+    if spawned < 0:
+        return False, "spawned 不能为负数"
+    if spawned > total_monsters:
+        return False, "spawned 超过波次怪物总数"
+
+    # 5. 总数量一致性验证
+    if result["killed"] + result["passed"] + remaining != spawned:
         return False, "怪物数量不一致"
 
-    # 5. 金钱收益验证
+    # 6. 金钱收益验证
     expected_money = sum(
         killed_by_type.get(m["type"], 0) * m["money"]
         for m in wave_config["monsters"]
@@ -388,6 +396,7 @@ def validate_remaining_monsters(
     attacks: list[dict[str, Any]],
     result: dict[str, Any],
     monsters_config: dict[str, Any],
+    monsters_list: list[str] | None = None,
 ) -> tuple[bool, str]:
     """验证 remaining 怪物的合法性.
 
@@ -395,9 +404,10 @@ def validate_remaining_monsters(
 
     验证项目：
     1. remainingMonsterIds 长度 == remaining
-    2. 每个 ID 都是服务端下发的有效 UUID
-    3. 这些怪物的累计伤害 < 生命值（确实没被击杀）
-    4. 这些怪物 ID 不重复
+    2. 这些怪物 ID 不重复
+    3. 每个 ID 都是服务端下发的有效 UUID
+    4. 这些怪物的累计伤害 < 生命值（确实没被击杀）
+    5. 每个 ID 都在前 spawned 个怪物中（防止使用未生成的怪物 ID）
 
     当 remaining == 0 时跳过验证（向后兼容）。
 
@@ -405,6 +415,7 @@ def validate_remaining_monsters(
         attacks: 攻击事件列表
         result: 波次结果，包含 remaining 和 remaining_monster_ids
         monsters_config: 服务端下发的怪物配置 {id: {type, life, ...}}
+        monsters_list: 有序的怪物 ID 列表（可选，用于 spawned 验证）
 
     Returns:
         (成功标志, 错误信息)
@@ -439,6 +450,14 @@ def validate_remaining_monsters(
         total_damage = damage_by_monster.get(mid, 0)
         if total_damage >= monster["life"]:
             return False, f"怪物 {mid} 累计伤害 {total_damage} >= 生命值 {monster['life']}，应被击杀而非 remaining"
+
+    # 5. spawned 范围验证（可选，传入 monsters_list 时生效）
+    if monsters_list is not None:
+        spawned = result.get("spawned", len(monsters_list))
+        spawned_ids = set(monsters_list[:spawned])
+        for mid in remaining_ids:
+            if mid not in spawned_ids:
+                return False, f"怪物 {mid} 不在前 {spawned} 个已生成的怪物中（未生成）"
 
     return True, ""
 

@@ -406,6 +406,7 @@ class WaveRecorder {
   // 记录战斗结果
   recordKill(monsterType: number, monsterLife: number): void
   recordPassed(damage: number): void
+  recordSpawn(): void  // 每生成一只怪物时调用
   recordRemainingMonster(monsterId: string): void  // 提前结束时记录单个在场怪物 ID
   addMoney(amount: number): void
   addScore(amount: number): void
@@ -656,15 +657,22 @@ describe('WaveRecorder', () => {
    - 波次完成后结束：调用 `/end` 不带 `lastWave`（必须至少完成一波）
 7. **remaining 字段**：提前结束时使用
    - `remaining` 表示场上还未被击杀也未穿过终点的怪物数
-   - 验证公式：`killed + passed + remaining == total`
+   - 验证公式：`killed + passed + remaining == spawned`
    - 该字段可选，默认为 0（向后兼容）
-8. **remainingMonsterIds 字段**：配合 `remaining` 使用的防作弊字段
+8. **spawned 字段**：记录实际生成的怪物数
+   - 怪物是逐帧生成的，提前结束时可能部分怪物尚未生成
+   - `spawned` 表示已经进入游戏场景的怪物总数
+   - 约束：`spawned <= total_monsters`（不能超过波次配置的怪物总数）
+   - 该字段可选，默认为波次配置的怪物总数（向后兼容）
+   - 在 `GameSceneLogic.spawnMonster()` 中调用 `WaveRecorder.recordSpawn()` 记录
+9. **remainingMonsterIds 字段**：配合 `remaining` 使用的防作弊字段
    - 当 `remaining > 0` 时必须提供 `remainingMonsterIds` 数组
    - 数组中的 ID 必须是服务端下发的有效 UUID
    - 数组长度必须等于 `remaining` 的值
    - 这些怪物必须确实没有被击杀（累计伤害 < 生命值）
+   - 这些怪物 ID 必须是前 `spawned` 个已生成的怪物（不能使用未生成的怪物 ID）
    - 使用 `WaveRecorder.recordRemainingMonster(monsterId)` 记录在场怪物
-9. **会话过期处理**：当服务端返回 `SESSION_NOT_FOUND` 错误时
+10. **会话过期处理**：当服务端返回 `SESSION_NOT_FOUND` 错误时
    - 显示提示告知用户会话已失效
    - 自动重启游戏创建新会话
    - 详见 SPEC.md 错误处理章节

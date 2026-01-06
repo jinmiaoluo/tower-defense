@@ -508,6 +508,7 @@ interface WaveRequest {
     passed: number;                // 穿过终点的怪物数
     remaining?: number;            // 提前结束时场上剩余的怪物数（可选，默认 0）
     remainingMonsterIds?: string[];  // 提前结束时场上剩余怪物的 ID 列表（可选）
+    spawned?: number;              // 实际生成的怪物数（可选，默认等于波次配置总数）
     scoreGained: number;           // 获得分数
     moneyGained: number;           // 获得金钱
     lifeLost: number;              // 损失生命
@@ -1063,9 +1064,16 @@ def validate_basic(result: dict, wave_config: dict) -> tuple[bool, str]:
     if remaining < 0:
         return False, "remaining 不能为负数"
 
-    # 总数量一致性验证
+    # spawned 字段验证（向后兼容，默认为 total_monsters）
     total_monsters = sum(m["count"] for m in wave_config["monsters"])
-    if result["killed"] + result["passed"] + remaining != total_monsters:
+    spawned = result.get("spawned", total_monsters)
+    if spawned < 0:
+        return False, "spawned 不能为负数"
+    if spawned > total_monsters:
+        return False, "spawned 超过波次怪物总数"
+
+    # 总数量一致性验证
+    if result["killed"] + result["passed"] + remaining != spawned:
         return False, "怪物数量不一致"
 
     # 金钱收益验证（基于 killedByType 精确计算）
@@ -1112,19 +1120,22 @@ def validate_remaining_monsters(
     attacks: list[dict],
     result: dict,
     monsters_config: dict,
+    monsters_list: list[str],  # 有序的怪物 ID 列表
 ) -> tuple[bool, str]:
     """验证 remaining 怪物的合法性
 
     验证项目：
     1. remainingMonsterIds 长度 == remaining
-    2. 每个 ID 都是服务端下发的有效 UUID
-    3. 这些怪物的累计伤害 < 生命值（确实没被击杀）
-    4. 这些怪物 ID 不重复
+    2. 这些怪物 ID 不重复
+    3. 每个 ID 都是服务端下发的有效 UUID
+    4. 这些怪物的累计伤害 < 生命值（确实没被击杀）
+    5. 每个 ID 都在前 spawned 个怪物中（防止使用未生成的怪物 ID）
 
     Args:
         attacks: 攻击事件列表
         result: 波次结果
         monsters_config: 服务端下发的怪物配置 {id: {type, life, ...}}
+        monsters_list: 有序的怪物 ID 列表
 
     Returns:
         (成功标志, 错误信息)
@@ -1144,23 +1155,29 @@ def validate_remaining_monsters(
     if len(remaining_ids) != len(set(remaining_ids)):
         return False, "remainingMonsterIds 包含重复的怪物 ID"
 
-    # 3. ID 有效性
-    for mid in remaining_ids:
-        if mid not in monsters_config:
-            return False, f"未知的 remaining 怪物 ID: {mid}（不是服务端下发的 UUID）"
-
-    # 4. 计算每个怪物的累计伤害
+    # 3. 计算每个怪物的累计伤害
     damage_by_monster: dict[str, int] = {}
     for attack in attacks:
         mid = attack["monsterId"]
         damage_by_monster[mid] = damage_by_monster.get(mid, 0) + attack["damage"]
 
-    # 5. 验证 remaining 怪物确实没被击杀
     for mid in remaining_ids:
+        # 4. ID 有效性
+        if mid not in monsters_config:
+            return False, f"未知的 remaining 怪物 ID: {mid}（不是服务端下发的 UUID）"
+
+        # 5. 验证 remaining 怪物确实没被击杀
         total_damage = damage_by_monster.get(mid, 0)
         monster_life = monsters_config[mid]["life"]
         if total_damage >= monster_life:
             return False, f"怪物 {mid} 累计伤害 {total_damage} >= 生命值 {monster_life}，应被击杀而非 remaining"
+
+    # 6. spawned 范围验证（怪物是逐帧生成的，remaining 只能是已生成的怪物）
+    spawned = result.get("spawned", len(monsters_list))
+    spawned_ids = set(monsters_list[:spawned])
+    for mid in remaining_ids:
+        if mid not in spawned_ids:
+            return False, f"怪物 {mid} 不在前 {spawned} 个已生成的怪物中（未生成）"
 
     return True, ""
 ```

@@ -72,6 +72,18 @@ def _get_monsters_config(next_wave: dict) -> dict[str, dict]:
     return {m["id"]: m for m in next_wave["monsters"]}
 
 
+def _get_monsters_list(next_wave: dict) -> list[str]:
+    """获取有序的怪物 ID 列表，用于 spawned 验证.
+
+    Args:
+        next_wave: 波次数据，包含 monsters 列表
+
+    Returns:
+        有序的怪物 ID 列表
+    """
+    return [m["id"] for m in next_wave["monsters"]]
+
+
 def _strip_wave_config(wave_data: dict) -> dict:
     """移除波次数据中的 waveConfig，用于 API 响应."""
     return {k: v for k, v in wave_data.items() if k != "waveConfig"}
@@ -166,7 +178,10 @@ class SubmitWaveView(APIView):
             return self._validation_error(msg)
 
         # remaining 怪物验证（防作弊）
-        ok, msg = validate_remaining_monsters(attacks, result, monsters_config)
+        monsters_list = _get_monsters_list(session.next_wave)
+        ok, msg = validate_remaining_monsters(
+            attacks, result, monsters_config, monsters_list
+        )
         if not ok:
             return self._validation_error(msg)
 
@@ -343,7 +358,10 @@ class EndSessionView(APIView):
         if not ok:
             return self._validation_error(msg)
 
-        ok, msg = validate_remaining_monsters(attacks, result, monsters_config)
+        monsters_list = _get_monsters_list(session.next_wave)
+        ok, msg = validate_remaining_monsters(
+            attacks, result, monsters_config, monsters_list
+        )
         if not ok:
             return self._validation_error(msg)
 

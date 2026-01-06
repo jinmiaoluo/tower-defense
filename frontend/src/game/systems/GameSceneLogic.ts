@@ -178,6 +178,7 @@ export function createGameSceneLogic(config: GameConfig): GameSceneLogic {
 
     monsters.push(monster)
     waveManager.registerMonster(monster)
+    waveRecorder.recordSpawn()
   }
 
   /**

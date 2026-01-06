@@ -264,6 +264,137 @@ class TestValidateBasic:
         assert ok is False
         assert "金钱收益不匹配" in err
 
+    def test_success_with_spawned_partial(self):
+        """成功：提前结束场景，spawned < total（部分怪物未生成）.
+
+        场景：第 2 波配置有 2 只怪物，但只生成了 1 只就提前结束
+        这对应 td-obj-map.js 中怪物逐帧生成的机制
+        """
+        result = {
+            "killed": 0,
+            "killed_by_type": {},
+            "passed": 0,
+            "remaining": 1,
+            "spawned": 1,  # 只生成了 1 只
+            "money_gained": 0,
+        }
+        wave_config = {
+            "monsters": [
+                {"type": 0, "count": 1, "money": 5},
+                {"type": 1, "count": 1, "money": 8},
+            ]  # total = 2
+        }
+        ok, err = validate_basic(result, wave_config)
+        assert ok is True
+
+    def test_success_spawned_equals_total(self):
+        """成功：spawned == total（正常情况）."""
+        result = {
+            "killed": 2,
+            "killed_by_type": {0: 1, 1: 1},
+            "passed": 0,
+            "remaining": 0,
+            "spawned": 2,  # 等于 total
+            "money_gained": 13,
+        }
+        wave_config = {
+            "monsters": [
+                {"type": 0, "count": 1, "money": 5},
+                {"type": 1, "count": 1, "money": 8},
+            ]
+        }
+        ok, err = validate_basic(result, wave_config)
+        assert ok is True
+
+    def test_success_spawned_default_to_total(self):
+        """成功：未提供 spawned 时默认为 total_monsters（向后兼容）."""
+        result = {
+            "killed": 3,
+            "killed_by_type": {0: 3},
+            "passed": 0,
+            # 不提供 spawned 字段
+            "money_gained": 15,
+        }
+        wave_config = {
+            "monsters": [{"type": 0, "count": 3, "money": 5}]
+        }
+        ok, err = validate_basic(result, wave_config)
+        assert ok is True
+
+    def test_spawned_exceeds_total(self):
+        """失败：spawned > total_monsters."""
+        result = {
+            "killed": 3,
+            "killed_by_type": {0: 3},
+            "passed": 0,
+            "spawned": 10,  # 超过配置的 3 只
+            "money_gained": 15,
+        }
+        wave_config = {
+            "monsters": [{"type": 0, "count": 3, "money": 5}]
+        }
+        ok, err = validate_basic(result, wave_config)
+        assert ok is False
+        assert "spawned 超过波次怪物总数" in err
+
+    def test_spawned_negative(self):
+        """失败：spawned 为负数."""
+        result = {
+            "killed": 0,
+            "killed_by_type": {},
+            "passed": 0,
+            "spawned": -1,
+            "money_gained": 0,
+        }
+        wave_config = {
+            "monsters": [{"type": 0, "count": 3, "money": 5}]
+        }
+        ok, err = validate_basic(result, wave_config)
+        assert ok is False
+        assert "spawned 不能为负数" in err
+
+    def test_killed_plus_passed_plus_remaining_not_equal_spawned(self):
+        """失败：killed + passed + remaining != spawned."""
+        result = {
+            "killed": 1,
+            "killed_by_type": {0: 1},
+            "passed": 0,
+            "remaining": 0,  # 总计 1
+            "spawned": 2,     # 但声称生成了 2 只
+            "money_gained": 5,
+        }
+        wave_config = {
+            "monsters": [{"type": 0, "count": 3, "money": 5}]
+        }
+        ok, err = validate_basic(result, wave_config)
+        assert ok is False
+        assert "怪物数量不一致" in err
+
+    def test_real_bug_scenario(self):
+        """真实 bug 场景复现：第 2 波只生成 1 只怪物就提前结束.
+
+        复现步骤：
+        1. 第一波怪物消灭后
+        2. 第二波怪物出现的短时间内立即暂停
+        3. 提前结束游戏
+        """
+        result = {
+            "killed": 0,
+            "killed_by_type": {},
+            "passed": 0,
+            "remaining": 1,
+            "spawned": 1,  # 只生成了 1 只
+            "money_gained": 0,
+        }
+        wave_config = {
+            "monsters": [
+                {"type": 0, "count": 1, "money": 5},
+                {"type": 1, "count": 1, "money": 8},
+            ]  # total = 2，但 spawned = 1
+        }
+        ok, err = validate_basic(result, wave_config)
+        assert ok is True
+
 
 class TestValidateScore:
     """得分验证测试."""
@@ -1173,6 +1304,80 @@ class TestValidateRemainingMonsters:
         }
         ok, err = validate_remaining_monsters(attacks, result, monsters_config)
         assert ok is True
+
+    def test_remaining_id_not_in_spawned(self):
+        """失败：remaining 怪物 ID 不在前 spawned 个怪物中."""
+        attacks = []
+        result = {
+            "remaining": 2,
+            "remaining_monster_ids": ["m-001", "m-006"],  # m-006 是第 6 个，未生成
+            "spawned": 5,  # 只生成了前 5 个
+        }
+        monsters_config = {
+            "m-001": {"type": 0, "life": 50},
+            "m-006": {"type": 0, "life": 50},  # 未生成但在配置中
+        }
+        monsters_list = ["m-001", "m-002", "m-003", "m-004", "m-005", "m-006", "m-007"]
+        ok, err = validate_remaining_monsters(
+            attacks, result, monsters_config, monsters_list
+        )
+        assert ok is False
+        assert "m-006" in err
+        assert "未生成" in err or "不在前" in err
+
+    def test_remaining_id_in_spawned_success(self):
+        """成功：remaining 怪物 ID 都在前 spawned 个怪物中."""
+        attacks = []
+        result = {
+            "remaining": 2,
+            "remaining_monster_ids": ["m-002", "m-004"],
+            "spawned": 5,
+        }
+        monsters_config = {
+            "m-002": {"type": 0, "life": 50},
+            "m-004": {"type": 0, "life": 50},
+        }
+        monsters_list = ["m-001", "m-002", "m-003", "m-004", "m-005", "m-006"]
+        ok, err = validate_remaining_monsters(
+            attacks, result, monsters_config, monsters_list
+        )
+        assert ok is True
+
+    def test_remaining_without_monsters_list_backward_compat(self):
+        """向后兼容：不传入 monsters_list 时跳过 spawned 验证."""
+        attacks = []
+        result = {
+            "remaining": 1,
+            "remaining_monster_ids": ["m-001"],
+        }
+        monsters_config = {
+            "m-001": {"type": 0, "life": 50},
+        }
+        # 不传入 monsters_list，应该跳过 spawned 验证
+        ok, err = validate_remaining_monsters(attacks, result, monsters_config)
+        assert ok is True
+
+    def test_cheat_scenario_use_unspawned_monster(self):
+        """作弊场景：用未生成的怪物 ID 隐藏 passed 怪物."""
+        # 场景：5 个怪物配置，生成了 3 个，m-001 穿过终点
+        # 作弊者声称 remaining=3，用 m-002, m-003, m-004（未生成）凑数
+        attacks = []
+        result = {
+            "remaining": 3,
+            "remaining_monster_ids": ["m-002", "m-003", "m-004"],  # m-004 未生成
+            "spawned": 3,  # 只生成了 m-001, m-002, m-003
+        }
+        monsters_config = {
+            "m-002": {"type": 0, "life": 50},
+            "m-003": {"type": 0, "life": 50},
+            "m-004": {"type": 0, "life": 50},  # 在配置中但未生成
+        }
+        monsters_list = ["m-001", "m-002", "m-003", "m-004", "m-005"]
+        ok, err = validate_remaining_monsters(
+            attacks, result, monsters_config, monsters_list
+        )
+        assert ok is False
+        assert "m-004" in err
 
 
 class TestValidateAttackRange:
