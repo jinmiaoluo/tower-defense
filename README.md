@@ -62,6 +62,24 @@ npm run preview
 npm run test
 ```
 
+## Docker 部署
+
+```bash
+# 构建并启动所有服务
+docker compose up -d
+
+# 查看日志
+docker compose logs -f
+
+# 停止服务
+docker compose down
+
+# 停止并清除数据
+docker compose down -v
+```
+
+启动后访问 http://localhost:8580 即可开始游戏。
+
 ## 开发文档
 
 - [技术规范](./docs/SPEC.md)
