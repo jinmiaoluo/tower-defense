@@ -92,6 +92,7 @@ docker compose down -v
 
 ## 开发文档
 
+- [架构文档](./docs/ARCHITECTURE.md)
 - [技术规范](./docs/SPEC.md)
 - [前端开发指南](./docs/FRONTEND_GUIDE.md)
 - [后端开发指南](./docs/BACKEND_GUIDE.md)

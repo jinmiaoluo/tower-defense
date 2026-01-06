@@ -22,33 +22,7 @@
 
 ## 目录结构
 
-```
-backend/
-├── config/              # Django 项目配置
-│   ├── settings.py
-│   ├── urls.py
-│   └── wsgi.py
-├── game/                # 游戏应用
-│   ├── models.py        # 数据模型
-│   ├── serializers.py   # DRF 序列化器
-│   ├── views.py         # API 视图
-│   ├── urls.py          # URL 路由
-│   ├── calculators.py   # 核心计算逻辑
-│   ├── validators.py    # 验证逻辑
-│   ├── generators.py    # 波次生成逻辑
-│   ├── config.py        # 游戏配置（建筑、怪物基础属性）
-│   └── management/
-│       └── commands/
-│           └── cleanup_sessions.py
-├── tests/
-│   ├── test_calculators.py
-│   ├── test_validators.py
-│   ├── test_generators.py
-│   └── test_views.py
-├── manage.py
-├── pyproject.toml
-└── pytest.ini
-```
+详见 [ARCHITECTURE.md](./ARCHITECTURE.md#目录结构)。
 
 ## 开发优先级
 

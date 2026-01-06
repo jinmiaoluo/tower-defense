@@ -18,23 +18,7 @@
 
 ## 目录结构
 
-```
-frontend/
-├── src/
-│   ├── types/           # 类型定义
-│   ├── mocks/           # Mock 数据
-│   ├── api/             # API 层
-│   ├── stores/          # Pinia 状态管理
-│   ├── game/            # Phaser 游戏逻辑
-│   │   ├── scenes/      # 游戏场景
-│   │   ├── entities/    # 游戏实体（怪物、建筑）
-│   │   └── systems/     # 游戏系统（路径、伤害、经济）
-│   ├── components/      # Vue 组件
-│   ├── composables/     # 组合式函数
-│   └── utils/           # 工具函数
-├── tests/               # 测试文件
-└── vite.config.ts
-```
+详见 [ARCHITECTURE.md](./ARCHITECTURE.md#目录结构)。
 
 ## 开发优先级
 
