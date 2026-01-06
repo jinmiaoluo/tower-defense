@@ -467,5 +467,69 @@ describe('GameApi', () => {
         expect((error as InstanceType<typeof ApiError>).status).toBe(404)
       }
     })
+
+    it('VALIDATION_FAILED 错误应包含服务端返回的错误消息', async () => {
+      const { ApiError } = await import('./game')
+
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: () => Promise.resolve({
+          error: { code: 'VALIDATION_FAILED', message: '金钱收益不匹配' },
+        }),
+      })
+
+      try {
+        await api.submitWave({
+          sessionId: 'test-session',
+          waveNumber: 1,
+          actions: [],
+          attacks: [],
+          result: {
+            killed: 0,
+            killedByType: {},
+            passed: 0,
+            scoreGained: 0,
+            moneyGained: 9999,
+            lifeLost: 0,
+            totalDamageDealt: 0,
+            totalLifeDestroyed: 0,
+            waveDurationFrames: 0,
+          },
+          buildings: [],
+        })
+        expect.fail('Should have thrown')
+      } catch (error) {
+        expect(error).toBeInstanceOf(ApiError)
+        expect((error as InstanceType<typeof ApiError>).code).toBe('VALIDATION_FAILED')
+        expect((error as InstanceType<typeof ApiError>).message).toBe('金钱收益不匹配')
+        expect((error as InstanceType<typeof ApiError>).status).toBe(400)
+      }
+    })
+
+    it('INVALID_REQUEST 错误应包含昵称验证失败的错误消息', async () => {
+      const { ApiError } = await import('./game')
+
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: () => Promise.resolve({
+          error: { code: 'INVALID_REQUEST', message: '昵称包含非法字符' },
+        }),
+      })
+
+      try {
+        await api.endGame({
+          sessionId: 'test-session',
+          nickname: '<script>alert(1)</script>',
+        })
+        expect.fail('Should have thrown')
+      } catch (error) {
+        expect(error).toBeInstanceOf(ApiError)
+        expect((error as InstanceType<typeof ApiError>).code).toBe('INVALID_REQUEST')
+        expect((error as InstanceType<typeof ApiError>).message).toBe('昵称包含非法字符')
+        expect((error as InstanceType<typeof ApiError>).status).toBe(400)
+      }
+    })
   })
 })

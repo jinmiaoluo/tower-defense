@@ -1615,6 +1615,31 @@ class TestEndSessionView:
         assert data["error"]["code"] == "INVALID_REQUEST"
 
     @pytest.mark.django_db
+    def test_end_session_nickname_xss_attack(
+        self, api_client: APIClient, session_with_waves: GameSession
+    ):
+        """测试昵称包含 XSS 攻击代码时返回正确的错误消息."""
+        session = session_with_waves
+        last_wave = self._make_valid_last_wave(session)
+
+        request_data = {
+            "sessionId": str(session.id),
+            "nickname": "<script>alert(1)</script>",
+            "lastWave": last_wave,
+        }
+
+        response = api_client.post(
+            "/api/game/sessions/end",
+            data=request_data,
+            format="json",
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert data["error"]["code"] == "INVALID_REQUEST"
+        assert "昵称包含非法字符" in data["error"]["message"]
+
+    @pytest.mark.django_db
     def test_end_session_without_last_wave_success(
         self, api_client: APIClient, session_with_waves: GameSession
     ):

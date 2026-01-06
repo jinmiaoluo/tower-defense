@@ -77,9 +77,15 @@ async function handleSubmitScore(nickname: string) {
     }
   } catch (error) {
     // 真实 API 模式下的错误处理
-    if (error instanceof ApiError && error.code === 'SESSION_NOT_FOUND') {
-      gameOverModalRef.value?.setError('Session expired. Please restart the game.')
+    if (error instanceof ApiError) {
+      if (error.code === 'SESSION_NOT_FOUND') {
+        gameOverModalRef.value?.setError('Session expired. Please restart the game.')
+      } else {
+        // 显示服务端返回的具体错误消息
+        gameOverModalRef.value?.setError(error.message)
+      }
     } else {
+      // 网络错误或其他未知错误
       gameOverModalRef.value?.setError('Network error')
     }
   }
