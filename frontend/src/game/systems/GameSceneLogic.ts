@@ -45,13 +45,18 @@ export interface GameState {
 export interface PlaceBuildingResult {
   success: boolean
   buildingId?: string
-  reason?: 'insufficient_money' | 'invalid_position' | 'would_block_path' | 'would_block_monsters'
+  reason?:
+    | 'insufficient_money'
+    | 'invalid_position'
+    | 'would_block_path'
+    | 'would_block_monsters'
+    | 'game_over'
 }
 
 /** 升级/出售结果 */
 export interface BuildingActionResult {
   success: boolean
-  reason?: 'insufficient_money' | 'building_not_found'
+  reason?: 'insufficient_money' | 'building_not_found' | 'game_over'
 }
 
 /** GameSceneLogic 接口 */
