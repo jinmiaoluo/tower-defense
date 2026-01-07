@@ -43,6 +43,7 @@ interface UIState {
   waveIntervalCounter: number
   isSubmittingWave: boolean
   waitingForFirstWeapon: boolean
+  firstWaveRecorderPrepared: boolean
   currentWaveSubmitted: boolean
   selectedBuildingType: BuildingType | null
   selectedBuildingId: string | null
@@ -199,6 +200,7 @@ export class Game extends Scene {
       waveIntervalCounter: 0,
       isSubmittingWave: false,
       waitingForFirstWeapon: true,
+      firstWaveRecorderPrepared: false,
       currentWaveSubmitted: false,
       selectedBuildingType: null,
       selectedBuildingId: null,
@@ -513,22 +515,22 @@ export class Game extends Scene {
     })
   }
 
-  /** 检查是否可以执行建筑操作 (放置/升级/出售) */
-  private canPerformBuildingAction(): boolean {
-    // 波次提交期间或间隔期间不允许建筑操作
-    // 否则操作会记录到已提交的 WaveRecorder 或即将被替换的 recorder 中
-    return !this.uiState.isSubmittingWave && this.uiState.waveIntervalCounter === 0
-  }
-
   /** 尝试放置建筑 */
   private tryPlaceBuilding(position: Position) {
     if (!this.uiState.selectedBuildingType) return
-    if (!this.canPerformBuildingAction()) return
+    // 波次提交期间不允许操作（尚未收到响应，新 recorder 未创建）
+    if (this.uiState.isSubmittingWave) return
 
     const buildingType = this.uiState.selectedBuildingType
 
-    // 放置第一个武器时,先开始波次再放置建筑
-    // 确保 BUILD action 记录到 wave 1 的 recorder 中
+    // 第一波开始前，放置任何建筑都需要先准备 recorder
+    // 确保所有 BUILD action（包括 wall）都记录到 wave 1 的 recorder 中
+    if (this.uiState.waitingForFirstWeapon && !this.uiState.firstWaveRecorderPrepared) {
+      this.logic.prepareNextWaveRecorder(this.currentWaveConfig.waveNumber)
+      this.uiState.firstWaveRecorderPrepared = true
+    }
+
+    // 只有放置武器建筑时才开始波次（触发怪物生成）
     if (this.uiState.waitingForFirstWeapon && isWeaponBuilding(buildingType)) {
       this.uiState.waitingForFirstWeapon = false
       this.uiState.currentWaveSubmitted = false
@@ -557,7 +559,8 @@ export class Game extends Scene {
 
   /** 尝试升级建筑 */
   tryUpgradeBuilding(buildingId: string) {
-    if (!this.canPerformBuildingAction()) return
+    // 波次提交期间不允许操作（尚未收到响应，新 recorder 未创建）
+    if (this.uiState.isSubmittingWave) return
 
     const building = this.logic.getBuilding(buildingId)
     const result = this.logic.upgradeBuilding(buildingId)
@@ -577,7 +580,8 @@ export class Game extends Scene {
 
   /** 尝试出售建筑 */
   trySellBuilding(buildingId: string) {
-    if (!this.canPerformBuildingAction()) return
+    // 波次提交期间不允许操作（尚未收到响应，新 recorder 未创建）
+    if (this.uiState.isSubmittingWave) return
 
     const result = this.logic.sellBuilding(buildingId)
     if (result.success) {
@@ -1413,6 +1417,9 @@ export class Game extends Scene {
       // 保存下一波配置
       this.currentWaveConfig = response.nextWave
 
+      // 立即为下一波准备 recorder，使间隔期间的操作记录到正确的波次
+      this.logic.prepareNextWaveRecorder(response.nextWave.waveNumber)
+
       // 标记当前波次已提交
       this.uiState.currentWaveSubmitted = true
 
@@ -1601,6 +1608,7 @@ export class Game extends Scene {
 
       // 等待玩家放置第一个武器后再开始第一波
       this.uiState.waitingForFirstWeapon = true
+      this.uiState.firstWaveRecorderPrepared = false
       this.uiState.currentWaveSubmitted = false
 
       this.uiState.isLoading = false

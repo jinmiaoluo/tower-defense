@@ -68,6 +68,7 @@ export interface GameSceneLogic {
   getUpgradeCost(type: BuildingType, level: number): number
 
   // 波次管理
+  prepareNextWaveRecorder(waveNumber: number): void
   startWave(waveConfig: WaveConfig): void
   isWaveComplete(): boolean
 
@@ -334,12 +335,18 @@ export function createGameSceneLogic(config: GameConfig): GameSceneLogic {
       return buildingSystem.getUpgradeCost(type, level)
     },
 
-    startWave(waveConfig: WaveConfig): void {
+    prepareNextWaveRecorder(waveNumber: number): void {
       // 保存之前波次的累计分数
       accumulatedScore += waveRecorder.getResult().scoreGained
+      // 更新状态中的分数
+      state.score = accumulatedScore
+      // 为下一波创建新的 recorder
+      waveRecorder = createWaveRecorder(waveNumber, state.frame)
+    },
 
+    startWave(waveConfig: WaveConfig): void {
+      // recorder 已由 prepareNextWaveRecorder 创建，这里只更新波次号和启动波次
       state.wave = waveConfig.waveNumber
-      waveRecorder = createWaveRecorder(waveConfig.waveNumber, state.frame)
       waveManager.reset()
       waveManager.startWave(waveConfig)
 

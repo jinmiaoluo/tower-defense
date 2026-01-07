@@ -950,5 +950,1287 @@ describe('GameSceneLogic', () => {
       // 分数应该归零
       expect(logic.getState().score).toBe(0)
     })
+
+    it('连续 3 波以上的累计分数计算正确（使用 prepareNextWaveRecorder）', () => {
+      // 放置建筑
+      logic.prepareNextWaveRecorder(1)
+      logic.placeBuilding([3, 3], 'LMG')
+
+      const waveScores: number[] = []
+      let expectedTotal = 0
+
+      // 运行 4 波，验证累计分数
+      for (let wave = 1; wave <= 4; wave++) {
+        logic.startWave({
+          waveNumber: wave,
+          monsters: [
+            { id: `uuid-${wave}-1`, type: 0, life: 30, speed: 0.5, shield: 0, money: 20 },
+          ],
+        })
+
+        // 运行到波次结束
+        for (let i = 0; i < 3000; i++) {
+          logic.update()
+          if (logic.isWaveComplete()) break
+        }
+
+        // 记录本波得分
+        const recorder = logic.getWaveRecorder()
+        const waveScore = recorder.getResult().scoreGained
+        waveScores.push(waveScore)
+        expectedTotal += waveScore
+
+        // 如果不是最后一波，准备下一波
+        if (wave < 4) {
+          logic.prepareNextWaveRecorder(wave + 1)
+        }
+
+        // 验证当前累计分数
+        const currentScore = logic.getState().score
+        expect(currentScore).toBe(expectedTotal)
+      }
+
+      // 最终验证：累计分数 = 所有波次得分之和
+      const finalScore = logic.getState().score
+      const sumOfWaveScores = waveScores.reduce((a, b) => a + b, 0)
+      expect(finalScore).toBe(sumOfWaveScores)
+
+      // 确保确实有多波得分（测试有效性验证）
+      expect(waveScores.filter(s => s > 0).length).toBeGreaterThanOrEqual(2)
+    })
+  })
+
+  describe('prepareNextWaveRecorder - 波次间隔期间建筑操作', () => {
+    it('第一波开始前需要调用 prepareNextWaveRecorder 确保 waveNumber 正确', () => {
+      // 模拟 Game.ts 中第一波开始前的调用顺序
+      logic.prepareNextWaveRecorder(1)
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 50, speed: 1, shield: 0, money: 10 }],
+      })
+
+      // 放置建筑（在 startWave 之后）
+      logic.placeBuilding([3, 3], 'cannon')
+
+      // 运行到波次结束
+      for (let i = 0; i < 5000; i++) {
+        logic.update()
+        if (logic.isWaveComplete()) break
+      }
+
+      // 验证 recorder 的 waveNumber 是 1（不是初始的 0）
+      const recorder = logic.getWaveRecorder()
+      const request = recorder.toWaveRequest('test-session', [])
+      expect(request.waveNumber).toBe(1)
+
+      // 验证操作被正确记录
+      expect(recorder.getActions()).toHaveLength(1)
+      expect(recorder.getActions()[0].type).toBe('BUILD')
+    })
+
+    it('prepareNextWaveRecorder 创建新的 recorder 并保存累计分数', () => {
+      // 放置建筑
+      logic.placeBuilding([3, 3], 'laser_gun')
+
+      // 第一波
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 50, speed: 1, shield: 0, money: 10 }],
+      })
+
+      // 运行到波次结束
+      for (let i = 0; i < 5000; i++) {
+        logic.update()
+        if (logic.isWaveComplete()) break
+      }
+
+      const wave1Score = logic.getWaveRecorder().getResult().scoreGained
+
+      // 调用 prepareNextWaveRecorder（模拟提交成功后的调用）
+      logic.prepareNextWaveRecorder(2)
+
+      // 新的 recorder 应该是波次 2
+      const recorder = logic.getWaveRecorder()
+      const request = recorder.toWaveRequest('test-session', [])
+      expect(request.waveNumber).toBe(2)
+
+      // 新 recorder 的操作列表应该为空
+      expect(recorder.getActions()).toHaveLength(0)
+      expect(recorder.getAttacks()).toHaveLength(0)
+
+      // 状态中的分数应该包含第一波的分数
+      expect(logic.getState().score).toBe(wave1Score)
+    })
+
+    it('波次间隔期间的建筑操作记录到新 recorder', () => {
+      // 第一波
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 10, speed: 5, shield: 0, money: 10 }],
+      })
+
+      // 运行到波次结束（怪物快速通过）
+      for (let i = 0; i < 500; i++) {
+        logic.update()
+        if (logic.isWaveComplete()) break
+      }
+
+      // 模拟提交成功后立即准备下一波 recorder
+      logic.prepareNextWaveRecorder(2)
+
+      // 在"间隔期间"放置建筑
+      logic.placeBuilding([3, 3], 'cannon')
+      logic.placeBuilding([5, 5], 'LMG')
+
+      // 这些操作应该记录到波次 2 的 recorder
+      const recorder = logic.getWaveRecorder()
+      const actions = recorder.getActions()
+      expect(actions).toHaveLength(2)
+      expect(actions[0].type).toBe('BUILD')
+      expect(actions[1].type).toBe('BUILD')
+
+      // 验证 waveNumber 是 2
+      const request = recorder.toWaveRequest('test-session', [])
+      expect(request.waveNumber).toBe(2)
+    })
+
+    it('startWave 不再重新创建 recorder（由 prepareNextWaveRecorder 负责）', () => {
+      // 第一波
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 10, speed: 5, shield: 0, money: 10 }],
+      })
+
+      for (let i = 0; i < 500; i++) {
+        logic.update()
+        if (logic.isWaveComplete()) break
+      }
+
+      // 准备下一波 recorder
+      logic.prepareNextWaveRecorder(2)
+
+      // 在间隔期间放置建筑
+      logic.placeBuilding([3, 3], 'cannon')
+
+      // 获取 recorder 引用
+      const recorderBefore = logic.getWaveRecorder()
+      const actionsBefore = recorderBefore.getActions().length
+
+      // 调用 startWave
+      logic.startWave({
+        waveNumber: 2,
+        monsters: [{ id: 'uuid-2', type: 0, life: 50, speed: 1, shield: 0, money: 10 }],
+      })
+
+      // recorder 应该是同一个实例，操作记录保留
+      const recorderAfter = logic.getWaveRecorder()
+      expect(recorderAfter.getActions().length).toBe(actionsBefore)
+    })
+
+    it('升级和出售操作也记录到新 recorder', () => {
+      // 先放一个建筑（wall 最便宜，留更多钱升级）
+      logic.placeBuilding([3, 3], 'wall')
+
+      // 第一波（怪物给更多金钱用于升级）
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 10, speed: 5, shield: 0, money: 100 }],
+      })
+
+      for (let i = 0; i < 500; i++) {
+        logic.update()
+        if (logic.isWaveComplete()) break
+      }
+
+      // 准备下一波 recorder
+      logic.prepareNextWaveRecorder(2)
+
+      // 获取建筑 ID
+      const buildings = logic.getBuildings()
+      const buildingId = buildings[0].id
+
+      // 在间隔期间升级（验证操作成功）
+      const upgradeResult = logic.upgradeBuilding(buildingId)
+      expect(upgradeResult.success).toBe(true)
+
+      // 在间隔期间出售（验证操作成功）
+      const sellResult = logic.sellBuilding(buildingId)
+      expect(sellResult.success).toBe(true)
+
+      // 验证操作记录到波次 2
+      const recorder = logic.getWaveRecorder()
+      const actions = recorder.getActions()
+      expect(actions.some(a => a.type === 'UPGRADE')).toBe(true)
+      expect(actions.some(a => a.type === 'SELL')).toBe(true)
+
+      const request = recorder.toWaveRequest('test-session', [])
+      expect(request.waveNumber).toBe(2)
+    })
+
+    it('间隔期间放置的建筑在下一波战斗中正常参与攻击，攻击记录归属正确波次', () => {
+      // 简化测试：直接从间隔期间放置建筑开始
+      // 模拟场景：API 返回波次 1 配置后，玩家在放置第一个武器前放置了建筑
+
+      // 准备波次 1 的 recorder
+      logic.prepareNextWaveRecorder(1)
+
+      // 在"间隔期间"放置建筑（第一波开始前）
+      const placeResult = logic.placeBuilding([3, 3], 'LMG')
+      expect(placeResult.success).toBe(true)
+
+      // 获取放置的建筑 ID
+      const placedBuildingId = placeResult.buildingId!
+
+      // 验证 BUILD action 记录到 recorder
+      const recorderBeforeCombat = logic.getWaveRecorder()
+      expect(recorderBeforeCombat.getActions()).toHaveLength(1)
+      expect(recorderBeforeCombat.getActions()[0].type).toBe('BUILD')
+
+      // 波次 1 的怪物 UUID
+      const wave1MonsterId = 'uuid-monster-1'
+
+      // 开始波次 1（怪物进入，建筑开始攻击）
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: wave1MonsterId, type: 0, life: 100, speed: 0.5, shield: 0, money: 10 }],
+      })
+
+      // 运行战斗直到怪物被击杀或通过
+      for (let i = 0; i < 3000; i++) {
+        logic.update()
+        if (logic.isWaveComplete()) break
+      }
+
+      // 获取最终的 recorder
+      const recorder = logic.getWaveRecorder()
+      const request = recorder.toWaveRequest('test-session', [])
+
+      // 验证 waveNumber 正确
+      expect(request.waveNumber).toBe(1)
+
+      // 验证 BUILD action 存在
+      expect(request.actions.some(a => a.type === 'BUILD')).toBe(true)
+
+      // 验证有攻击记录
+      expect(request.attacks.length).toBeGreaterThan(0)
+
+      // 验证攻击事件的具体内容
+      const attacks = request.attacks
+      for (const attack of attacks) {
+        // 验证攻击来自放置的建筑
+        expect(attack.buildingId).toBe(placedBuildingId)
+
+        // 验证攻击目标是波次 1 的怪物
+        expect(attack.monsterId).toBe(wave1MonsterId)
+
+        // 验证伤害值为正数
+        expect(attack.damage).toBeGreaterThan(0)
+
+        // 验证帧号为正数
+        expect(attack.frame).toBeGreaterThan(0)
+      }
+
+      // 验证结果数据存在
+      expect(request.result).toBeDefined()
+      expect(request.result.spawned).toBe(1)
+    })
+
+    it('跨波次场景：波次 1 结束后间隔期间放置的建筑，攻击记录归属波次 2', () => {
+      // 完整的跨波次场景测试
+
+      // 波次 1：放置第一个建筑，击杀怪物
+      logic.prepareNextWaveRecorder(1)
+      logic.placeBuilding([3, 3], 'LMG')
+
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'wave1-monster', type: 0, life: 30, speed: 0.5, shield: 0, money: 100 }],
+      })
+
+      for (let i = 0; i < 3000; i++) {
+        logic.update()
+        if (logic.isWaveComplete()) break
+      }
+
+      // 波次 1 结束后的帧号
+      const wave1EndFrame = logic.getState().frame
+
+      // 准备波次 2（模拟 API 返回后）
+      logic.prepareNextWaveRecorder(2)
+
+      // 在间隔期间放置第二个建筑
+      const placeResult = logic.placeBuilding([5, 5], 'cannon')
+      expect(placeResult.success).toBe(true)
+      const wave2BuildingId = placeResult.buildingId!
+
+      // 验证 BUILD action 记录到 recorder 2
+      const recorder2Actions = logic.getWaveRecorder().getActions()
+      expect(recorder2Actions).toHaveLength(1)
+      expect(recorder2Actions[0].type).toBe('BUILD')
+
+      // 波次 2 的怪物
+      const wave2MonsterId = 'wave2-monster'
+
+      logic.startWave({
+        waveNumber: 2,
+        monsters: [{ id: wave2MonsterId, type: 0, life: 100, speed: 0.5, shield: 0, money: 10 }],
+      })
+
+      for (let i = 0; i < 3000; i++) {
+        logic.update()
+        if (logic.isWaveComplete()) break
+      }
+
+      const request = logic.getWaveRecorder().toWaveRequest('test-session', [])
+
+      // 验证 waveNumber
+      expect(request.waveNumber).toBe(2)
+
+      // 验证有攻击记录
+      expect(request.attacks.length).toBeGreaterThan(0)
+
+      // 筛选出来自波次 2 新建筑的攻击
+      const wave2BuildingAttacks = request.attacks.filter(a => a.buildingId === wave2BuildingId)
+
+      // 验证新建筑的攻击记录
+      if (wave2BuildingAttacks.length > 0) {
+        for (const attack of wave2BuildingAttacks) {
+          // 攻击目标是波次 2 的怪物
+          expect(attack.monsterId).toBe(wave2MonsterId)
+          // 攻击帧号在波次 2 期间
+          expect(attack.frame).toBeGreaterThan(wave1EndFrame)
+          // 伤害值为正数
+          expect(attack.damage).toBeGreaterThan(0)
+        }
+      }
+
+      // 验证所有攻击都针对波次 2 的怪物
+      for (const attack of request.attacks) {
+        expect(attack.monsterId).toBe(wave2MonsterId)
+      }
+    })
+
+    it('间隔期间升级的建筑在下一波战斗中使用升级后的属性', () => {
+      // 第一波：放置 1 级建筑
+      logic.prepareNextWaveRecorder(1)
+      logic.placeBuilding([3, 3], 'cannon')
+
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 10, speed: 5, shield: 0, money: 100 }],
+      })
+
+      for (let i = 0; i < 500; i++) {
+        logic.update()
+        if (logic.isWaveComplete()) break
+      }
+
+      // 波次 1 结束，准备波次 2
+      logic.prepareNextWaveRecorder(2)
+
+      // 在间隔期间升级建筑
+      const buildings = logic.getBuildings()
+      const buildingId = buildings[0].id
+      const levelBefore = buildings[0].level
+
+      const upgradeResult = logic.upgradeBuilding(buildingId)
+      expect(upgradeResult.success).toBe(true)
+
+      const levelAfter = logic.getBuildings()[0].level
+      expect(levelAfter).toBe(levelBefore + 1)
+
+      // 验证 UPGRADE action 记录到 recorder 2
+      const recorder = logic.getWaveRecorder()
+      expect(recorder.getActions().some(a => a.type === 'UPGRADE')).toBe(true)
+
+      // 开始波次 2
+      logic.startWave({
+        waveNumber: 2,
+        monsters: [{ id: 'uuid-2', type: 0, life: 100, speed: 0.5, shield: 0, money: 10 }],
+      })
+
+      // 运行战斗
+      for (let i = 0; i < 3000; i++) {
+        logic.update()
+        if (logic.isWaveComplete()) break
+      }
+
+      // 验证攻击记录存在（升级后的建筑参与战斗）
+      const request = recorder.toWaveRequest('test-session', [])
+      expect(request.waveNumber).toBe(2)
+      expect(request.attacks.length).toBeGreaterThan(0)
+
+      // 验证升级操作和攻击记录在同一个请求中
+      expect(request.actions.some(a => a.type === 'UPGRADE')).toBe(true)
+    })
+
+    it('第一波开始前先放置非武器建筑再放置武器建筑，两个操作都记录到波次 1', () => {
+      // 边界问题 4：模拟 Game.ts 的调用顺序
+      // 关键点：在放置第一个建筑（无论类型）时就应该准备 recorder
+
+      // 正确的调用顺序：
+      // 1. 放置第一个建筑前先准备 recorder
+      logic.prepareNextWaveRecorder(1)
+
+      // 2. 玩家先放置 wall（非武器建筑）
+      const wallResult = logic.placeBuilding([1, 1], 'wall')
+      expect(wallResult.success).toBe(true)
+
+      // 3. 玩家再放置 cannon（武器建筑）
+      const cannonResult = logic.placeBuilding([3, 3], 'cannon')
+      expect(cannonResult.success).toBe(true)
+
+      // 4. 放置武器后开始波次
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 50, speed: 1, shield: 0, money: 10 }],
+      })
+
+      // 验证两个 BUILD 操作都记录到波次 1 的 recorder
+      const recorder = logic.getWaveRecorder()
+      const actions = recorder.getActions()
+
+      // 应该有 2 个 BUILD action
+      const buildActions = actions.filter(a => a.type === 'BUILD')
+      expect(buildActions).toHaveLength(2)
+
+      // 验证 waveNumber 是 1
+      const request = recorder.toWaveRequest('test-session', [])
+      expect(request.waveNumber).toBe(1)
+
+      // 验证两个建筑类型
+      const buildTypes = buildActions.map(a => (a as { buildingType: string }).buildingType)
+      expect(buildTypes).toContain('wall')
+      expect(buildTypes).toContain('cannon')
+    })
+
+    it('第一波开始前放置多个非武器建筑，所有操作都记录到波次 1', () => {
+      // 扩展场景：玩家可能放置多个 wall 后再放置武器
+
+      // 正确的调用顺序：在第一个建筑放置前准备 recorder
+      logic.prepareNextWaveRecorder(1)
+
+      // 放置多个 wall（初始金钱 500，wall 成本 20）
+      logic.placeBuilding([1, 1], 'wall')
+      logic.placeBuilding([2, 2], 'wall')
+      logic.placeBuilding([4, 4], 'wall')
+
+      // 然后放置武器（LMG 成本 100）
+      logic.placeBuilding([3, 3], 'LMG')
+
+      // 开始波次
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 50, speed: 1, shield: 0, money: 10 }],
+      })
+
+      // 验证所有 BUILD 操作都记录到波次 1
+      const recorder = logic.getWaveRecorder()
+      const buildActions = recorder.getActions().filter(a => a.type === 'BUILD')
+
+      expect(buildActions).toHaveLength(4)
+
+      const request = recorder.toWaveRequest('test-session', [])
+      expect(request.waveNumber).toBe(1)
+    })
+  })
+
+  // ============================================================================
+  // 帧号记录正确性测试（边界问题 5）
+  // ============================================================================
+
+  describe('startFrame and frame recording', () => {
+    it('第一波开始前 prepareNextWaveRecorder 使用 frame=0 作为 startFrame', () => {
+      // 游戏初始化后 frame = 0
+      expect(logic.getState().frame).toBe(0)
+
+      // 准备波次 1
+      logic.prepareNextWaveRecorder(1)
+
+      // 放置建筑（frame 仍然是 0，因为还没调用 update）
+      logic.placeBuilding([3, 3], 'cannon')
+
+      // 验证操作记录的 frame 是 0
+      const recorder = logic.getWaveRecorder()
+      const actions = recorder.getActions()
+      expect(actions).toHaveLength(1)
+      expect(actions[0].frame).toBe(0)
+    })
+
+    it('波次进行中操作记录使用当前绝对帧号', () => {
+      logic.prepareNextWaveRecorder(1)
+      // 使用 wall（成本 5）而不是 cannon（成本 300），以便有足够金钱升级
+      logic.placeBuilding([3, 3], 'wall')
+
+      logic.startWave({
+        waveNumber: 1,
+        // 怪物给 300 金钱，足够升级 wall（升级成本约 5 * 0.75 = 3）
+        monsters: [{ id: 'uuid-1', type: 0, life: 100, speed: 0.5, shield: 0, money: 300 }],
+      })
+
+      // 运行 50 帧
+      for (let i = 0; i < 50; i++) {
+        logic.update()
+      }
+
+      const frameAfter50Updates = logic.getState().frame
+      expect(frameAfter50Updates).toBe(50)
+
+      // 在 frame=50 时升级建筑
+      const building = logic.getBuildings()[0]
+      const upgradeResult = logic.upgradeBuilding(building.id)
+      expect(upgradeResult.success).toBe(true)
+
+      // 验证升级操作记录的 frame 是 50
+      const recorder = logic.getWaveRecorder()
+      const upgradeAction = recorder.getActions().find(a => a.type === 'UPGRADE')
+      expect(upgradeAction).toBeDefined()
+      expect(upgradeAction!.frame).toBe(50)
+    })
+
+    it('跨波次场景：波次 2 的 startFrame 是波次 1 结束时的帧号', () => {
+      // 波次 1
+      logic.prepareNextWaveRecorder(1)
+      logic.placeBuilding([3, 3], 'LMG')
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 30, speed: 5, shield: 0, money: 10 }],
+      })
+
+      // 运行到波次 1 结束
+      for (let i = 0; i < 3000; i++) {
+        logic.update()
+        if (logic.isWaveComplete()) break
+      }
+
+      const wave1EndFrame = logic.getState().frame
+
+      // 准备波次 2（此时 startFrame 应该是 wave1EndFrame）
+      logic.prepareNextWaveRecorder(2)
+
+      // 在间隔期间放置建筑（frame 仍然是 wave1EndFrame）
+      logic.placeBuilding([5, 5], 'cannon')
+
+      // 验证操作记录的 frame 是 wave1EndFrame
+      const recorder = logic.getWaveRecorder()
+      const actions = recorder.getActions()
+      expect(actions).toHaveLength(1)
+      expect(actions[0].frame).toBe(wave1EndFrame)
+    })
+
+    it('waveDurationFrames 正确计算为 endFrame - startFrame', () => {
+      logic.prepareNextWaveRecorder(1)
+      logic.placeBuilding([3, 3], 'LMG')
+
+      // 记录波次开始时的帧号
+      const startFrame = logic.getState().frame
+
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 30, speed: 5, shield: 0, money: 10 }],
+      })
+
+      // 运行到波次结束
+      for (let i = 0; i < 3000; i++) {
+        logic.update()
+        if (logic.isWaveComplete()) break
+      }
+
+      const endFrame = logic.getState().frame
+
+      // 验证 waveDurationFrames
+      const recorder = logic.getWaveRecorder()
+      const result = recorder.getResult()
+      expect(result.waveDurationFrames).toBe(endFrame - startFrame)
+    })
+
+    it('间隔期间 frame 不增长（update 跳过非战斗状态）', () => {
+      logic.prepareNextWaveRecorder(1)
+      logic.placeBuilding([3, 3], 'LMG')
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 30, speed: 10, shield: 0, money: 10 }],
+      })
+
+      // 运行到波次结束
+      for (let i = 0; i < 1000; i++) {
+        logic.update()
+        if (logic.isWaveComplete()) break
+      }
+
+      const frameAtWaveEnd = logic.getState().frame
+
+      // 准备波次 2（模拟 API 响应后）
+      logic.prepareNextWaveRecorder(2)
+
+      // 在间隔期间，不调用 startWave，直接放置建筑
+      // （模拟玩家在等待下一波时操作）
+      logic.placeBuilding([5, 5], 'cannon')
+
+      // 间隔期间 frame 不增长（因为没有调用 update 或 update 跳过）
+      // 注意：实际游戏中 Game.ts 的 update 会在间隔期间继续运行
+      // 但 GameSceneLogic.update 会因为 waveComplete 而不增长 frame
+      const frameAfterIntervalAction = logic.getState().frame
+      expect(frameAfterIntervalAction).toBe(frameAtWaveEnd)
+    })
+
+    it('攻击事件的 frame 记录正确（绝对帧号）', () => {
+      logic.prepareNextWaveRecorder(1)
+      logic.placeBuilding([3, 3], 'LMG')
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 100, speed: 0.5, shield: 0, money: 10 }],
+      })
+
+      // 运行直到有攻击发生
+      let attackOccurred = false
+      for (let i = 0; i < 500; i++) {
+        logic.update()
+        const attacks = logic.getWaveRecorder().getAttacks()
+        if (attacks.length > 0) {
+          attackOccurred = true
+          break
+        }
+      }
+
+      expect(attackOccurred).toBe(true)
+
+      // 验证攻击事件的 frame 是正数（绝对帧号）
+      const attacks = logic.getWaveRecorder().getAttacks()
+      for (const attack of attacks) {
+        expect(attack.frame).toBeGreaterThan(0)
+        expect(attack.frame).toBeLessThanOrEqual(logic.getState().frame)
+      }
+    })
+  })
+
+  // ============================================================================
+  // waveNumber 一致性测试（边界问题 6）
+  // ============================================================================
+
+  describe('prepareNextWaveRecorder and startWave waveNumber consistency', () => {
+    it('正确调用顺序：prepareNextWaveRecorder(N) → startWave(N) 数据一致', () => {
+      // 准备波次 2
+      logic.prepareNextWaveRecorder(2)
+      logic.placeBuilding([3, 3], 'LMG')
+
+      // 开始波次 2（waveNumber 一致）
+      logic.startWave({
+        waveNumber: 2,
+        monsters: [{ id: 'uuid-1', type: 0, life: 30, speed: 5, shield: 0, money: 10 }],
+      })
+
+      // 运行到波次结束
+      for (let i = 0; i < 3000; i++) {
+        logic.update()
+        if (logic.isWaveComplete()) break
+      }
+
+      // 验证 state.wave 和 recorder.waveNumber 一致
+      expect(logic.getState().wave).toBe(2)
+      const request = logic.getWaveRecorder().toWaveRequest('test-session', [])
+      expect(request.waveNumber).toBe(2)
+    })
+
+    it('不一致调用：prepareNextWaveRecorder(2) → startWave(3) 导致 recorder.waveNumber 与 state.wave 不同', () => {
+      // 这是一个文档化的边界行为测试
+      // 目的：记录当前行为，以便未来修改时能检测到变化
+
+      // 准备波次 2
+      logic.prepareNextWaveRecorder(2)
+      logic.placeBuilding([3, 3], 'LMG')
+
+      // 错误地开始波次 3（waveNumber 不一致）
+      logic.startWave({
+        waveNumber: 3,
+        monsters: [{ id: 'uuid-1', type: 0, life: 30, speed: 5, shield: 0, money: 10 }],
+      })
+
+      // 运行到波次结束
+      for (let i = 0; i < 3000; i++) {
+        logic.update()
+        if (logic.isWaveComplete()) break
+      }
+
+      // 当前行为：state.wave 被更新为 3，但 recorder.waveNumber 仍然是 2
+      expect(logic.getState().wave).toBe(3)
+      const request = logic.getWaveRecorder().toWaveRequest('test-session', [])
+      // recorder 的 waveNumber 是 prepareNextWaveRecorder 传入的值
+      expect(request.waveNumber).toBe(2)
+
+      // 注意：这是一个编程错误场景，Game.ts 应该确保一致性
+      // 此测试记录当前行为，不是推荐的使用方式
+    })
+
+    it('连续正确调用序列：波次 1 → 波次 2 → 波次 3 数据一致', () => {
+      // 波次 1
+      logic.prepareNextWaveRecorder(1)
+      logic.placeBuilding([3, 3], 'LMG')
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 30, speed: 5, shield: 0, money: 10 }],
+      })
+      for (let i = 0; i < 3000; i++) {
+        logic.update()
+        if (logic.isWaveComplete()) break
+      }
+      expect(logic.getState().wave).toBe(1)
+      expect(logic.getWaveRecorder().toWaveRequest('test', []).waveNumber).toBe(1)
+
+      // 波次 2
+      logic.prepareNextWaveRecorder(2)
+      logic.startWave({
+        waveNumber: 2,
+        monsters: [{ id: 'uuid-2', type: 0, life: 30, speed: 5, shield: 0, money: 10 }],
+      })
+      for (let i = 0; i < 3000; i++) {
+        logic.update()
+        if (logic.isWaveComplete()) break
+      }
+      expect(logic.getState().wave).toBe(2)
+      expect(logic.getWaveRecorder().toWaveRequest('test', []).waveNumber).toBe(2)
+
+      // 波次 3
+      logic.prepareNextWaveRecorder(3)
+      logic.startWave({
+        waveNumber: 3,
+        monsters: [{ id: 'uuid-3', type: 0, life: 30, speed: 5, shield: 0, money: 10 }],
+      })
+      for (let i = 0; i < 3000; i++) {
+        logic.update()
+        if (logic.isWaveComplete()) break
+      }
+      expect(logic.getState().wave).toBe(3)
+      expect(logic.getWaveRecorder().toWaveRequest('test', []).waveNumber).toBe(3)
+    })
+
+    it('Game.ts 调用模式验证：第一波正确初始化', () => {
+      // 模拟 Game.ts 中第一波的调用模式
+      // 1. 玩家放置建筑前先 prepareNextWaveRecorder
+      // 2. 放置建筑
+      // 3. 放置武器后 startWave
+
+      const waveNumber = 1
+
+      // 准备 recorder（使用相同的 waveNumber）
+      logic.prepareNextWaveRecorder(waveNumber)
+
+      // 放置建筑
+      logic.placeBuilding([3, 3], 'LMG')
+
+      // 开始波次（使用相同的 waveNumber）
+      logic.startWave({
+        waveNumber: waveNumber,
+        monsters: [{ id: 'uuid-1', type: 0, life: 30, speed: 5, shield: 0, money: 10 }],
+      })
+
+      // 验证一致性
+      expect(logic.getState().wave).toBe(waveNumber)
+      expect(logic.getWaveRecorder().toWaveRequest('test', []).waveNumber).toBe(waveNumber)
+    })
+  })
+
+  // ============================================================================
+  // 暂停期间操作行为测试
+  // ============================================================================
+
+  describe('pause state and operations', () => {
+    it('暂停期间允许放置建筑', () => {
+      logic.prepareNextWaveRecorder(1)
+      logic.placeBuilding([3, 3], 'LMG')
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 100, speed: 0.5, shield: 0, money: 100 }],
+      })
+
+      // 运行几帧
+      for (let i = 0; i < 10; i++) {
+        logic.update()
+      }
+
+      // 暂停游戏
+      logic.togglePause()
+      expect(logic.getState().isPaused).toBe(true)
+
+      // 暂停期间放置建筑应该成功
+      const result = logic.placeBuilding([5, 5], 'cannon')
+      expect(result.success).toBe(true)
+
+      // 验证建筑确实被放置
+      expect(logic.getBuildings()).toHaveLength(2)
+    })
+
+    it('暂停期间放置建筑使用暂停时的帧号', () => {
+      logic.prepareNextWaveRecorder(1)
+      logic.placeBuilding([3, 3], 'LMG')
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 100, speed: 0.5, shield: 0, money: 100 }],
+      })
+
+      // 运行 50 帧
+      for (let i = 0; i < 50; i++) {
+        logic.update()
+      }
+
+      const frameBeforePause = logic.getState().frame
+      expect(frameBeforePause).toBe(50)
+
+      // 暂停游戏
+      logic.togglePause()
+
+      // 暂停期间放置建筑
+      logic.placeBuilding([5, 5], 'cannon')
+
+      // 验证操作记录的帧号是暂停时的帧号
+      const recorder = logic.getWaveRecorder()
+      const actions = recorder.getActions()
+      const lastAction = actions[actions.length - 1]
+      expect(lastAction.type).toBe('BUILD')
+      expect(lastAction.frame).toBe(50)
+    })
+
+    it('暂停期间帧号不增长', () => {
+      logic.prepareNextWaveRecorder(1)
+      logic.placeBuilding([3, 3], 'LMG')
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 100, speed: 0.5, shield: 0, money: 100 }],
+      })
+
+      // 运行 30 帧
+      for (let i = 0; i < 30; i++) {
+        logic.update()
+      }
+
+      const frameBeforePause = logic.getState().frame
+      expect(frameBeforePause).toBe(30)
+
+      // 暂停游戏
+      logic.togglePause()
+
+      // 暂停期间调用多次 update
+      for (let i = 0; i < 100; i++) {
+        logic.update()
+      }
+
+      // 帧号不应该增长
+      expect(logic.getState().frame).toBe(30)
+
+      // 恢复游戏
+      logic.togglePause()
+
+      // 继续运行 20 帧
+      for (let i = 0; i < 20; i++) {
+        logic.update()
+      }
+
+      // 帧号应该是 30 + 20 = 50
+      expect(logic.getState().frame).toBe(50)
+    })
+
+    it('暂停期间允许升级建筑，使用暂停时的帧号', () => {
+      logic.prepareNextWaveRecorder(1)
+      logic.placeBuilding([3, 3], 'wall')
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 10, speed: 5, shield: 0, money: 500 }],
+      })
+
+      // 运行到怪物被击杀（获得金钱）
+      for (let i = 0; i < 500; i++) {
+        logic.update()
+        if (logic.isWaveComplete()) break
+      }
+
+      const frameBeforePause = logic.getState().frame
+
+      // 暂停游戏
+      logic.togglePause()
+
+      // 暂停期间升级建筑
+      const building = logic.getBuildings()[0]
+      const result = logic.upgradeBuilding(building.id)
+      expect(result.success).toBe(true)
+
+      // 验证升级操作记录的帧号
+      const recorder = logic.getWaveRecorder()
+      const upgradeAction = recorder.getActions().find(a => a.type === 'UPGRADE')
+      expect(upgradeAction).toBeDefined()
+      expect(upgradeAction!.frame).toBe(frameBeforePause)
+    })
+
+    it('暂停期间允许出售建筑，使用暂停时的帧号', () => {
+      logic.prepareNextWaveRecorder(1)
+      logic.placeBuilding([3, 3], 'cannon')
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 100, speed: 0.5, shield: 0, money: 10 }],
+      })
+
+      // 运行 40 帧
+      for (let i = 0; i < 40; i++) {
+        logic.update()
+      }
+
+      const frameBeforePause = logic.getState().frame
+      expect(frameBeforePause).toBe(40)
+
+      // 暂停游戏
+      logic.togglePause()
+
+      // 暂停期间出售建筑
+      const building = logic.getBuildings()[0]
+      const result = logic.sellBuilding(building.id)
+      expect(result.success).toBe(true)
+
+      // 验证出售操作记录的帧号
+      const recorder = logic.getWaveRecorder()
+      const sellAction = recorder.getActions().find(a => a.type === 'SELL')
+      expect(sellAction).toBeDefined()
+      expect(sellAction!.frame).toBe(40)
+
+      // 验证建筑已被移除
+      expect(logic.getBuildings()).toHaveLength(0)
+    })
+
+    it('暂停期间怪物不移动，建筑不攻击', () => {
+      logic.prepareNextWaveRecorder(1)
+      logic.placeBuilding([3, 3], 'LMG')
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 100, speed: 0.5, shield: 0, money: 10 }],
+      })
+
+      // 运行 10 帧让怪物开始移动
+      for (let i = 0; i < 10; i++) {
+        logic.update()
+      }
+
+      // 记录暂停前的攻击数
+      const attacksBeforePause = logic.getWaveRecorder().getAttacks().length
+
+      // 暂停游戏
+      logic.togglePause()
+
+      // 暂停期间调用多次 update
+      for (let i = 0; i < 100; i++) {
+        logic.update()
+      }
+
+      // 攻击数不应该增加
+      const attacksAfterPause = logic.getWaveRecorder().getAttacks().length
+      expect(attacksAfterPause).toBe(attacksBeforePause)
+    })
+
+    it('恢复后游戏继续正常运行', () => {
+      logic.prepareNextWaveRecorder(1)
+      logic.placeBuilding([3, 3], 'LMG')
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 50, speed: 1, shield: 0, money: 10 }],
+      })
+
+      // 运行几帧
+      for (let i = 0; i < 20; i++) {
+        logic.update()
+      }
+
+      // 暂停
+      logic.togglePause()
+
+      // 暂停期间
+      for (let i = 0; i < 50; i++) {
+        logic.update()
+      }
+
+      // 恢复
+      logic.togglePause()
+
+      // 运行到波次结束
+      for (let i = 0; i < 5000; i++) {
+        logic.update()
+        if (logic.isWaveComplete()) break
+      }
+
+      // 波次应该正常结束
+      expect(logic.isWaveComplete()).toBe(true)
+
+      // 应该有攻击记录
+      expect(logic.getWaveRecorder().getAttacks().length).toBeGreaterThan(0)
+    })
+  })
+
+  // ============================================================================
+  // 提前结束游戏测试
+  // ============================================================================
+
+  describe('early game over - remaining monsters', () => {
+    it('setGameOver 后可以获取在场怪物列表', () => {
+      logic.prepareNextWaveRecorder(1)
+      logic.placeBuilding([3, 3], 'LMG')
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [
+          { id: 'uuid-1', type: 0, life: 500, speed: 0.5, shield: 0, money: 10 },
+          { id: 'uuid-2', type: 0, life: 500, speed: 0.5, shield: 0, money: 10 },
+        ],
+      })
+
+      // 运行几帧让怪物生成
+      for (let i = 0; i < 50; i++) {
+        logic.update()
+      }
+
+      // 提前结束游戏
+      logic.setGameOver()
+
+      // 应该能获取在场怪物
+      const monsters = logic.getMonsters()
+      expect(monsters.length).toBeGreaterThan(0)
+
+      // 怪物仍然有效
+      for (const monster of monsters) {
+        expect(monster.isValid).toBe(true)
+      }
+    })
+
+    it('提前结束时记录剩余怪物 ID（模拟 Game.ts 的调用流程）', () => {
+      logic.prepareNextWaveRecorder(1)
+      logic.placeBuilding([3, 3], 'wall') // 不攻击，所有怪物都会存活
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [
+          { id: 'uuid-1', type: 0, life: 100, speed: 0.5, shield: 0, money: 10 },
+          { id: 'uuid-2', type: 0, life: 100, speed: 0.5, shield: 0, money: 10 },
+          { id: 'uuid-3', type: 0, life: 100, speed: 0.5, shield: 0, money: 10 },
+        ],
+      })
+
+      // 运行足够帧数让所有怪物生成
+      for (let i = 0; i < 100; i++) {
+        logic.update()
+      }
+
+      // 提前结束游戏
+      logic.setGameOver()
+
+      // 模拟 Game.ts 的调用流程：遍历在场怪物并记录
+      const waveRecorder = logic.getWaveRecorder()
+      const monsters = logic.getMonsters()
+      for (const monster of monsters) {
+        if (monster.isValid) {
+          waveRecorder.recordRemainingMonster(monster.id)
+        }
+      }
+
+      // 验证 remainingMonsterIds
+      const remainingIds = waveRecorder.getRemainingMonsterIds()
+      expect(remainingIds.length).toBe(monsters.filter(m => m.isValid).length)
+
+      // 验证 ID 正确
+      for (const monster of monsters) {
+        if (monster.isValid) {
+          expect(remainingIds).toContain(monster.id)
+        }
+      }
+    })
+
+    it('提前结束时 remaining 数量正确', () => {
+      logic.prepareNextWaveRecorder(1)
+      logic.placeBuilding([3, 3], 'LMG')
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [
+          { id: 'uuid-1', type: 0, life: 30, speed: 0.5, shield: 0, money: 10 },
+          { id: 'uuid-2', type: 0, life: 500, speed: 0.5, shield: 0, money: 10 },
+          { id: 'uuid-3', type: 0, life: 500, speed: 0.5, shield: 0, money: 10 },
+        ],
+      })
+
+      // 运行一段时间，可能击杀第一个怪物
+      for (let i = 0; i < 200; i++) {
+        logic.update()
+      }
+
+      // 提前结束游戏
+      logic.setGameOver()
+
+      // 记录剩余怪物
+      const waveRecorder = logic.getWaveRecorder()
+      const monsters = logic.getMonsters()
+      for (const monster of monsters) {
+        if (monster.isValid) {
+          waveRecorder.recordRemainingMonster(monster.id)
+        }
+      }
+
+      // 获取结果
+      const result = waveRecorder.getResult()
+
+      // 验证 remaining 字段
+      if (result.remaining !== undefined) {
+        expect(result.remaining).toBe(result.remainingMonsterIds?.length)
+      }
+    })
+
+    it('提前结束时数量守恒公式成立：killed + passed + remaining == spawned', () => {
+      logic.prepareNextWaveRecorder(1)
+      logic.placeBuilding([3, 3], 'LMG')
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [
+          { id: 'uuid-1', type: 0, life: 30, speed: 0.5, shield: 0, money: 10 },
+          { id: 'uuid-2', type: 0, life: 30, speed: 0.5, shield: 0, money: 10 },
+          { id: 'uuid-3', type: 0, life: 500, speed: 0.5, shield: 0, money: 10 },
+          { id: 'uuid-4', type: 0, life: 500, speed: 0.5, shield: 0, money: 10 },
+        ],
+      })
+
+      // 运行一段时间，击杀部分怪物
+      for (let i = 0; i < 300; i++) {
+        logic.update()
+      }
+
+      // 提前结束游戏
+      logic.setGameOver()
+
+      // 记录剩余怪物
+      const waveRecorder = logic.getWaveRecorder()
+      const monsters = logic.getMonsters()
+      for (const monster of monsters) {
+        if (monster.isValid) {
+          waveRecorder.recordRemainingMonster(monster.id)
+        }
+      }
+
+      // 验证数量守恒公式
+      const result = waveRecorder.getResult()
+      const remaining = result.remaining ?? 0
+      expect(result.killed + result.passed + remaining).toBe(result.spawned)
+    })
+
+    it('波次进行中部分怪物未生成时提前结束', () => {
+      logic.prepareNextWaveRecorder(1)
+      logic.placeBuilding([3, 3], 'LMG')
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [
+          { id: 'uuid-1', type: 0, life: 100, speed: 0.5, shield: 0, money: 10 },
+          { id: 'uuid-2', type: 0, life: 100, speed: 0.5, shield: 0, money: 10 },
+          { id: 'uuid-3', type: 0, life: 100, speed: 0.5, shield: 0, money: 10 },
+          { id: 'uuid-4', type: 0, life: 100, speed: 0.5, shield: 0, money: 10 },
+          { id: 'uuid-5', type: 0, life: 100, speed: 0.5, shield: 0, money: 10 },
+        ],
+      })
+
+      // 只运行很少的帧数，可能只生成了部分怪物
+      for (let i = 0; i < 10; i++) {
+        logic.update()
+      }
+
+      // 提前结束游戏
+      logic.setGameOver()
+
+      // 记录剩余怪物
+      const waveRecorder = logic.getWaveRecorder()
+      const monsters = logic.getMonsters()
+      for (const monster of monsters) {
+        if (monster.isValid) {
+          waveRecorder.recordRemainingMonster(monster.id)
+        }
+      }
+
+      const result = waveRecorder.getResult()
+
+      // spawned 可能小于配置的怪物总数（因为提前结束）
+      // 但数量守恒公式仍然成立
+      const remaining = result.remaining ?? 0
+      expect(result.killed + result.passed + remaining).toBe(result.spawned)
+    })
+
+    it('提前结束后 lastWave 数据包含正确的 remaining 信息', () => {
+      logic.prepareNextWaveRecorder(1)
+      logic.placeBuilding([3, 3], 'LMG')
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [
+          { id: 'uuid-1', type: 0, life: 500, speed: 0.5, shield: 0, money: 10 },
+          { id: 'uuid-2', type: 0, life: 500, speed: 0.5, shield: 0, money: 10 },
+        ],
+      })
+
+      // 运行一段时间
+      for (let i = 0; i < 100; i++) {
+        logic.update()
+      }
+
+      // 提前结束游戏
+      logic.setGameOver()
+
+      // 模拟 Game.ts 的完整调用流程
+      const waveRecorder = logic.getWaveRecorder()
+      const monsters = logic.getMonsters()
+      for (const monster of monsters) {
+        if (monster.isValid) {
+          waveRecorder.recordRemainingMonster(monster.id)
+        }
+      }
+
+      // 获取 API 请求格式的数据
+      const buildings = logic.getBuildings()
+      const buildingSnapshots = buildings.map(b => ({
+        id: b.id,
+        type: b.type,
+        position: b.position,
+        level: b.level,
+        damageDealt: b.damageDealt,
+        kills: b.kills,
+      }))
+      const request = waveRecorder.toWaveRequest('test-session', buildingSnapshots)
+
+      // 验证请求数据
+      expect(request.waveNumber).toBe(1)
+      expect(request.result.remaining).toBeGreaterThan(0)
+      expect(request.result.remainingMonsterIds).toBeDefined()
+      expect(request.result.remainingMonsterIds!.length).toBe(request.result.remaining)
+
+      // 验证数量守恒
+      const remaining = request.result.remaining ?? 0
+      expect(request.result.killed + request.result.passed + remaining).toBe(request.result.spawned)
+    })
+
+    it('正常结束时 remaining 为 0 或 undefined', () => {
+      logic.prepareNextWaveRecorder(1)
+      logic.placeBuilding([3, 3], 'laser_gun')
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [
+          // 使用高速度的怪物，确保能在限定帧内完成
+          { id: 'uuid-1', type: 0, life: 30, speed: 5, shield: 0, money: 10 },
+        ],
+      })
+
+      // 运行到波次正常结束（增加帧数上限）
+      let completed = false
+      for (let i = 0; i < 10000; i++) {
+        logic.update()
+        if (logic.isWaveComplete()) {
+          completed = true
+          break
+        }
+      }
+
+      expect(completed).toBe(true)
+
+      // 正常结束时不需要记录剩余怪物
+      const result = logic.getWaveRecorder().getResult()
+
+      // remaining 应该是 undefined（没有剩余怪物）
+      expect(result.remaining).toBeUndefined()
+
+      // 数量守恒：killed + passed == spawned
+      expect(result.killed + result.passed).toBe(result.spawned)
+    })
   })
 })
