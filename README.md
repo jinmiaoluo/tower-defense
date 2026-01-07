@@ -13,6 +13,16 @@ tower-defense/
 
 ## 快速开始
 
+### VSCode Workspace
+
+使用 VSCode 打开项目推荐通过 workspace 文件：
+
+```bash
+code tower-defense.code-workspace
+```
+
+或在 VSCode 中选择 File -> Open Workspace from File，然后选择 `tower-defense.code-workspace`。
+
 ### 后端
 
 ```bash
