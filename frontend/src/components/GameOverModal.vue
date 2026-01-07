@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import type { RankingInfo } from '@/types'
 
 interface GameOverData {
@@ -8,10 +8,21 @@ interface GameOverData {
   sessionId: string
 }
 
-defineProps<{
+const props = defineProps<{
   visible: boolean
   gameData: GameOverData | null
 }>()
+
+const nicknameInput = ref<HTMLInputElement | null>(null)
+const isSubmitted = ref(false)
+
+watch([() => props.visible, isSubmitted], ([newVisible, submitted]) => {
+  if (newVisible && !submitted) {
+    nextTick(() => {
+      nicknameInput.value?.focus()
+    })
+  }
+}, { immediate: true })
 
 const emit = defineEmits<{
   submit: [nickname: string]
@@ -22,7 +33,6 @@ const emit = defineEmits<{
 
 const nickname = ref('')
 const isSubmitting = ref(false)
-const isSubmitted = ref(false)
 const rankingInfo = ref<RankingInfo | null>(null)
 const errorMessage = ref('')
 
@@ -62,6 +72,9 @@ function setRankingResult(ranking: RankingInfo) {
 function setError(message: string) {
   errorMessage.value = message
   isSubmitting.value = false
+  nextTick(() => {
+    nicknameInput.value?.focus()
+  })
 }
 
 function resetState() {
@@ -100,6 +113,7 @@ defineExpose({
           <label for="nickname">Enter your nickname:</label>
           <input
             id="nickname"
+            ref="nicknameInput"
             v-model="nickname"
             type="text"
             maxlength="32"
