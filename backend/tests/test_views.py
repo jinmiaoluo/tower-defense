@@ -865,6 +865,502 @@ class TestSubmitWaveView:
         assert data["valid"] is False
         assert "建筑列表不一致" in data["error"]["message"]
 
+    # ========== DPS 验证使用 validation_buildings 测试 ==========
+
+    @pytest.mark.django_db
+    def test_submit_wave_dps_validation_with_sold_buildings(
+        self, api_client: APIClient, session_with_first_wave: GameSession
+    ):
+        """测试建造后卖掉建筑时 DPS 验证仍能正常工作.
+
+        场景（复现问题）：
+        1. 建造一个 LMG 建筑
+        2. LMG 攻击怪物，造成伤害
+        3. 卖掉 LMG
+        4. 提交波次结果，buildings 列表为空
+
+        修复前：DPS 验证使用 submitted_buildings（空列表），导致 max_dps=0，
+               任何伤害都会触发 "DPS 容量超限" 错误。
+
+        修复后：DPS 验证使用 validation_buildings（包含波次期间存在过的建筑），
+               正确计算 max_dps，验证应通过。
+        """
+        session = session_with_first_wave
+        wave_config = session.next_wave
+        monsters = wave_config["monsters"]
+
+        building_id = "b-001"
+        building_type = "LMG"
+        building_damage = GAME_CONFIG["buildings"][building_type]["damage"]
+
+        attacks = []
+        frame = 100
+        killed_by_type: dict[int, int] = {}
+        total_life_destroyed = 0
+        total_money = 0
+
+        for m in monsters:
+            hits_needed = (m["life"] + building_damage - 1) // building_damage
+            for _ in range(hits_needed):
+                attacks.append({
+                    "frame": frame,
+                    "buildingId": building_id,
+                    "originalTargetId": m["id"],
+                    "originalTargetPosition": [4, 3],
+                    "monsterId": m["id"],
+                    "monsterPosition": [4, 3],
+                    "damage": building_damage,
+                })
+                frame += 3
+
+            t = m["type"]
+            killed_by_type[t] = killed_by_type.get(t, 0) + 1
+            total_life_destroyed += m["life"]
+            total_money += m["money"]
+
+        total_damage = sum(a["damage"] for a in attacks)
+        score = sum(int(math.sqrt(a["damage"])) for a in attacks)
+
+        result = {
+            "killed": len(monsters),
+            "killedByType": killed_by_type,
+            "passed": 0,
+            "scoreGained": score,
+            "moneyGained": total_money,
+            "lifeLost": 0,
+            "totalDamageDealt": total_damage,
+            "totalLifeDestroyed": total_life_destroyed,
+            "waveDurationFrames": 1000,
+        }
+
+        actions = [
+            {
+                "type": "BUILD",
+                "frame": 10,
+                "buildingType": building_type,
+                "buildingId": building_id,
+                "position": [0, 0],
+            },
+            {
+                "type": "SELL",
+                "frame": frame + 10,
+                "buildingId": building_id,
+            },
+        ]
+
+        request_data = {
+            "sessionId": str(session.id),
+            "waveNumber": 1,
+            "actions": actions,
+            "attacks": attacks,
+            "result": result,
+            "buildings": [],
+        }
+
+        response = api_client.post(
+            "/api/game/sessions/wave",
+            data=request_data,
+            format="json",
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["valid"] is True
+
+    @pytest.mark.django_db
+    def test_submit_wave_dps_validation_with_upgraded_then_sold_building(
+        self, api_client: APIClient, session_with_first_wave: GameSession
+    ):
+        """测试升级后卖掉建筑时 DPS 验证使用升级后的等级.
+
+        场景：
+        1. 建造 LMG (level 1, damage=5)
+        2. 升级到 level 2 (damage=6)
+        3. 用 level 2 的伤害攻击怪物
+        4. 卖掉建筑
+        5. buildings 列表为空
+
+        验证：
+        - DPS 应使用 level 2 的伤害值计算 (6 / 3 = 2)
+        - 而不是 level 1 的伤害值 (5 / 3 = 1.67)
+        """
+        session = session_with_first_wave
+        wave_config = session.next_wave
+        monsters = wave_config["monsters"]
+
+        building_id = "b-001"
+        building_type = "LMG"
+        # LMG level 2 伤害: int(5 * 1.2) = 6
+        building_damage_level_2 = 6
+
+        attacks = []
+        frame = 100
+        killed_by_type: dict[int, int] = {}
+        total_life_destroyed = 0
+        total_money = 0
+
+        for m in monsters:
+            hits_needed = (m["life"] + building_damage_level_2 - 1) // building_damage_level_2
+            for _ in range(hits_needed):
+                attacks.append({
+                    "frame": frame,
+                    "buildingId": building_id,
+                    "originalTargetId": m["id"],
+                    "originalTargetPosition": [4, 3],
+                    "monsterId": m["id"],
+                    "monsterPosition": [4, 3],
+                    "damage": building_damage_level_2,
+                })
+                frame += 3
+
+            t = m["type"]
+            killed_by_type[t] = killed_by_type.get(t, 0) + 1
+            total_life_destroyed += m["life"]
+            total_money += m["money"]
+
+        total_damage = sum(a["damage"] for a in attacks)
+        score = sum(int(math.sqrt(a["damage"])) for a in attacks)
+
+        result = {
+            "killed": len(monsters),
+            "killedByType": killed_by_type,
+            "passed": 0,
+            "scoreGained": score,
+            "moneyGained": total_money,
+            "lifeLost": 0,
+            "totalDamageDealt": total_damage,
+            "totalLifeDestroyed": total_life_destroyed,
+            "waveDurationFrames": 1000,
+        }
+
+        actions = [
+            {
+                "type": "BUILD",
+                "frame": 10,
+                "buildingType": building_type,
+                "buildingId": building_id,
+                "position": [0, 0],
+            },
+            {
+                "type": "UPGRADE",
+                "frame": 50,
+                "buildingId": building_id,
+                "level": 2,
+            },
+            {
+                "type": "SELL",
+                "frame": frame + 10,
+                "buildingId": building_id,
+            },
+        ]
+
+        request_data = {
+            "sessionId": str(session.id),
+            "waveNumber": 1,
+            "actions": actions,
+            "attacks": attacks,
+            "result": result,
+            "buildings": [],
+        }
+
+        response = api_client.post(
+            "/api/game/sessions/wave",
+            data=request_data,
+            format="json",
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["valid"] is True
+
+    @pytest.mark.django_db
+    def test_submit_wave_dps_validation_with_existing_building_sold(
+        self, api_client: APIClient, db
+    ):
+        """测试已有建筑被升级后卖掉的场景（用户复现场景）.
+
+        场景（模拟波次 2）：
+        1. 波次开始时 session.buildings 已有 b-1 (LMG, level 1)
+        2. 升级 b-1 到 level 2
+        3. 卖掉 b-1
+        4. 建造 b-2 (LMG)
+        5. b-2 攻击怪物
+        6. 卖掉 b-2
+        7. buildings 列表为空
+
+        验证：
+        - DPS 应包含 b-1 (level 2) 和 b-2 (level 1) 两个建筑
+        """
+        wave_2 = generate_wave(2, INITIAL["difficulty"])
+        session = GameSession.objects.create(
+            money=450,  # 500 - 100(LMG) + 5(怪物奖励) = 405，再加点余量
+            life=INITIAL["life"],
+            difficulty=INITIAL["difficulty"],
+            wave_count=1,
+            buildings=[
+                {"id": "b-1", "type": "LMG", "level": 1, "position": [2, 2]},
+            ],
+            config=GAME_CONFIG,
+            next_wave=wave_2,
+        )
+
+        monsters = wave_2["monsters"]
+        building_damage = GAME_CONFIG["buildings"]["LMG"]["damage"]
+
+        attacks = []
+        frame = 1000
+        killed_by_type: dict[int, int] = {}
+        total_life_destroyed = 0
+        total_money = 0
+
+        for m in monsters:
+            hits_needed = (m["life"] + building_damage - 1) // building_damage
+            for _ in range(hits_needed):
+                attacks.append({
+                    "frame": frame,
+                    "buildingId": "b-2",
+                    "originalTargetId": m["id"],
+                    "originalTargetPosition": [4, 3],
+                    "monsterId": m["id"],
+                    "monsterPosition": [4, 3],
+                    "damage": building_damage,
+                })
+                frame += 3
+
+            t = m["type"]
+            killed_by_type[t] = killed_by_type.get(t, 0) + 1
+            total_life_destroyed += m["life"]
+            total_money += m["money"]
+
+        total_damage = sum(a["damage"] for a in attacks)
+        score = sum(int(math.sqrt(a["damage"])) for a in attacks)
+
+        result = {
+            "killed": len(monsters),
+            "killedByType": killed_by_type,
+            "passed": 0,
+            "scoreGained": score,
+            "moneyGained": total_money,
+            "lifeLost": 0,
+            "totalDamageDealt": total_damage,
+            "totalLifeDestroyed": total_life_destroyed,
+            "waveDurationFrames": 1000,
+        }
+
+        actions = [
+            {"type": "UPGRADE", "frame": 100, "buildingId": "b-1", "level": 2},
+            {"type": "SELL", "frame": 200, "buildingId": "b-1"},
+            {
+                "type": "BUILD",
+                "frame": 500,
+                "buildingType": "LMG",
+                "buildingId": "b-2",
+                "position": [3, 3],
+            },
+            {"type": "SELL", "frame": frame + 10, "buildingId": "b-2"},
+        ]
+
+        request_data = {
+            "sessionId": str(session.id),
+            "waveNumber": 2,
+            "actions": actions,
+            "attacks": attacks,
+            "result": result,
+            "buildings": [],
+        }
+
+        response = api_client.post(
+            "/api/game/sessions/wave",
+            data=request_data,
+            format="json",
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["valid"] is True
+
+    @pytest.mark.django_db
+    def test_submit_wave_dps_validation_with_multiple_buildings_partial_sold(
+        self, api_client: APIClient, session_with_first_wave: GameSession
+    ):
+        """测试多建筑部分卖掉的场景.
+
+        场景：
+        1. 建造 b-1 (LMG)
+        2. 建造 b-2 (cannon)
+        3. 两个建筑都攻击怪物
+        4. 只卖掉 b-1
+        5. buildings 列表只有 b-2
+
+        验证：
+        - DPS 应包含 b-1 (LMG) 和 b-2 (cannon) 两个建筑
+        - 不能只计算 b-2 的 DPS
+        """
+        session = session_with_first_wave
+        wave_config = session.next_wave
+        monsters = wave_config["monsters"]
+
+        lmg_damage = GAME_CONFIG["buildings"]["LMG"]["damage"]
+        cannon_damage = GAME_CONFIG["buildings"]["cannon"]["damage"]
+
+        attacks = []
+        frame = 100
+        killed_by_type: dict[int, int] = {}
+        total_life_destroyed = 0
+        total_money = 0
+
+        for m in monsters:
+            # LMG 先攻击几次
+            lmg_hits = 2
+            for _ in range(lmg_hits):
+                attacks.append({
+                    "frame": frame,
+                    "buildingId": "b-1",
+                    "originalTargetId": m["id"],
+                    "originalTargetPosition": [4, 3],
+                    "monsterId": m["id"],
+                    "monsterPosition": [4, 3],
+                    "damage": lmg_damage,
+                })
+                frame += 3
+
+            # cannon 继续攻击直到击杀
+            remaining_life = m["life"] - lmg_hits * lmg_damage
+            cannon_hits = (remaining_life + cannon_damage - 1) // cannon_damage
+            for _ in range(max(cannon_hits, 1)):
+                attacks.append({
+                    "frame": frame,
+                    "buildingId": "b-2",
+                    "originalTargetId": m["id"],
+                    "originalTargetPosition": [4, 3],
+                    "monsterId": m["id"],
+                    "monsterPosition": [4, 3],
+                    "damage": cannon_damage,
+                })
+                frame += 2
+
+            t = m["type"]
+            killed_by_type[t] = killed_by_type.get(t, 0) + 1
+            total_life_destroyed += m["life"]
+            total_money += m["money"]
+
+        total_damage = sum(a["damage"] for a in attacks)
+        score = sum(int(math.sqrt(a["damage"])) for a in attacks)
+
+        result = {
+            "killed": len(monsters),
+            "killedByType": killed_by_type,
+            "passed": 0,
+            "scoreGained": score,
+            "moneyGained": total_money,
+            "lifeLost": 0,
+            "totalDamageDealt": total_damage,
+            "totalLifeDestroyed": total_life_destroyed,
+            "waveDurationFrames": 1000,
+        }
+
+        actions = [
+            {
+                "type": "BUILD",
+                "frame": 10,
+                "buildingType": "LMG",
+                "buildingId": "b-1",
+                "position": [0, 0],
+            },
+            {
+                "type": "BUILD",
+                "frame": 20,
+                "buildingType": "cannon",
+                "buildingId": "b-2",
+                "position": [1, 1],
+            },
+            {"type": "SELL", "frame": frame + 10, "buildingId": "b-1"},
+        ]
+
+        request_data = {
+            "sessionId": str(session.id),
+            "waveNumber": 1,
+            "actions": actions,
+            "attacks": attacks,
+            "result": result,
+            "buildings": [
+                {"id": "b-2", "type": "cannon", "position": [1, 1], "level": 1,
+                 "damageDealt": 0, "kills": 0},
+            ],
+        }
+
+        response = api_client.post(
+            "/api/game/sessions/wave",
+            data=request_data,
+            format="json",
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["valid"] is True
+
+    @pytest.mark.django_db
+    def test_submit_wave_dps_validation_with_sold_building_no_attacks(
+        self, api_client: APIClient, session_with_first_wave: GameSession
+    ):
+        """测试建造后卖掉但无攻击的场景（零伤害边界）.
+
+        场景：
+        1. 建造 LMG
+        2. 不攻击任何怪物（怪物全部穿过）
+        3. 卖掉建筑
+        4. total_damage_dealt = 0
+
+        验证：
+        - 0 <= max_dps * duration * 1.1
+        - 应该通过验证
+        """
+        session = session_with_first_wave
+        wave_config = session.next_wave
+        monsters = wave_config["monsters"]
+
+        result = {
+            "killed": 0,
+            "killedByType": {},
+            "passed": len(monsters),
+            "scoreGained": 0,
+            "moneyGained": 0,
+            "lifeLost": len(monsters),
+            "totalDamageDealt": 0,
+            "totalLifeDestroyed": 0,
+            "waveDurationFrames": 1000,
+        }
+
+        actions = [
+            {
+                "type": "BUILD",
+                "frame": 10,
+                "buildingType": "LMG",
+                "buildingId": "b-001",
+                "position": [0, 0],
+            },
+            {"type": "SELL", "frame": 500, "buildingId": "b-001"},
+        ]
+
+        request_data = {
+            "sessionId": str(session.id),
+            "waveNumber": 1,
+            "actions": actions,
+            "attacks": [],
+            "result": result,
+            "buildings": [],
+        }
+
+        response = api_client.post(
+            "/api/game/sessions/wave",
+            data=request_data,
+            format="json",
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["valid"] is True
+
     # ========== remaining 字段验证测试 ==========
 
     @pytest.fixture
@@ -1393,6 +1889,111 @@ class TestEndSessionView:
         data = response.json()
         assert data["verified"] is False
         assert "金钱收益不匹配" in data["error"]["message"]
+
+    @pytest.mark.django_db
+    def test_end_session_dps_validation_with_sold_buildings(
+        self, api_client: APIClient, session_with_waves: GameSession
+    ):
+        """测试 lastWave 中建造后卖掉建筑时 DPS 验证仍能正常工作.
+
+        场景（复现问题）：
+        1. 建造一个 LMG 建筑
+        2. LMG 攻击怪物，造成伤害
+        3. 卖掉 LMG
+        4. 结束游戏，lastWave.buildings 列表为空
+
+        修复前：DPS 验证使用 submitted_buildings（空列表），导致 max_dps=0，
+               任何伤害都会触发 "DPS 容量超限" 错误。
+
+        修复后：DPS 验证使用 validation_buildings（包含波次期间存在过的建筑），
+               正确计算 max_dps，验证应通过。
+        """
+        session = session_with_waves
+        wave_config = session.next_wave
+        monsters = wave_config["monsters"]
+
+        building_id = "b-001"
+        building_type = "LMG"
+        building_damage = GAME_CONFIG["buildings"][building_type]["damage"]
+
+        attacks = []
+        frame = 100
+        killed_by_type: dict[int, int] = {}
+        total_life_destroyed = 0
+        total_money = 0
+
+        for m in monsters:
+            hits_needed = (m["life"] + building_damage - 1) // building_damage
+            for _ in range(hits_needed):
+                attacks.append({
+                    "frame": frame,
+                    "buildingId": building_id,
+                    "originalTargetId": m["id"],
+                    "originalTargetPosition": [4, 3],
+                    "monsterId": m["id"],
+                    "monsterPosition": [4, 3],
+                    "damage": building_damage,
+                })
+                frame += 3
+
+            t = m["type"]
+            killed_by_type[t] = killed_by_type.get(t, 0) + 1
+            total_life_destroyed += m["life"]
+            total_money += m["money"]
+
+        total_damage = sum(a["damage"] for a in attacks)
+        score = sum(int(math.sqrt(a["damage"])) for a in attacks)
+
+        result = {
+            "killed": len(monsters),
+            "killedByType": killed_by_type,
+            "passed": 0,
+            "scoreGained": score,
+            "moneyGained": total_money,
+            "lifeLost": 0,
+            "totalDamageDealt": total_damage,
+            "totalLifeDestroyed": total_life_destroyed,
+            "waveDurationFrames": 1000,
+        }
+
+        actions = [
+            {
+                "type": "BUILD",
+                "frame": 10,
+                "buildingType": building_type,
+                "buildingId": building_id,
+                "position": [0, 0],
+            },
+            {
+                "type": "SELL",
+                "frame": frame + 10,
+                "buildingId": building_id,
+            },
+        ]
+
+        last_wave = {
+            "waveNumber": session.wave_count + 1,
+            "actions": actions,
+            "attacks": attacks,
+            "result": result,
+            "buildings": [],
+        }
+
+        request_data = {
+            "sessionId": str(session.id),
+            "nickname": "SoldBuildingTester",
+            "lastWave": last_wave,
+        }
+
+        response = api_client.post(
+            "/api/game/sessions/end",
+            data=request_data,
+            format="json",
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["verified"] is True
 
     @pytest.mark.django_db
     def test_end_session_ranking_calculation(

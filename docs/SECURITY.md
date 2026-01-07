@@ -83,8 +83,10 @@
 **DPS 容量计算**：
 
 ```
-max_dps = sum(building.damage / building.attack_interval for building in buildings)
+max_dps = sum(building.damage / building.attack_interval for building in validation_buildings)
 ```
+
+注意：使用的是 `validation_buildings`（波次期间存在过的建筑），而非波次结束时的 `submitted_buildings`。因为攻击可能发生在建筑被出售之前，验证需要考虑所有参与过攻击的建筑。
 
 10% 容差用于处理浮点精度和边界情况。
 

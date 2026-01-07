@@ -154,17 +154,19 @@ class SubmitWaveView(APIView):
         if not ok:
             return self._validation_error(msg)
 
+        # 构建用于验证的建筑列表
+        # 使用 validation_buildings 而非 submitted_buildings，
+        # 因为攻击可能发生在建筑被出售之前
+        validation_buildings = build_validation_buildings(actions, session.buildings)
+
         # Level 2 伤害验证
         ok, msg = validate_damage(
-            result, submitted_buildings, wave_config, GAME_CONFIG["buildings"]
+            result, validation_buildings, wave_config, GAME_CONFIG["buildings"]
         )
         if not ok:
             return self._validation_error(msg)
 
         # Level 2+ 攻击事件验证
-        # 使用 validation_buildings 而非 submitted_buildings，
-        # 因为攻击可能发生在建筑被出售之前
-        validation_buildings = build_validation_buildings(actions, session.buildings)
         monsters_config = _get_monsters_config(session.next_wave)
         ok, msg = validate_attacks(
             attacks,
@@ -337,15 +339,17 @@ class EndSessionView(APIView):
         if not ok:
             return self._validation_error(msg)
 
+        # 构建用于验证的建筑列表
+        # 使用 validation_buildings 而非 submitted_buildings，
+        # 因为攻击可能发生在建筑被出售之前
+        validation_buildings = build_validation_buildings(actions, session.buildings)
+
         ok, msg = validate_damage(
-            result, submitted_buildings, wave_config, GAME_CONFIG["buildings"]
+            result, validation_buildings, wave_config, GAME_CONFIG["buildings"]
         )
         if not ok:
             return self._validation_error(msg)
 
-        # 使用 validation_buildings 而非 submitted_buildings，
-        # 因为攻击可能发生在建筑被出售之前
-        validation_buildings = build_validation_buildings(actions, session.buildings)
         monsters_config = _get_monsters_config(session.next_wave)
         ok, msg = validate_attacks(
             attacks,
