@@ -267,6 +267,7 @@ export class Game extends Scene {
 
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       if (this.uiState.isLoading) return
+      if (this.logic.getState().isGameOver) return
 
       // 检查是否点击在交互 UI 元素上（建筑面板按钮等）
       // hitTestPointer 返回指针位置下所有设置了 interactive 的游戏对象
@@ -547,6 +548,7 @@ export class Game extends Scene {
     if (!this.uiState.selectedBuildingType) return
     // 波次提交期间不允许操作（尚未收到响应，新 recorder 未创建）
     if (this.uiState.isSubmittingWave) return
+    if (this.logic.getState().isGameOver) return
 
     const buildingType = this.uiState.selectedBuildingType
 
@@ -588,6 +590,7 @@ export class Game extends Scene {
   tryUpgradeBuilding(buildingId: string) {
     // 波次提交期间不允许操作（尚未收到响应，新 recorder 未创建）
     if (this.uiState.isSubmittingWave) return
+    if (this.logic.getState().isGameOver) return
 
     const building = this.logic.getBuilding(buildingId)
     const result = this.logic.upgradeBuilding(buildingId)
@@ -609,6 +612,7 @@ export class Game extends Scene {
   trySellBuilding(buildingId: string) {
     // 波次提交期间不允许操作（尚未收到响应，新 recorder 未创建）
     if (this.uiState.isSubmittingWave) return
+    if (this.logic.getState().isGameOver) return
 
     const result = this.logic.sellBuilding(buildingId)
     if (result.success) {

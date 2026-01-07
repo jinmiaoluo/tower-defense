@@ -361,6 +361,10 @@ export function createGameSceneLogic(config: GameConfig): GameSceneLogic {
     },
 
     placeBuilding(position: Position, type: BuildingType): PlaceBuildingResult {
+      if (state.isGameOver) {
+        return { success: false, reason: 'game_over' }
+      }
+
       const cost = buildingSystem.getBuildingConfig(type).cost
 
       // 检查金钱
@@ -409,6 +413,10 @@ export function createGameSceneLogic(config: GameConfig): GameSceneLogic {
     },
 
     upgradeBuilding(buildingId: string): BuildingActionResult {
+      if (state.isGameOver) {
+        return { success: false, reason: 'game_over' }
+      }
+
       const building = buildings.find((b) => b.id === buildingId)
       if (!building) {
         return { success: false, reason: 'building_not_found' }
@@ -432,6 +440,10 @@ export function createGameSceneLogic(config: GameConfig): GameSceneLogic {
     },
 
     sellBuilding(buildingId: string): BuildingActionResult {
+      if (state.isGameOver) {
+        return { success: false, reason: 'game_over' }
+      }
+
       const index = buildings.findIndex((b) => b.id === buildingId)
       if (index === -1) {
         return { success: false, reason: 'building_not_found' }

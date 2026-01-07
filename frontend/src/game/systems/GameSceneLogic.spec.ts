@@ -587,6 +587,130 @@ describe('GameSceneLogic', () => {
       const attacksAfter = logic.getWaveRecorder().getAttacks().length
       expect(attacksAfter).toBe(attacksBefore)
     })
+
+    it('调用 setGameOver 后不能放置建筑', () => {
+      const moneyBefore = logic.getState().money
+
+      logic.setGameOver()
+
+      const result = logic.placeBuilding([5, 5], 'wall')
+
+      expect(result.success).toBe(false)
+      expect(result.reason).toBe('game_over')
+      expect(logic.getState().money).toBe(moneyBefore)
+      expect(logic.getBuildings()).toHaveLength(0)
+    })
+
+    it('调用 setGameOver 后不能升级建筑', () => {
+      // 先放置建筑
+      const placeResult = logic.placeBuilding([5, 5], 'cannon')
+      expect(placeResult.success).toBe(true)
+
+      const building = logic.getBuildings()[0]
+      const levelBefore = building.level
+      const moneyBefore = logic.getState().money
+
+      logic.setGameOver()
+
+      const result = logic.upgradeBuilding(building.id)
+
+      expect(result.success).toBe(false)
+      expect(result.reason).toBe('game_over')
+      expect(building.level).toBe(levelBefore)
+      expect(logic.getState().money).toBe(moneyBefore)
+    })
+
+    it('调用 setGameOver 后不能出售建筑', () => {
+      // 先放置建筑
+      const placeResult = logic.placeBuilding([5, 5], 'cannon')
+      expect(placeResult.success).toBe(true)
+
+      const building = logic.getBuildings()[0]
+      const moneyBefore = logic.getState().money
+
+      logic.setGameOver()
+
+      const result = logic.sellBuilding(building.id)
+
+      expect(result.success).toBe(false)
+      expect(result.reason).toBe('game_over')
+      expect(logic.getBuildings()).toHaveLength(1)
+      expect(logic.getState().money).toBe(moneyBefore)
+    })
+
+    it('游戏结束后重置再放置建筑应成功', () => {
+      logic.setGameOver()
+
+      // 游戏结束后操作应失败
+      const failResult = logic.placeBuilding([5, 5], 'wall')
+      expect(failResult.success).toBe(false)
+      expect(failResult.reason).toBe('game_over')
+
+      // 重置后操作应成功
+      logic.reset()
+
+      const successResult = logic.placeBuilding([5, 5], 'wall')
+      expect(successResult.success).toBe(true)
+      expect(logic.getBuildings()).toHaveLength(1)
+    })
+
+    it('怪物穿过导致游戏结束后不能放置建筑', () => {
+      const lowLifeConfig = {
+        ...MOCK_GAME_CONFIG,
+        initial: { ...MOCK_GAME_CONFIG.initial, life: 1 },
+      }
+      const lowLifeLogic = createGameSceneLogic(lowLifeConfig)
+      lowLifeLogic.prepareNextWaveRecorder(1)
+
+      // 使用高速怪物快速穿过
+      lowLifeLogic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 50, speed: 100, shield: 0, money: 5 }],
+      })
+
+      // 运行直到游戏结束
+      for (let i = 0; i < 5000; i++) {
+        lowLifeLogic.update()
+        if (lowLifeLogic.getState().isGameOver) break
+      }
+
+      expect(lowLifeLogic.getState().isGameOver).toBe(true)
+
+      // 游戏结束后尝试放置建筑应失败
+      const result = lowLifeLogic.placeBuilding([5, 5], 'wall')
+      expect(result.success).toBe(false)
+      expect(result.reason).toBe('game_over')
+    })
+
+    it('生命值从 1 降为 0 时游戏结束且无法操作', () => {
+      const lowLifeConfig = {
+        ...MOCK_GAME_CONFIG,
+        initial: { ...MOCK_GAME_CONFIG.initial, life: 1 },
+      }
+      const lowLifeLogic = createGameSceneLogic(lowLifeConfig)
+      lowLifeLogic.prepareNextWaveRecorder(1)
+
+      // 使用伤害为 1 的普通怪 (type: 0, damage: 1)
+      lowLifeLogic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 50, speed: 100, shield: 0, money: 5 }],
+      })
+
+      // 运行直到游戏结束
+      for (let i = 0; i < 5000; i++) {
+        lowLifeLogic.update()
+        if (lowLifeLogic.getState().isGameOver) break
+      }
+
+      // 验证生命值精确为 0
+      expect(lowLifeLogic.getState().life).toBe(0)
+      expect(lowLifeLogic.getState().isGameOver).toBe(true)
+
+      // 游戏结束后操作应失败
+      const result = lowLifeLogic.placeBuilding([5, 5], 'wall')
+      expect(result.success).toBe(false)
+      expect(result.reason).toBe('game_over')
+    })
   })
 
   // ============================================================================
