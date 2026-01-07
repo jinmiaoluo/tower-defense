@@ -215,7 +215,21 @@ final_score = sum(wave_record.score_gained for wave_record in session.wave_recor
 
 - 创建：POST /sessions
 - 更新：POST /sessions/wave（波次提交）
-- 结束：POST /sessions/end 或 24 小时过期清理
+- 结束：POST /sessions/end（成功后删除 session）或 24 小时过期清理
+
+**防重复提交**：
+
+提交成功后立即删除 session，确保同一 sessionId 只能成功提交一次：
+
+```python
+with transaction.atomic():
+    entry = LeaderboardEntry.objects.create(...)
+    session.delete()
+```
+
+- 第一次提交：查询 session 成功，创建排行榜记录，删除 session
+- 第二次提交：查询 session 失败（DoesNotExist），返回 404
+- 事务保证：创建记录和删除 session 原子执行，不会出现中间状态
 
 **会话状态追踪**：
 
