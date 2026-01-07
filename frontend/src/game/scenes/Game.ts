@@ -37,6 +37,24 @@ const RENDER_GRID_SIZE = GRID_SIZE * DPR
 /** 波次间隔帧数 (60 FPS x 3 秒 = 180 帧) */
 const WAVE_INTERVAL_FRAMES = 180
 
+/** 状态卡片颜色配置 */
+const STATS_CARD_COLORS = {
+  money: 0xf5a623,
+  score: 0x9b59b6,
+  life: 0xe74c3c,
+  buildings: 0x27ae60,
+  monsters: 0xe67e22,
+} as const
+
+/** 单个状态卡片的数据结构 */
+interface StatsCard {
+  container: Phaser.GameObjects.Container
+  background: Phaser.GameObjects.Graphics
+  colorBar: Phaser.GameObjects.Graphics
+  labelText: Phaser.GameObjects.Text
+  valueText: Phaser.GameObjects.Text
+}
+
 /** 游戏 UI 状态 */
 interface UIState {
   isLoading: boolean
@@ -72,8 +90,17 @@ export class Game extends Scene {
   private monsterGraphics!: Phaser.GameObjects.Graphics
   private bulletGraphics!: Phaser.GameObjects.Graphics
   private hoverGraphics!: Phaser.GameObjects.Graphics
-  private uiText!: Phaser.GameObjects.Text
   private buildingPanel!: Phaser.GameObjects.Container
+
+  // 状态卡片容器
+  private statsContainer!: Phaser.GameObjects.Container
+  private statsCards!: {
+    money: StatsCard
+    score: StatsCard
+    life: StatsCard
+    buildings: StatsCard
+    monsters: StatsCard
+  }
 
   // 渲染上下文适配器
   private buildingRenderCtx!: RenderContext
@@ -335,8 +362,6 @@ export class Game extends Scene {
     // 重新渲染需要主题颜色的元素
     if (!this.uiState.isLoading) {
       this.renderMap()
-      // 更新 UI 文本颜色
-      this.uiText.setColor(this.gameColors.uiText)
     }
   }
 
@@ -344,6 +369,8 @@ export class Game extends Scene {
   private handleLocaleChange() {
     // 更新翻译函数
     this.t = getTranslator()
+    // 更新状态卡片标签
+    this.updateStatsCardLabels()
     // 更新建筑面板文字
     this.updateBuildingPanelTexts()
     // 更新控制面板文字
@@ -806,17 +833,8 @@ export class Game extends Scene {
 
   /** 创建 UI */
   private createUI() {
-    const { width } = this.scale
-
-    this.uiText = this.add
-      .text(width / 2, 10 * DPR, '', {
-        fontFamily: 'Arial',
-        fontSize: `${14 * DPR}px`,
-        color: this.getColors().uiText,
-        wordWrap: { width: width - 20 * DPR },
-        align: 'center',
-      })
-      .setOrigin(0.5, 0)
+    // 创建状态卡片
+    this.createStatsCards()
 
     // 创建提示容器
     this.createTipContainer()
@@ -825,6 +843,101 @@ export class Game extends Scene {
     this.createTooltipContainer()
 
     this.updateUI()
+  }
+
+  /** 创建状态卡片 */
+  private createStatsCards() {
+    const { width } = this.scale
+
+    this.statsContainer = this.add.container(width / 2, 8 * DPR)
+
+    const cardWidth = 60 * DPR
+    const cardHeight = 36 * DPR
+    const gap = 6 * DPR
+    const colorBarHeight = 4 * DPR
+    const cornerRadius = 4 * DPR
+
+    const cardConfigs: Array<{
+      key: keyof typeof STATS_CARD_COLORS
+      labelKey: string
+    }> = [
+      { key: 'money', labelKey: 'panel_money_title' },
+      { key: 'score', labelKey: 'panel_score_title' },
+      { key: 'life', labelKey: 'panel_life_title' },
+      { key: 'buildings', labelKey: 'panel_building_title' },
+      { key: 'monsters', labelKey: 'panel_monster_title' },
+    ]
+
+    const totalWidth = cardConfigs.length * cardWidth + (cardConfigs.length - 1) * gap
+    const startX = -totalWidth / 2
+
+    this.statsCards = {} as typeof this.statsCards
+
+    cardConfigs.forEach((config, index) => {
+      const x = startX + index * (cardWidth + gap) + cardWidth / 2
+      const color = STATS_CARD_COLORS[config.key]
+
+      const container = this.add.container(x, cardHeight / 2)
+
+      // 背景（半透明深色）
+      const background = this.add.graphics()
+      background.fillStyle(0x000000, 0.5)
+      background.fillRoundedRect(
+        -cardWidth / 2,
+        -cardHeight / 2,
+        cardWidth,
+        cardHeight,
+        cornerRadius,
+      )
+      background.lineStyle(1, 0xffffff, 0.2)
+      background.strokeRoundedRect(
+        -cardWidth / 2,
+        -cardHeight / 2,
+        cardWidth,
+        cardHeight,
+        cornerRadius,
+      )
+
+      // 顶部颜色条
+      const colorBar = this.add.graphics()
+      colorBar.fillStyle(color, 1)
+      colorBar.fillRoundedRect(
+        -cardWidth / 2 + 2,
+        -cardHeight / 2 + 2,
+        cardWidth - 4,
+        colorBarHeight,
+        { tl: cornerRadius - 1, tr: cornerRadius - 1, bl: 0, br: 0 },
+      )
+
+      // 标签文字（简短版本，不带冒号）
+      const label = this.t(config.labelKey).replace(/[:\s:]+$/, '')
+      const labelText = this.add.text(0, -4 * DPR, label, {
+        fontFamily: 'Arial',
+        fontSize: `${9 * DPR}px`,
+        color: 'rgba(255, 255, 255, 0.7)',
+      })
+      labelText.setOrigin(0.5, 0.5)
+
+      // 数值文字
+      const valueText = this.add.text(0, 10 * DPR, '0', {
+        fontFamily: 'Arial',
+        fontSize: `${12 * DPR}px`,
+        fontStyle: 'bold',
+        color: '#ffffff',
+      })
+      valueText.setOrigin(0.5, 0.5)
+
+      container.add([background, colorBar, labelText, valueText])
+      this.statsContainer.add(container)
+
+      this.statsCards[config.key] = {
+        container,
+        background,
+        colorBar,
+        labelText,
+        valueText,
+      }
+    })
   }
 
   /** 创建提示容器 */
@@ -1331,8 +1444,7 @@ export class Game extends Scene {
 
   /** 更新 UI 显示 */
   private updateUI() {
-    if (this.uiState.isLoading) {
-      this.uiText.setText(this.t('loading'))
+    if (this.uiState.isLoading || !this.statsCards) {
       return
     }
 
@@ -1341,15 +1453,33 @@ export class Game extends Scene {
     const monsters = this.logic.getMonsters()
     const aliveMonsters = monsters.filter((m) => m.isValid).length
 
-    const statusText = [
-      `${this.t('panel_money_title')}${state.money}`,
-      `${this.t('panel_score_title')}${state.score}`,
-      `${this.t('panel_life_title')}${state.life}`,
-      `${this.t('panel_building_title')}${buildings.length}`,
-      `${this.t('panel_monster_title')}${aliveMonsters}`,
-    ].join(' | ')
+    // 更新各卡片数值
+    this.statsCards.money.valueText.setText(`$${state.money}`)
+    this.statsCards.score.valueText.setText(String(state.score))
+    this.statsCards.life.valueText.setText(String(state.life))
+    this.statsCards.buildings.valueText.setText(String(buildings.length))
+    this.statsCards.monsters.valueText.setText(String(aliveMonsters))
+  }
 
-    this.uiText.setText(statusText)
+  /** 更新状态卡片标签文字（语言切换时） */
+  private updateStatsCardLabels() {
+    if (!this.statsCards) return
+
+    const labelConfigs: Array<{
+      key: keyof typeof STATS_CARD_COLORS
+      labelKey: string
+    }> = [
+      { key: 'money', labelKey: 'panel_money_title' },
+      { key: 'score', labelKey: 'panel_score_title' },
+      { key: 'life', labelKey: 'panel_life_title' },
+      { key: 'buildings', labelKey: 'panel_building_title' },
+      { key: 'monsters', labelKey: 'panel_monster_title' },
+    ]
+
+    labelConfigs.forEach((config) => {
+      const label = this.t(config.labelKey).replace(/[:\s:]+$/, '')
+      this.statsCards[config.key].labelText.setText(label)
+    })
   }
 
   /** 检查波次是否结束并处理 */
