@@ -749,22 +749,25 @@ def analyze_statistics(
             },
         )
 
-    # 历史平均效率
-    hist_score = sum(r.score_gained for r in wave_records)
-    hist_cost = sum(r.money_spent for r in wave_records)
-    hist_efficiency = hist_score / max(hist_cost, 1)
+    # 效率突增检测：只在当前波和历史都有花费时才检测
+    # 无花费时跳过检测，因为：
+    # - 当前无花费：玩家在前期集中投资后不再建造是正常策略
+    # - 历史无花费：无法计算有意义的历史效率基准
+    if money_spent > 0:
+        hist_score = sum(r.score_gained for r in wave_records)
+        hist_cost = sum(r.money_spent for r in wave_records)
 
-    # 当前效率
-    curr_efficiency = result["score_gained"] / max(money_spent, 1)
+        if hist_cost > 0:
+            hist_efficiency = hist_score / hist_cost
+            curr_efficiency = result["score_gained"] / money_spent
 
-    # 效率突增检测
-    if curr_efficiency > hist_efficiency * 3:
-        logger.warning(
-            "资源效率异常突增",
-            extra={
-                "wave": session.wave_count + 1,
-                "session_id": str(session.id),
-                "hist_efficiency": hist_efficiency,
-                "curr_efficiency": curr_efficiency,
-            },
-        )
+            if curr_efficiency > hist_efficiency * 3:
+                logger.warning(
+                    "资源效率异常突增",
+                    extra={
+                        "wave": session.wave_count + 1,
+                        "session_id": str(session.id),
+                        "hist_efficiency": hist_efficiency,
+                        "curr_efficiency": curr_efficiency,
+                    },
+                )

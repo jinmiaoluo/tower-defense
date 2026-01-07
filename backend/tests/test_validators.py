@@ -1988,8 +1988,35 @@ class TestAnalyzeStatistics:
             analyze_statistics(session, result, 100)
             assert mock_logger.warning.call_count == 2
 
+    def test_no_efficiency_warning_when_no_spending(self):
+        """无花费时不触发效率警告（正常游戏策略）.
+
+        玩家在前期集中投资建造后，后续波次不再建造是正常策略。
+        此时 money_spent = 0，不应触发效率警告。
+        """
+        session = Mock()
+        session.waves.all.return_value = [
+            self._create_wave_record(10, 0, 50, 500),  # 效率 0.1
+            self._create_wave_record(10, 0, 60, 300),  # 效率 0.2
+            self._create_wave_record(10, 0, 40, 200),  # 效率 0.2
+        ]
+        session.wave_count = 3
+        session.id = "test-session-id"
+        # 历史平均效率 = 150/1000 = 0.15
+        # 当前：无花费，分数 100（已有建筑产出）
+        result = {"killed": 10, "passed": 0, "score_gained": 100}
+
+        with patch("game.validators.logger") as mock_logger:
+            analyze_statistics(session, result, 0)
+            # 无花费时应跳过效率检测，不触发警告
+            efficiency_warnings = [
+                call for call in mock_logger.warning.call_args_list
+                if "资源效率异常突增" in str(call)
+            ]
+            assert len(efficiency_warnings) == 0
+
     def test_zero_money_spent_no_crash(self):
-        """花费为 0 时不崩溃."""
+        """花费为 0 时不崩溃且不触发效率警告."""
         session = Mock()
         session.waves.all.return_value = [
             self._create_wave_record(5, 0, 50, 0),
@@ -2000,8 +2027,15 @@ class TestAnalyzeStatistics:
         session.id = "test-session-id"
         result = {"killed": 5, "passed": 0, "score_gained": 50}
 
-        # 不应该崩溃
-        analyze_statistics(session, result, 0)
+        with patch("game.validators.logger") as mock_logger:
+            # 不应该崩溃
+            analyze_statistics(session, result, 0)
+            # 无花费时应跳过效率检测
+            efficiency_warnings = [
+                call for call in mock_logger.warning.call_args_list
+                if "资源效率异常突增" in str(call)
+            ]
+            assert len(efficiency_warnings) == 0
 
     def test_zero_total_monsters_no_crash(self):
         """怪物总数为 0 时不崩溃."""
@@ -2017,6 +2051,106 @@ class TestAnalyzeStatistics:
 
         # 不应该崩溃
         analyze_statistics(session, result, 100)
+
+    def test_no_efficiency_warning_when_zero_historical_cost(self):
+        """历史无花费时跳过效率检测.
+
+        当历史 3 波都没有花费时，无法计算有意义的历史效率基准，
+        应跳过效率检测，与当前波无花费的处理保持一致。
+        """
+        session = Mock()
+        session.waves.all.return_value = [
+            self._create_wave_record(5, 0, 50, 0),
+            self._create_wave_record(5, 0, 50, 0),
+            self._create_wave_record(5, 0, 50, 0),
+        ]
+        session.wave_count = 3
+        session.id = "test-session-id"
+        result = {"killed": 5, "passed": 0, "score_gained": 100}
+
+        with patch("game.validators.logger") as mock_logger:
+            analyze_statistics(session, result, 100)
+            efficiency_warnings = [
+                call for call in mock_logger.warning.call_args_list
+                if "资源效率异常突增" in str(call)
+            ]
+            assert len(efficiency_warnings) == 0
+
+    def test_efficiency_warning_when_zero_historical_score(self):
+        """历史效率为零时触发效率警告.
+
+        当历史有花费但无分数（效率=0）时，任何正效率都会触发警告。
+        这是合理行为：从零效率突变到有效率确实值得关注。
+        """
+        session = Mock()
+        session.waves.all.return_value = [
+            self._create_wave_record(0, 0, 0, 100),
+            self._create_wave_record(0, 0, 0, 100),
+            self._create_wave_record(0, 0, 0, 100),
+        ]
+        session.wave_count = 3
+        session.id = "test-session-id"
+        # 历史效率 = 0 / 300 = 0
+        # 当前效率 = 50 / 100 = 0.5 > 0 × 3 = 0
+        result = {"killed": 5, "passed": 0, "score_gained": 50}
+
+        with patch("game.validators.logger") as mock_logger:
+            analyze_statistics(session, result, 100)
+            efficiency_warnings = [
+                call for call in mock_logger.warning.call_args_list
+                if "资源效率异常突增" in str(call)
+            ]
+            assert len(efficiency_warnings) == 1
+
+    def test_no_efficiency_warning_at_exact_threshold(self):
+        """效率刚好等于阈值时不触发警告.
+
+        使用 > 而非 >=，刚好等于阈值时不触发。
+        """
+        session = Mock()
+        session.waves.all.return_value = [
+            self._create_wave_record(10, 0, 100, 100),
+            self._create_wave_record(10, 0, 100, 100),
+            self._create_wave_record(10, 0, 100, 100),
+        ]
+        session.wave_count = 3
+        session.id = "test-session-id"
+        # 历史效率 = 300 / 300 = 1.0
+        # 当前效率 = 300 / 100 = 3.0 == 1.0 × 3
+        result = {"killed": 10, "passed": 0, "score_gained": 300}
+
+        with patch("game.validators.logger") as mock_logger:
+            analyze_statistics(session, result, 100)
+            efficiency_warnings = [
+                call for call in mock_logger.warning.call_args_list
+                if "资源效率异常突增" in str(call)
+            ]
+            assert len(efficiency_warnings) == 0
+
+    def test_no_efficiency_warning_when_zero_current_score(self):
+        """当前分数为零时效率为零，不触发警告.
+
+        有花费但无分数（效率=0）不会 > 历史效率 × 3。
+        """
+        session = Mock()
+        session.waves.all.return_value = [
+            self._create_wave_record(10, 0, 50, 100),
+            self._create_wave_record(10, 0, 50, 100),
+            self._create_wave_record(10, 0, 50, 100),
+        ]
+        session.wave_count = 3
+        session.id = "test-session-id"
+        # 历史效率 = 150 / 300 = 0.5
+        # 当前效率 = 0 / 100 = 0 < 0.5 × 3 = 1.5
+        result = {"killed": 0, "passed": 10, "score_gained": 0}
+
+        with patch("game.validators.logger") as mock_logger:
+            analyze_statistics(session, result, 100)
+            efficiency_warnings = [
+                call for call in mock_logger.warning.call_args_list
+                if "资源效率异常突增" in str(call)
+            ]
+            assert len(efficiency_warnings) == 0
 
 
 class TestValidateGameEnd:
