@@ -2,6 +2,8 @@
 
 基于 Vue 3 + Phaser 3 + Django 的塔防游戏，包含防作弊验证机制和排行榜功能。
 
+这是对 [html5-tower-defense](https://github.com/oldj/html5-tower-defense) 的现代化重写。
+
 ## 项目结构
 
 ```
