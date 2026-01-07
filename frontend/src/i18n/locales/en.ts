@@ -86,9 +86,16 @@ export const en: Record<MessageKey, string> = {
   leaderboard: 'Leaderboard',
   rank: 'Rank',
   nickname: 'Nickname',
+  player: 'Player',
   score: 'Score',
+  waves: 'Waves',
+  date: 'Date',
   enter_nickname: 'Enter your nickname',
   submit: 'Submit',
+  retry: 'Retry',
+  close: 'Close',
+  leaderboard_error: 'Failed to load leaderboard',
+  leaderboard_empty: 'No records yet. Be the first!',
 
   // 游戏状态
   loading: 'Loading...',

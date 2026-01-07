@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import {
   createI18n,
   detectBrowserLocale,
+  getDateLocale,
   type I18n,
 } from './i18n'
 
@@ -161,6 +162,73 @@ describe('i18n', () => {
       expect(i18n.t('button_endgame_text')).toBe('End Game')
       expect(i18n.t('button_upgrade_text')).toBe('Upgrade')
       expect(i18n.t('button_sell_text')).toBe('Sell')
+    })
+  })
+
+  describe('排行榜翻译', () => {
+    it('应正确翻译排行榜相关文本（中文）', () => {
+      const i18n = createI18n('zh')
+
+      expect(i18n.t('leaderboard')).toBe('排行榜')
+      expect(i18n.t('rank')).toBe('排名')
+      expect(i18n.t('player')).toBe('玩家')
+      expect(i18n.t('score')).toBe('得分')
+      expect(i18n.t('waves')).toBe('波次')
+      expect(i18n.t('date')).toBe('日期')
+      expect(i18n.t('retry')).toBe('重试')
+      expect(i18n.t('close')).toBe('关闭')
+      expect(i18n.t('leaderboard_error')).toBe('加载排行榜失败')
+      expect(i18n.t('leaderboard_empty')).toBe('暂无记录，成为第一个上榜者吧！')
+    })
+
+    it('应正确翻译排行榜相关文本（英文）', () => {
+      const i18n = createI18n('en')
+
+      expect(i18n.t('leaderboard')).toBe('Leaderboard')
+      expect(i18n.t('rank')).toBe('Rank')
+      expect(i18n.t('player')).toBe('Player')
+      expect(i18n.t('score')).toBe('Score')
+      expect(i18n.t('waves')).toBe('Waves')
+      expect(i18n.t('date')).toBe('Date')
+      expect(i18n.t('retry')).toBe('Retry')
+      expect(i18n.t('close')).toBe('Close')
+      expect(i18n.t('leaderboard_error')).toBe('Failed to load leaderboard')
+      expect(i18n.t('leaderboard_empty')).toBe('No records yet. Be the first!')
+    })
+  })
+
+  describe('getDateLocale', () => {
+    it('中文语言应返回 zh-CN', () => {
+      expect(getDateLocale('zh')).toBe('zh-CN')
+    })
+
+    it('英文语言应返回 en-US', () => {
+      expect(getDateLocale('en')).toBe('en-US')
+    })
+
+    it('Date.toLocaleDateString 应使用正确的日期格式', () => {
+      const date = new Date('2024-06-15T12:00:00Z')
+
+      const zhFormatted = date.toLocaleDateString(getDateLocale('zh'), {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      })
+      const enFormatted = date.toLocaleDateString(getDateLocale('en'), {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      })
+
+      // 中文格式应包含年月日
+      expect(zhFormatted).toMatch(/2024/)
+      expect(zhFormatted).toMatch(/6/)
+      expect(zhFormatted).toMatch(/15/)
+
+      // 英文格式应包含 Jun 和 15
+      expect(enFormatted).toMatch(/Jun/)
+      expect(enFormatted).toMatch(/15/)
+      expect(enFormatted).toMatch(/2024/)
     })
   })
 })

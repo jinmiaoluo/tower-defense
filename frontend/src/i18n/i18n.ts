@@ -84,5 +84,12 @@ export function createAutoI18n(): I18n {
   return createI18n(detectBrowserLocale())
 }
 
+/**
+ * 根据 Locale 获取 Date API 使用的本地化字符串
+ */
+export function getDateLocale(locale: Locale): string {
+  return locale === 'zh' ? 'zh-CN' : 'en-US'
+}
+
 // 导出类型
 export type { MessageKey }

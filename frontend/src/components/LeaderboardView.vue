@@ -1,7 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { gameApi } from '@/api'
+import { useI18n, getDateLocale } from '@/i18n'
 import type { LeaderboardEntry } from '@/types'
+
+const { t, locale } = useI18n()
+const dateLocale = computed(() => getDateLocale(locale.value))
 
 defineProps<{
   visible: boolean
@@ -13,17 +17,17 @@ const emit = defineEmits<{
 
 const entries = ref<LeaderboardEntry[]>([])
 const isLoading = ref(false)
-const errorMessage = ref('')
+const hasError = ref(false)
 
 async function fetchLeaderboard() {
   isLoading.value = true
-  errorMessage.value = ''
+  hasError.value = false
 
   try {
     const response = await gameApi.getLeaderboard()
     entries.value = response.entries
   } catch {
-    errorMessage.value = 'Failed to load leaderboard'
+    hasError.value = true
   } finally {
     isLoading.value = false
   }
@@ -31,7 +35,7 @@ async function fetchLeaderboard() {
 
 function formatDate(isoString: string): string {
   const date = new Date(isoString)
-  return date.toLocaleDateString('en-US', {
+  return date.toLocaleDateString(dateLocale.value, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -56,28 +60,28 @@ defineExpose({
     <div v-if="visible" class="modal-overlay" @click.self="handleClose">
       <div class="modal-content">
       <div class="modal-header">
-        <h2 class="modal-title">Leaderboard</h2>
+        <h2 class="modal-title">{{ t('leaderboard') }}</h2>
         <button class="close-btn" @click="handleClose">&times;</button>
       </div>
 
       <div v-if="isLoading" class="loading">
-        Loading...
+        {{ t('loading') }}
       </div>
 
-      <div v-else-if="errorMessage" class="error">
-        {{ errorMessage }}
+      <div v-else-if="hasError" class="error">
+        {{ t('leaderboard_error') }}
         <button class="btn btn-secondary" @click="fetchLeaderboard">
-          Retry
+          {{ t('retry') }}
         </button>
       </div>
 
       <div v-else class="leaderboard-list">
         <div class="list-header">
-          <span class="col-rank">Rank</span>
-          <span class="col-name">Player</span>
-          <span class="col-score">Score</span>
-          <span class="col-waves">Waves</span>
-          <span class="col-date">Date</span>
+          <span class="col-rank">{{ t('rank') }}</span>
+          <span class="col-name">{{ t('player') }}</span>
+          <span class="col-score">{{ t('score') }}</span>
+          <span class="col-waves">{{ t('waves') }}</span>
+          <span class="col-date">{{ t('date') }}</span>
         </div>
 
         <div
@@ -99,13 +103,13 @@ defineExpose({
         </div>
 
         <p v-if="entries.length === 0" class="empty-message">
-          No records yet. Be the first!
+          {{ t('leaderboard_empty') }}
         </p>
       </div>
 
       <div class="modal-footer">
         <button class="btn btn-primary" @click="handleClose">
-          Close
+          {{ t('close') }}
         </button>
       </div>
       </div>

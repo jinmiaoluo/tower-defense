@@ -6,6 +6,7 @@ export {
   createI18n,
   createAutoI18n,
   detectBrowserLocale,
+  getDateLocale,
   type I18n,
   type Locale,
   type MessageKey,

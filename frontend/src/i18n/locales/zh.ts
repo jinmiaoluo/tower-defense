@@ -84,9 +84,16 @@ export const zh = {
   leaderboard: '排行榜',
   rank: '排名',
   nickname: '昵称',
+  player: '玩家',
   score: '得分',
+  waves: '波次',
+  date: '日期',
   enter_nickname: '请输入昵称',
   submit: '提交',
+  retry: '重试',
+  close: '关闭',
+  leaderboard_error: '加载排行榜失败',
+  leaderboard_empty: '暂无记录，成为第一个上榜者吧！',
 
   // 游戏状态
   loading: '加载中...',
