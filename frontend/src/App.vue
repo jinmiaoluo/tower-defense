@@ -8,6 +8,8 @@ import LocaleToggle from './components/LocaleToggle.vue'
 import LeaderboardButton from './components/LeaderboardButton.vue'
 import { EventBus } from './game/EventBus'
 import { gameApi, ApiError } from './api'
+import { WakeLockManager } from './utils/WakeLockManager'
+import { isMobileDevice } from './utils/device'
 import type { Scene } from 'phaser'
 import type { WaveResult, BuildingSnapshot, Action, AttackEvent } from './types'
 
@@ -18,13 +20,15 @@ interface GameOverData {
   isEarlyEnd: boolean
 }
 
-const phaserRef = ref<InstanceType<typeof PhaserGame>>()
 const gameOverModalRef = ref<InstanceType<typeof GameOverModal>>()
 const leaderboardRef = ref<InstanceType<typeof LeaderboardView>>()
 
 const showGameOver = ref(false)
 const showLeaderboard = ref(false)
 const gameOverData = ref<GameOverData | null>(null)
+
+// 屏幕唤醒锁管理器（仅移动设备）
+const wakeLockManager = isMobileDevice() ? new WakeLockManager() : null
 
 // 存储最后一波的数据，用于提交
 const lastWaveData = ref<{
@@ -36,7 +40,8 @@ const lastWaveData = ref<{
 } | null>(null)
 
 const currentScene = (_scene: Scene) => {
-  // 场景切换时的回调
+  // 场景就绪时获取屏幕唤醒锁
+  wakeLockManager?.acquire()
 }
 
 async function handleSubmitScore(nickname: string) {
@@ -153,6 +158,9 @@ onMounted(() => {
       lastWaveData.value = null
     }
 
+    // 游戏结束时释放屏幕唤醒锁
+    wakeLockManager?.release()
+
     showGameOver.value = true
   })
 
@@ -161,11 +169,19 @@ onMounted(() => {
     showLeaderboard.value = true
     leaderboardRef.value?.refresh()
   })
+
+  // 监听游戏重启完成事件，重新获取屏幕唤醒锁
+  EventBus.on('game-restarted', () => {
+    wakeLockManager?.acquire()
+  })
 })
 
 onUnmounted(() => {
   EventBus.off('game-over')
   EventBus.off('show-leaderboard')
+  EventBus.off('game-restarted')
+  // 组件卸载时释放屏幕唤醒锁
+  wakeLockManager?.release()
 })
 </script>
 
@@ -176,7 +192,7 @@ onUnmounted(() => {
     <ThemeToggle />
   </div>
 
-  <PhaserGame ref="phaserRef" @current-active-scene="currentScene" />
+  <PhaserGame @current-active-scene="currentScene" />
 
   <GameOverModal
     ref="gameOverModalRef"
