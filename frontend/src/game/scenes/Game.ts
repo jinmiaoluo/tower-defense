@@ -138,6 +138,9 @@ export class Game extends Scene {
   // 建筑面板按钮（用于选中状态更新）
   private buildingPanelButtons: Map<BuildingType, Phaser.GameObjects.Rectangle> = new Map()
 
+  // 页面可见性变化处理器（用于自动暂停）
+  private visibilityChangeHandler: (() => void) | null = null
+
   // 控制面板（暂停/重启/结束按钮）
   private controlPanel!: Phaser.GameObjects.Container
   private pauseButton!: Phaser.GameObjects.Rectangle
@@ -352,6 +355,36 @@ export class Game extends Scene {
     // 监听语言变化（来自 Vue 层的 AppEventBus）
     AppEventBus.on('locale-changed', (_locale: unknown) => {
       this.handleLocaleChange()
+    })
+
+    // 设置页面可见性处理器（自动暂停）
+    this.setupVisibilityHandlers()
+  }
+
+  /** 设置页面可见性处理器（自动暂停） */
+  private setupVisibilityHandlers() {
+    this.visibilityChangeHandler = () => {
+      // 页面隐藏时自动暂停游戏
+      if (document.hidden && this.logic && !this.uiState.isLoading) {
+        const state = this.logic.getState()
+        // 仅在游戏运行中且非暂停状态时自动暂停
+        if (!state.isGameOver && !state.isPaused && state.isPlaying) {
+          this.logic.pause()
+          // 更新 UI 显示
+          this.pauseButtonText?.setText(this.t('button_continue_text'))
+          EventBus.emit('game-paused', true)
+        }
+      }
+    }
+
+    document.addEventListener('visibilitychange', this.visibilityChangeHandler)
+
+    // 场景关闭时移除监听器
+    this.events.on('shutdown', () => {
+      if (this.visibilityChangeHandler) {
+        document.removeEventListener('visibilitychange', this.visibilityChangeHandler)
+        this.visibilityChangeHandler = null
+      }
     })
   }
 

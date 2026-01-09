@@ -84,6 +84,7 @@ export interface GameSceneLogic {
 
   // 游戏控制
   update(): void
+  pause(): void
   togglePause(): void
   setGameOver(): void
   reset(): void
@@ -501,6 +502,12 @@ export function createGameSceneLogic(config: GameConfig): GameSceneLogic {
 
       // 累计分数（之前波次 + 当前波次）
       state.score = accumulatedScore + waveRecorder.getResult().scoreGained
+    },
+
+    pause(): void {
+      if (!state.isGameOver) {
+        state.isPaused = true
+      }
     },
 
     togglePause(): void {

@@ -2357,4 +2357,222 @@ describe('GameSceneLogic', () => {
       expect(result.killed + result.passed).toBe(result.spawned)
     })
   })
+
+  // ============================================================================
+  // 自动暂停功能测试
+  // ============================================================================
+
+  describe('auto pause - pause() method', () => {
+    it('pause() 方法可以暂停游戏', () => {
+      expect(logic.getState().isPaused).toBe(false)
+
+      logic.pause()
+
+      expect(logic.getState().isPaused).toBe(true)
+    })
+
+    it('pause() 方法在已暂停状态下不会改变状态', () => {
+      logic.pause()
+      expect(logic.getState().isPaused).toBe(true)
+
+      logic.pause()
+      expect(logic.getState().isPaused).toBe(true)
+    })
+
+    it('pause() 后可以用 togglePause() 恢复', () => {
+      logic.pause()
+      expect(logic.getState().isPaused).toBe(true)
+
+      logic.togglePause()
+      expect(logic.getState().isPaused).toBe(false)
+    })
+
+    it('pause() 暂停后帧号不增长', () => {
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 100, speed: 1, shield: 0, money: 5 }],
+      })
+
+      logic.update()
+      const frameBeforePause = logic.getState().frame
+
+      logic.pause()
+
+      // 暂停后多次 update
+      for (let i = 0; i < 10; i++) {
+        logic.update()
+      }
+
+      expect(logic.getState().frame).toBe(frameBeforePause)
+    })
+
+    it('pause() 暂停后怪物不移动', () => {
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 100, speed: 3, shield: 0, money: 5 }],
+      })
+
+      // 生成怪物并移动一段时间
+      for (let i = 0; i < 30; i++) {
+        logic.update()
+      }
+
+      const monsters = logic.getMonsters()
+      expect(monsters.length).toBeGreaterThan(0)
+
+      const positionBeforePause = monsters[0].getPixelPosition()
+
+      logic.pause()
+
+      // 暂停后多次 update
+      for (let i = 0; i < 30; i++) {
+        logic.update()
+      }
+
+      const positionAfterPause = monsters[0].getPixelPosition()
+
+      expect(positionAfterPause.x).toBe(positionBeforePause.x)
+      expect(positionAfterPause.y).toBe(positionBeforePause.y)
+    })
+
+    it('游戏结束后 pause() 无效', () => {
+      logic.setGameOver()
+
+      logic.pause()
+
+      // 游戏结束状态不受 pause() 影响
+      const state = logic.getState()
+      expect(state.isGameOver).toBe(true)
+      expect(state.isPlaying).toBe(false)
+    })
+
+    it('reset() 后 pause 状态被重置', () => {
+      logic.pause()
+      expect(logic.getState().isPaused).toBe(true)
+
+      logic.reset()
+
+      expect(logic.getState().isPaused).toBe(false)
+    })
+
+    it('pause() 暂停后建筑不攻击', () => {
+      logic.prepareNextWaveRecorder(1)
+      logic.placeBuilding([3, 3], 'LMG')
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 100, speed: 0.5, shield: 0, money: 10 }],
+      })
+
+      // 运行 10 帧让怪物进入射程
+      for (let i = 0; i < 10; i++) {
+        logic.update()
+      }
+
+      const attacksBeforePause = logic.getWaveRecorder().getAttacks().length
+
+      logic.pause()
+
+      // 暂停期间多次 update
+      for (let i = 0; i < 100; i++) {
+        logic.update()
+      }
+
+      // 攻击数不应该增加
+      expect(logic.getWaveRecorder().getAttacks().length).toBe(attacksBeforePause)
+    })
+
+    it('pause() 暂停后子弹不移动', () => {
+      logic.prepareNextWaveRecorder(1)
+      // 使用 cannon（有子弹飞行）而非 laser_gun（即时命中）
+      logic.placeBuilding([3, 3], 'cannon')
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 500, speed: 0.5, shield: 0, money: 10 }],
+      })
+
+      // 运行直到产生子弹
+      let hasBullets = false
+      for (let i = 0; i < 100 && !hasBullets; i++) {
+        logic.update()
+        if (logic.getBullets().length > 0) {
+          hasBullets = true
+        }
+      }
+
+      // 如果有子弹，测试暂停行为
+      if (hasBullets) {
+        const bullets = logic.getBullets()
+        const bulletPositions = bullets.map(b => ({ x: b.x, y: b.y }))
+
+        logic.pause()
+
+        // 暂停期间多次 update
+        for (let i = 0; i < 50; i++) {
+          logic.update()
+        }
+
+        // 子弹位置不应该改变
+        const bulletsAfterPause = logic.getBullets()
+        bulletPositions.forEach((pos, idx) => {
+          if (bulletsAfterPause[idx]) {
+            expect(bulletsAfterPause[idx].x).toBe(pos.x)
+            expect(bulletsAfterPause[idx].y).toBe(pos.y)
+          }
+        })
+      }
+    })
+
+    it('pause() 暂停期间建筑操作仍然允许', () => {
+      logic.prepareNextWaveRecorder(1)
+      logic.placeBuilding([3, 3], 'LMG')
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 100, speed: 0.5, shield: 0, money: 10 }],
+      })
+
+      // 运行几帧
+      for (let i = 0; i < 10; i++) {
+        logic.update()
+      }
+
+      logic.pause()
+
+      // 暂停期间放置建筑应该成功
+      const result = logic.placeBuilding([5, 5], 'cannon')
+      expect(result.success).toBe(true)
+
+      // 暂停期间升级建筑应该成功
+      const building = logic.getBuildings()[0]
+      const upgradeResult = logic.upgradeBuilding(building.id)
+      expect(upgradeResult.success).toBe(true)
+    })
+
+    it('初始状态（wave=0）暂停正常工作', () => {
+      // 游戏刚开始，还没有开始波次
+      expect(logic.getState().wave).toBe(0)
+      expect(logic.getState().frame).toBe(0)
+
+      logic.pause()
+
+      expect(logic.getState().isPaused).toBe(true)
+
+      // 暂停后帧号不增长
+      for (let i = 0; i < 10; i++) {
+        logic.update()
+      }
+      expect(logic.getState().frame).toBe(0)
+
+      // 恢复后可以正常进行
+      logic.togglePause()
+      logic.prepareNextWaveRecorder(1)
+      logic.placeBuilding([3, 3], 'LMG')
+      logic.startWave({
+        waveNumber: 1,
+        monsters: [{ id: 'uuid-1', type: 0, life: 50, speed: 1, shield: 0, money: 5 }],
+      })
+
+      logic.update()
+      expect(logic.getState().frame).toBe(1)
+    })
+  })
 })
