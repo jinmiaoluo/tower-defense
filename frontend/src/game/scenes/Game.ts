@@ -138,8 +138,11 @@ export class Game extends Scene {
   // 建筑面板按钮（用于选中状态更新）
   private buildingPanelButtons: Map<BuildingType, Phaser.GameObjects.Rectangle> = new Map()
 
-  // 页面可见性变化处理器（用于自动暂停）
+  // 页面可见性变化处理器（用于自动暂停/恢复）
   private visibilityChangeHandler: (() => void) | null = null
+  private pageHideHandler: (() => void) | null = null
+  private pageShowHandler: ((event: PageTransitionEvent) => void) | null = null
+  private wasAutoPaused: boolean = false
 
   // 控制面板（暂停/重启/结束按钮）
   private controlPanel!: Phaser.GameObjects.Container
@@ -361,29 +364,71 @@ export class Game extends Scene {
     this.setupVisibilityHandlers()
   }
 
-  /** 设置页面可见性处理器（自动暂停） */
+  /** 设置页面可见性处理器（自动暂停/恢复） */
   private setupVisibilityHandlers() {
+    // 自动暂停逻辑（抽取公共方法避免重复）
+    const autoPause = () => {
+      if (!this.logic || this.uiState.isLoading) return
+      const state = this.logic.getState()
+      if (!state.isGameOver && !state.isPaused && state.isPlaying) {
+        this.logic.pause()
+        this.wasAutoPaused = true
+        this.pauseButtonText?.setText(this.t('button_continue_text'))
+        EventBus.emit('game-paused', true)
+      }
+    }
+
+    // 自动恢复逻辑
+    const autoResume = () => {
+      if (!this.logic || this.uiState.isLoading) return
+      const state = this.logic.getState()
+      if (this.wasAutoPaused && state.isPaused && !state.isGameOver) {
+        this.logic.togglePause()
+        this.wasAutoPaused = false
+        this.pauseButtonText?.setText(this.t('button_pause_text'))
+        EventBus.emit('game-paused', false)
+      }
+    }
+
+    // visibilitychange 事件：主要处理标签页切换
     this.visibilityChangeHandler = () => {
-      // 页面隐藏时自动暂停游戏
-      if (document.hidden && this.logic && !this.uiState.isLoading) {
-        const state = this.logic.getState()
-        // 仅在游戏运行中且非暂停状态时自动暂停
-        if (!state.isGameOver && !state.isPaused && state.isPlaying) {
-          this.logic.pause()
-          // 更新 UI 显示
-          this.pauseButtonText?.setText(this.t('button_continue_text'))
-          EventBus.emit('game-paused', true)
-        }
+      if (document.hidden) {
+        autoPause()
+      } else {
+        autoResume()
+      }
+    }
+
+    // pagehide 事件：补充处理移动设备上的页面隐藏场景
+    this.pageHideHandler = () => {
+      autoPause()
+    }
+
+    // pageshow 事件：补充处理移动设备上的页面恢复场景
+    this.pageShowHandler = (event: PageTransitionEvent) => {
+      // persisted 属性表示页面是从 bfcache（前进后退缓存）恢复的
+      if (event.persisted) {
+        autoResume()
       }
     }
 
     document.addEventListener('visibilitychange', this.visibilityChangeHandler)
+    window.addEventListener('pagehide', this.pageHideHandler)
+    window.addEventListener('pageshow', this.pageShowHandler)
 
     // 场景关闭时移除监听器
     this.events.on('shutdown', () => {
       if (this.visibilityChangeHandler) {
         document.removeEventListener('visibilitychange', this.visibilityChangeHandler)
         this.visibilityChangeHandler = null
+      }
+      if (this.pageHideHandler) {
+        window.removeEventListener('pagehide', this.pageHideHandler)
+        this.pageHideHandler = null
+      }
+      if (this.pageShowHandler) {
+        window.removeEventListener('pageshow', this.pageShowHandler)
+        this.pageShowHandler = null
       }
     })
   }
@@ -1442,6 +1487,9 @@ export class Game extends Scene {
       return
     }
 
+    // 用户手动操作时清除自动暂停标志
+    this.wasAutoPaused = false
+
     if (state.isPaused) {
       // 当前是暂停状态，点击继续游戏
       this.logic.togglePause()
@@ -1739,6 +1787,9 @@ export class Game extends Scene {
     this.uiState.selectedBuildingId = null
     this.uiState.hoverPosition = null
     this.uiState.mobilePreviewPosition = null
+
+    // 重置自动暂停标志
+    this.wasAutoPaused = false
 
     // 重置控制面板状态
     this.pauseButtonText.setText(this.t('button_pause_text'))
