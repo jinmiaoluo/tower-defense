@@ -3,9 +3,11 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import PhaserGame from './PhaserGame.vue'
 import GameOverModal from './components/GameOverModal.vue'
 import LeaderboardView from './components/LeaderboardView.vue'
+import StartGuide from './components/StartGuide.vue'
 import ThemeToggle from './components/ThemeToggle.vue'
 import LocaleToggle from './components/LocaleToggle.vue'
 import LeaderboardButton from './components/LeaderboardButton.vue'
+import HelpButton from './components/HelpButton.vue'
 import { EventBus } from './game/EventBus'
 import { gameApi, ApiError } from './api'
 import { WakeLockManager } from './utils/WakeLockManager'
@@ -25,6 +27,7 @@ const leaderboardRef = ref<InstanceType<typeof LeaderboardView>>()
 
 const showGameOver = ref(false)
 const showLeaderboard = ref(false)
+const showGuide = ref(StartGuide.shouldShowGuide())
 const gameOverData = ref<GameOverData | null>(null)
 
 // 屏幕唤醒锁管理器（仅移动设备）
@@ -111,6 +114,14 @@ function handleOpenLeaderboard() {
   leaderboardRef.value?.refresh()
 }
 
+function handleCloseGuide() {
+  showGuide.value = false
+}
+
+function handleOpenGuide() {
+  showGuide.value = true
+}
+
 function handleCloseGameOver() {
   showGameOver.value = false
 }
@@ -187,6 +198,7 @@ onUnmounted(() => {
 
 <template>
   <div class="toolbar-container">
+    <HelpButton @click="handleOpenGuide" />
     <LeaderboardButton @click="handleOpenLeaderboard" />
     <LocaleToggle />
     <ThemeToggle />
@@ -208,6 +220,11 @@ onUnmounted(() => {
     ref="leaderboardRef"
     :visible="showLeaderboard"
     @close="handleCloseLeaderboard"
+  />
+
+  <StartGuide
+    :visible="showGuide"
+    @close="handleCloseGuide"
   />
 </template>
 

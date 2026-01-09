@@ -111,6 +111,19 @@ export const zh = {
 
   // 横屏提示
   rotate_screen: '请旋转设备至竖屏模式',
+
+  // 游戏指引
+  guide_title: '游戏指引',
+  guide_objective_title: '游戏目标',
+  guide_objective: '阻止怪物从入口到达出口。每个怪物到达出口会扣除生命值，生命值归零则游戏结束。',
+  guide_build_title: '建造防御塔',
+  guide_build: '点击下方建筑面板选择防御塔类型，然后点击地图上的空白格子放置。不同防御塔有不同的攻击力、射程和攻速。',
+  guide_upgrade_title: '升级与出售',
+  guide_upgrade: '点击已建造的防御塔可以进行升级或出售。升级提升攻击力，出售可回收部分金钱。',
+  guide_tips_title: '小提示',
+  guide_tips: '合理利用路障可以延长怪物的行进路线，为防御塔争取更多攻击时间。',
+  guide_start_game: '开始游戏',
+  toolbar_view_guide: '查看指引',
 } as const
 
 export type MessageKey = keyof typeof zh

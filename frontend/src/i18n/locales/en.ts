@@ -113,4 +113,17 @@ export const en: Record<MessageKey, string> = {
 
   // 横屏提示
   rotate_screen: 'Please rotate to portrait mode',
+
+  // 游戏指引
+  guide_title: 'How to Play',
+  guide_objective_title: 'Objective',
+  guide_objective: 'Stop monsters from reaching the exit. Each monster that escapes costs you life. Game over when life reaches zero.',
+  guide_build_title: 'Build Towers',
+  guide_build: 'Select a tower type from the building panel below, then click an empty tile on the map to place it. Different towers have different damage, range, and attack speed.',
+  guide_upgrade_title: 'Upgrade & Sell',
+  guide_upgrade: 'Click on a placed tower to upgrade or sell it. Upgrading increases damage, selling refunds some money.',
+  guide_tips_title: 'Tips',
+  guide_tips: 'Use roadblocks strategically to extend the monster path, giving your towers more time to attack.',
+  guide_start_game: 'Start Game',
+  toolbar_view_guide: 'View Guide',
 } as const
