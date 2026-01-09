@@ -17,7 +17,7 @@ COPY --from=builder /usr/local/bin/gunicorn /usr/local/bin/gunicorn
 
 COPY . .
 
-RUN python manage.py collectstatic --noinput || true
+RUN python manage.py collectstatic --noinput
 
 EXPOSE 8000
 
