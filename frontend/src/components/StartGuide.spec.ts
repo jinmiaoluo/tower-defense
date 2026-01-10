@@ -58,6 +58,51 @@ describe('StartGuide', () => {
       expect(wrapper.emitted('close')).toHaveLength(1)
     })
 
+    it('显示时应自动聚焦到关闭按钮', async () => {
+      const wrapper = mount(StartGuide, {
+        props: { visible: true },
+        attachTo: document.body,
+      })
+
+      await wrapper.vm.$nextTick()
+      const closeButton = wrapper.find('.close-button').element as HTMLElement
+      expect(document.activeElement).toBe(closeButton)
+      wrapper.unmount()
+    })
+
+    it('从隐藏变为显示时应自动聚焦到关闭按钮', async () => {
+      const wrapper = mount(StartGuide, {
+        props: { visible: false },
+        attachTo: document.body,
+      })
+
+      expect(wrapper.find('.close-button').exists()).toBe(false)
+
+      await wrapper.setProps({ visible: true })
+      await wrapper.vm.$nextTick()
+
+      const closeButton = wrapper.find('.close-button').element as HTMLElement
+      expect(document.activeElement).toBe(closeButton)
+      wrapper.unmount()
+    })
+
+    it('关闭时应移除焦点避免焦点转移到其他元素', async () => {
+      const wrapper = mount(StartGuide, {
+        props: { visible: true },
+        attachTo: document.body,
+      })
+
+      await wrapper.vm.$nextTick()
+      const closeButton = wrapper.find('.close-button').element as HTMLElement
+      expect(document.activeElement).toBe(closeButton)
+
+      await wrapper.find('.close-button').trigger('click')
+
+      expect(document.activeElement).not.toBe(closeButton)
+      expect(document.activeElement).toBe(document.body)
+      wrapper.unmount()
+    })
+
     it('按下 Enter 键应触发 close 事件', async () => {
       const wrapper = mount(StartGuide, {
         props: { visible: true },

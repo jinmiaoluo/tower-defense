@@ -13,7 +13,7 @@ export default {
 </script>
 
 <script setup lang="ts">
-import { watch, onUnmounted } from 'vue'
+import { ref, watch, nextTick, onUnmounted } from 'vue'
 import { useI18n } from '@/i18n'
 
 const props = defineProps<{
@@ -25,12 +25,17 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const closeButtonRef = ref<HTMLButtonElement | null>(null)
 
 function handleClose() {
   try {
     localStorage.setItem(STORAGE_KEY, 'true')
   } catch {
     // 忽略 localStorage 写入失败（如隐私模式、配额满）
+  }
+  // 移除焦点，避免焦点转移到其他可交互元素（如 HelpButton）
+  if (document.activeElement instanceof HTMLElement) {
+    document.activeElement.blur()
   }
   emit('close')
 }
@@ -44,6 +49,9 @@ function handleKeydown(event: KeyboardEvent) {
 watch(() => props.visible, (newVisible) => {
   if (newVisible) {
     document.addEventListener('keydown', handleKeydown)
+    nextTick(() => {
+      closeButtonRef.value?.focus()
+    })
   } else {
     document.removeEventListener('keydown', handleKeydown)
   }
@@ -82,7 +90,7 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <button class="close-button" @click="handleClose">
+        <button ref="closeButtonRef" class="close-button" @click="handleClose">
           {{ t('guide_start_game') }}
         </button>
       </div>
