@@ -124,6 +124,6 @@ export const en: Record<MessageKey, string> = {
   guide_upgrade: 'Click on a placed tower to upgrade or sell it. Upgrading increases damage, selling refunds some money.',
   guide_tips_title: 'Tips',
   guide_tips: 'Use roadblocks strategically to extend the monster path, giving your towers more time to attack.',
-  guide_start_game: 'Start Game',
+  guide_start_game: 'Got it',
   toolbar_view_guide: 'View Guide',
 } as const

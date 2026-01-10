@@ -261,5 +261,15 @@ describe('StartGuide', () => {
       expect(content).toContain('Upgrade')
       expect(content).toContain('Sell')
     })
+
+    it('关闭按钮应显示通用确认文案而非开始游戏', () => {
+      const wrapper = mount(StartGuide, {
+        props: { visible: true },
+      })
+
+      const buttonText = wrapper.find('.close-button').text()
+      expect(buttonText).toBe('Got it')
+      expect(buttonText).not.toContain('Start')
+    })
   })
 })

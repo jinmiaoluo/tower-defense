@@ -122,7 +122,7 @@ export const zh = {
   guide_upgrade: '点击已建造的防御塔可以进行升级或出售。升级提升攻击力，出售可回收部分金钱。',
   guide_tips_title: '小提示',
   guide_tips: '合理利用路障可以延长怪物的行进路线，为防御塔争取更多攻击时间。',
-  guide_start_game: '开始游戏',
+  guide_start_game: '知道了',
   toolbar_view_guide: '查看指引',
 } as const
 
