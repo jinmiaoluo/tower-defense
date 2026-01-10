@@ -590,6 +590,38 @@ def validate_damage_value(
     return True, ""
 
 
+def _is_moving_toward_exit(
+    first_pos: list[int],
+    last_pos: list[int],
+    exit_pos: list[int],
+) -> bool:
+    """检查怪物是否朝出口方向移动.
+
+    蛇形路径中，怪物在某一方向上可能远离出口，但另一方向应该朝向出口。
+    例如：在水平 S 弯中，y 坐标应该逐渐接近出口的 y 坐标。
+
+    Args:
+        first_pos: 首次攻击位置 [x, y]
+        last_pos: 最后攻击位置 [x, y]
+        exit_pos: 出口位置 [x, y]
+
+    Returns:
+        True 如果至少有一个方向朝向出口
+    """
+    dx_first = exit_pos[0] - first_pos[0]
+    dx_last = exit_pos[0] - last_pos[0]
+    dy_first = exit_pos[1] - first_pos[1]
+    dy_last = exit_pos[1] - last_pos[1]
+
+    # x 方向是否朝向出口（距离减小或保持）
+    x_toward = abs(dx_last) <= abs(dx_first)
+    # y 方向是否朝向出口（距离减小或保持）
+    y_toward = abs(dy_last) <= abs(dy_first)
+
+    # 至少有一个方向朝向出口
+    return x_toward or y_toward
+
+
 def validate_monster_paths(
     attacks: list[dict[str, Any]],
     map_config: dict[str, Any],
@@ -597,6 +629,16 @@ def validate_monster_paths(
     """验证怪物路径合理性.
 
     来源：SPEC.md L1225-1258
+
+    验证逻辑：
+    1. 比较怪物首次和最后一次被攻击时到出口的曼哈顿距离
+    2. 允许一定容差以适应蛇形路径等合法绕路行为
+    3. 额外检查移动方向：至少一个坐标轴应该朝向出口
+
+    蛇形路径场景说明：
+    - 玩家可以构建路障迫使怪物走蛇形路径
+    - 在蛇形路径中，怪物可能需要先走到远离出口的位置再折返
+    - 此时曼哈顿距离可能暂时增加，但至少有一个方向应该朝向出口
 
     Args:
         attacks: 攻击事件列表
@@ -606,6 +648,9 @@ def validate_monster_paths(
         (成功标志, 错误信息)
     """
     exit_pos = map_config["exit"]
+    width = map_config.get("width", 16)
+    height = map_config.get("height", 16)
+    tolerance = max(width, height) - 1
 
     # 按怪物分组
     monster_attacks: dict[str, list[dict]] = {}
@@ -628,9 +673,14 @@ def validate_monster_paths(
         first_to_exit = position_distance(first_pos, exit_pos)
         last_to_exit = position_distance(last_pos, exit_pos)
 
-        # 怪物应该从入口向出口移动
-        if last_to_exit > first_to_exit + 3:  # 允许 3 格容差
+        # 验证 1：距离不能增加超过容差
+        if last_to_exit > first_to_exit + tolerance:
             return False, f"怪物 {mid} 路径异常: 远离出口方向移动"
+
+        # 验证 2：如果距离增加，至少有一个方向应该朝向出口
+        if last_to_exit > first_to_exit:
+            if not _is_moving_toward_exit(first_pos, last_pos, exit_pos):
+                return False, f"怪物 {mid} 路径异常: 两个方向都远离出口"
 
     return True, ""
 
@@ -696,10 +746,14 @@ def validate_attacks(
     if not ok:
         return False, err
 
-    # 6. 路径合理性验证
+    # 6. 路径合理性验证（仅记录日志，不再阻断请求）
+    # 原因：怪物有 10% 概率随机重新寻路，且玩家可以移除路障并封堵老路径导致怪物掉头。
+    # 这些都是合法的游戏行为，但会导致怪物暂时远离出口，因此将阻断请求，改为记录日志。
+    #
+    # TODO：对于这种场景，需要结合建筑出售和构建的操作，判断买卖时机的合理性，本质上是通过金币换积分。
     ok, err = validate_monster_paths(attacks, map_config)
     if not ok:
-        return False, err
+        logger.warning("路径验证异常: %s", err)
 
     return True, ""
 

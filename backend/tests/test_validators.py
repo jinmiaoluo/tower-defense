@@ -1633,7 +1633,12 @@ class TestCalcBuildingDamage:
 
 
 class TestValidateMonsterPaths:
-    """怪物路径合理性验证测试."""
+    """怪物路径合理性验证测试.
+
+    注意：validate_monster_paths 函数本身仍然返回检测结果（True/False），
+    但在 validate_attacks 中，路径异常只会记录日志而不会阻断请求。
+    这是因为怪物重新寻路和玩家移除路障都是合法的游戏行为。
+    """
 
     def test_moving_toward_exit(self):
         """成功：怪物向出口移动."""
@@ -1694,6 +1699,62 @@ class TestValidateMonsterPaths:
         map_config = {"entrance": [0, 0], "exit": [15, 15]}
         ok, err = validate_monster_paths(attacks, map_config)
         assert ok is True
+
+    def test_zigzag_path_should_pass(self):
+        """成功：蛇形路径中怪物曼哈顿距离可能暂时增加.
+
+        场景：玩家构建蛇形路障迫使怪物绕行
+        - 第一行：入口 (0,0) 向右走到 (14,0)，然后转弯
+        - 第二行：从 (14,1) 向左走到 (1,1)，然后转弯
+        - 如此往复形成蛇形路径
+
+        在这种情况下，怪物在转弯点被攻击时：
+        - 首次攻击位置 (14, 1)：到出口 (15,15) 距离 = 1 + 14 = 15
+        - 最后攻击位置 (1, 2)：到出口距离 = 14 + 13 = 27
+        - 距离增加了 12 格，这是合法的游戏行为
+        """
+        attacks = [
+            {"monsterId": "m-001", "frame": 100, "monsterPosition": [14, 1]},
+            {"monsterId": "m-001", "frame": 200, "monsterPosition": [8, 1]},
+            {"monsterId": "m-001", "frame": 300, "monsterPosition": [1, 2]},
+        ]
+        map_config = {"entrance": [0, 0], "exit": [15, 15]}
+        ok, err = validate_monster_paths(attacks, map_config)
+        assert ok is True, f"蛇形路径应该通过验证，但失败了: {err}"
+
+    def test_extreme_zigzag_path(self):
+        """成功：极端蛇形路径，怪物需要走到地图另一端.
+
+        模拟多轮蛇形路径后，怪物在地图中部被攻击的情况。
+        首次攻击在接近出口的拐弯处，最后攻击在远离出口的直道上。
+        """
+        attacks = [
+            {"monsterId": "m-001", "frame": 50, "monsterPosition": [15, 10]},
+            {"monsterId": "m-001", "frame": 150, "monsterPosition": [1, 11]},
+        ]
+        map_config = {"entrance": [0, 0], "exit": [15, 15]}
+        ok, err = validate_monster_paths(attacks, map_config)
+        assert ok is True, f"极端蛇形路径应该通过验证，但失败了: {err}"
+
+    def test_backward_movement_should_fail(self):
+        """失败：怪物向入口方向倒退（两个方向都远离出口）.
+
+        场景：作弊者伪造数据，怪物从 (10, 10) 倒退到 (3, 3)
+        - 首次攻击位置 (10, 10)：到出口距离 = 10
+        - 最后攻击位置 (3, 3)：到出口距离 = 24
+        - x 方向：从距离 5 增加到 12（远离）
+        - y 方向：从距离 5 增加到 12（远离）
+        - 两个方向都远离出口，应该失败
+        """
+        attacks = [
+            {"monsterId": "m-001", "frame": 10, "monsterPosition": [10, 10]},
+            {"monsterId": "m-001", "frame": 20, "monsterPosition": [3, 3]},
+        ]
+        map_config = {"entrance": [0, 0], "exit": [15, 15]}
+        ok, err = validate_monster_paths(attacks, map_config)
+        assert ok is False
+        assert "路径异常" in err
+        assert "两个方向都远离出口" in err
 
 
 class TestValidateAttacks:
@@ -1857,6 +1918,57 @@ class TestValidateAttacks:
             attacks, buildings, result, building_config, map_config, monsters_config
         )
         assert ok is True
+
+    def test_path_anomaly_does_not_block(self):
+        """成功：路径异常不阻断请求（只记录日志）.
+
+        场景：玩家移除路障后，怪物掉头走新路径
+        - 首次攻击位置 (8, 5)：到出口距离 = 17
+        - 最后攻击位置 (2, 3)：到出口距离 = 25（两个方向都远离）
+        - 这是合法的游戏行为（怪物重新寻路）
+
+        验证：validate_attacks 应返回 True，路径异常只记录日志
+        """
+        attacks = [
+            {
+                "buildingId": "b-001",
+                "monsterId": "m-001",
+                "frame": 10,
+                "damage": 12,
+                "originalTargetPosition": [8, 5],
+                "monsterPosition": [8, 5],
+            },
+            {
+                "buildingId": "b-001",
+                "monsterId": "m-001",
+                "frame": 20,
+                "damage": 12,
+                "originalTargetPosition": [2, 3],
+                "monsterPosition": [2, 3],
+            },
+        ]
+        buildings = [
+            {"id": "b-001", "type": "cannon", "level": 1, "position": [5, 5]},
+        ]
+        result = {
+            "total_damage_dealt": 24,
+            "killed_by_type": {0: 0},
+        }
+        building_config = {
+            "cannon": {"damage": 12, "range": 4, "max_range": 8},
+        }
+        map_config = {"entrance": [0, 0], "exit": [15, 15], "width": 16, "height": 16}
+        monsters_config = {"m-001": {"type": 0, "life": 50}}
+
+        with patch("game.validators.logger") as mock_logger:
+            ok, err = validate_attacks(
+                attacks, buildings, result, building_config, map_config, monsters_config
+            )
+            # 验证请求未被阻断
+            assert ok is True
+            # 验证路径异常被记录到日志
+            mock_logger.warning.assert_called_once()
+            assert "路径验证异常" in mock_logger.warning.call_args[0][0]
 
 
 class TestAnalyzeStatistics:
