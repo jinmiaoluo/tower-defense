@@ -1,0 +1,76 @@
+stages:
+  - test
+  - build
+  - deploy
+
+test:frontend:
+  stage: test
+  image: node:22-alpine
+  before_script:
+    - cd frontend
+    - npm ci --prefer-offline
+  script:
+    - npm run test:run
+
+test:backend:
+  stage: test
+  image: python:3.13-slim
+  services:
+    - name: postgres:15-alpine
+      alias: postgres
+  variables:
+    USE_SQLITE: "True"
+  before_script:
+    - cd backend
+    - pip install --no-cache-dir uv
+    - uv pip install --system --no-cache -r pyproject.toml
+    - uv pip install --system --no-cache pytest pytest-django pytest-cov pytest-env
+  script:
+    - pytest
+
+.build:
+  stage: build
+  image:
+    name: gcr.io/kaniko-project/executor:v1.23.2-debug
+    entrypoint: [""]
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+build:frontend:
+  extends: .build
+  script:
+    - /kaniko/executor
+      --context "${CI_PROJECT_DIR}/frontend"
+      --dockerfile "${CI_PROJECT_DIR}/frontend/Dockerfile"
+      --destination "${CI_REGISTRY_IMAGE}/frontend:${CI_PIPELINE_ID}"
+      --destination "${CI_REGISTRY_IMAGE}/frontend:latest"
+
+build:backend:
+  extends: .build
+  script:
+    - /kaniko/executor
+      --context "${CI_PROJECT_DIR}/backend"
+      --dockerfile "${CI_PROJECT_DIR}/backend/Dockerfile"
+      --destination "${CI_REGISTRY_IMAGE}/backend:${CI_PIPELINE_ID}"
+      --destination "${CI_REGISTRY_IMAGE}/backend:latest"
+
+deploy:
+  stage: deploy
+  image: python:3.13-slim
+  variables:
+    ANSIBLE_CONFIG: "${CI_PROJECT_DIR}/deploy/ansible.cfg"
+  before_script:
+    - apt update && apt install -y --no-install-recommends openssh-client
+    - pip install --no-cache-dir ansible-core
+    - ansible-galaxy collection install community.docker community.general
+    - eval $(ssh-agent -s)
+    - chmod 400 "${JINMIAOLUO_SSH_PRIVATE_KEY}"
+    - ssh-add "${JINMIAOLUO_SSH_PRIVATE_KEY}"
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - ssh-keyscan 192.168.188.235 > ~/.ssh/known_hosts
+  script:
+    - cd deploy
+    - ansible-playbook -i inventory.ini playbook.yml
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"

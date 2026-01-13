@@ -1,0 +1,104 @@
+- name: Deploy Tower Defense
+  hosts: production
+  vars:
+    registry_url: "{{ lookup('env', 'CI_REGISTRY') }}"
+    registry_image: "{{ lookup('env', 'CI_REGISTRY_IMAGE') }}"
+    registry_user: "{{ lookup('env', 'TOWER_DEFENSE_DEPLOY_USER') }}"
+    registry_password: "{{ lookup('env', 'TOWER_DEFENSE_DEPLOY_TOKEN') }}"
+    image_tag: "{{ lookup('env', 'CI_PIPELINE_ID') }}"
+    secret_key: "{{ lookup('env', 'TOWER_DEFENSE_SECRET_KEY') }}"
+  tasks:
+    - name: Install Python dependencies
+      ansible.builtin.package:
+        name:
+          - python-requests
+          - python-docker
+        state: present
+
+    - name: Login to registry
+      community.docker.docker_login:
+        registry_url: "{{ registry_url }}"
+        username: "{{ registry_user }}"
+        password: "{{ registry_password }}"
+
+    - name: Create network
+      community.docker.docker_network:
+        name: tower-defense
+
+    - name: Create postgres volume
+      community.docker.docker_volume:
+        name: tower-defense-postgres-data
+
+    - name: Run postgres
+      community.docker.docker_container:
+        name: tower-defense-postgres
+        image: postgres:15-alpine
+        state: started
+        restart_policy: unless-stopped
+        pull: true
+        networks:
+          - name: tower-defense
+            aliases:
+              - postgres
+        volumes:
+          - tower-defense-postgres-data:/var/lib/postgresql/data
+        env:
+          POSTGRES_DB: tower_defense
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        healthcheck:
+          test: ["CMD-SHELL", "pg_isready -U postgres"]
+          interval: 5s
+          timeout: 5s
+          retries: 5
+
+    - name: Wait for postgres
+      community.docker.docker_container_info:
+        name: tower-defense-postgres
+      register: tower_defense_postgres_info
+      until: tower_defense_postgres_info.container.State.Health.Status == "healthy"
+      retries: 3
+      delay: 10
+
+    - name: Run backend
+      community.docker.docker_container:
+        name: tower-defense-backend
+        image: "{{ registry_image }}/backend:{{ image_tag }}"
+        state: started
+        restart_policy: unless-stopped
+        pull: true
+        networks:
+          - name: tower-defense
+            aliases:
+              - backend
+        env:
+          SECRET_KEY: "{{ secret_key }}"
+          ALLOWED_HOSTS: backend,tower-defense.jinmiaoluo.com
+          CORS_ALLOWED_ORIGINS: https://tower-defense.jinmiaoluo.com
+          USE_SQLITE: "False"
+          DB_HOST: postgres
+        command: >
+          sh -c "python manage.py migrate && gunicorn --bind 0.0.0.0:8000 --workers 2 config.wsgi:application"
+
+    - name: Run frontend
+      community.docker.docker_container:
+        name: tower-defense-frontend
+        image: "{{ registry_image }}/frontend:{{ image_tag }}"
+        state: started
+        restart_policy: unless-stopped
+        pull: true
+        networks:
+          - name: tower-defense
+            aliases:
+              - frontend
+        ports:
+          - "8580:80"
+
+    - name: Logout from registry
+      community.docker.docker_login:
+        registry_url: "{{ registry_url }}"
+        state: absent
+
+    - name: Prune images
+      community.docker.docker_prune:
+        images: true
