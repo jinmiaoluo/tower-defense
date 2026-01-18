@@ -15,15 +15,14 @@ tower-defense/
 
 ## 快速开始
 
-### VSCode Workspace
+### VSCode 开发
 
-使用 VSCode 打开项目推荐通过 workspace 文件：
+推荐使用 VSCode 打开项目：
 
 ```bash
-code tower-defense.code-workspace
+git clone git@github.com:jinmiaoluo/tower-defense.git
+code tower-defense
 ```
-
-或在 VSCode 中选择 File -> Open Workspace from File，然后选择 `tower-defense.code-workspace`。
 
 ### 后端
 
