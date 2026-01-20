@@ -131,6 +131,16 @@ tower-defense/
 └── docs/                     # 文档
 ```
 
+### 前端架构风格
+
+目录命名借鉴 ECS（Entity-Component-System）概念，但实际实现是 **OOP 为主**：
+
+- `entities/`：OOP 类，包含数据和行为（Monster、Building）
+- `systems/`：服务层，提供跨实体的工具函数
+- `render/`：渲染层，与实体解耦
+
+塔防游戏实体类型少，OOP 足够清晰，无需纯 ECS 的复杂性。
+
 ### 关键目录说明
 
 **frontend/src/game/systems/**：游戏核心逻辑，与渲染解耦
