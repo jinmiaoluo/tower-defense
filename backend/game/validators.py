@@ -2,8 +2,7 @@
 
 包含游戏数据验证逻辑，分为多个级别：
 - Level 1：基础验证（数量一致性、收益验证）
-- Level 2：伤害验证（DPS 容量、生命池）
-- Level 2+：攻击事件验证（射程、攻速）
+- Level 2：伤害验证（生命池、DPS 容量、射程、伤害值、累计伤害）
 - Level 4：统计分析（异常检测）
 """
 
@@ -693,7 +692,7 @@ def validate_attacks(
     map_config: dict[str, Any],
     monsters_config: dict[str, Any],
 ) -> tuple[bool, str]:
-    """Level 2+ 攻击事件验证：伤害一致性、射程验证、路径合理性、累计伤害验证.
+    """Level 2 攻击事件验证：伤害一致性、射程验证、路径合理性、累计伤害验证.
 
     来源：SPEC.md L1061-1118
 

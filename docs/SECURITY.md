@@ -2,8 +2,6 @@
 
 本文档描述塔防游戏排行榜的安全实现策略。
 
----
-
 ## 目录
 
 1. [威胁模型](#威胁模型)
@@ -11,8 +9,6 @@
 3. [入榜判定策略](#入榜判定策略)
 4. [防重放与防刷榜](#防重放与防刷榜)
 5. [局限性与应对](#局限性与应对)
-
----
 
 ## 威胁模型
 
@@ -49,8 +45,6 @@
 
 - 修改系统时间伪造游戏时长
 - 暂停游戏期间修改状态
-
----
 
 ## 多层验证架构
 
@@ -90,11 +84,7 @@ max_dps = sum(building.damage / building.attack_interval for building in validat
 
 10% 容差用于处理浮点精度和边界情况。
 
-### Level 2+：攻击事件验证
-
-**目标**：精确验证每次攻击的合法性。
-
-**验证内容**：
+**攻击事件验证**：
 
 - 伤害总和：`sum(attacks.damage) == totalDamageDealt`
 - 帧号时序：攻击帧号必须递增
@@ -165,8 +155,6 @@ expected_score = sum(floor(sqrt(attack.damage)) for attack in attacks)
 
 服务端独立计算得分，与客户端提交值比对。
 
----
-
 ## 入榜判定策略
 
 ### 判定流程
@@ -178,7 +166,7 @@ expected_score = sum(floor(sqrt(attack.damage)) for attack in attacks)
     |       - SESSION_NOT_FOUND: 会话不存在或过期
     |
     +-- 如有 lastWave，执行波次验证
-    |       - Level 1 -> Level 2 -> Level 2+
+    |       - Level 1 -> Level 2
     |       - 任一失败则拒绝入榜
     |
     +-- 检查最终得分
@@ -209,8 +197,6 @@ final_score = sum(wave_record.score_gained for wave_record in session.wave_recor
 - 防止刷空记录占位
 - 确保排行榜有实际游戏内容
 - 最低要求：完成至少一次有效攻击
-
----
 
 ## 防重放与防刷榜
 
@@ -313,8 +299,6 @@ for attack in attacks:
 - 无需存储完整怪物列表
 - 防止客户端伪造有利的波次配置
 
----
-
 ## 局限性与应对
 
 ### 已知局限
@@ -325,7 +309,7 @@ for attack in attacks:
 
 - 原因：需要移除或改造 10% 随机重新寻路机制
 - 影响：射程验证依赖客户端提供的怪物位置
-- 应对：Level 2+ 的攻击事件验证提供部分覆盖
+- 应对：Level 2 的攻击事件验证提供部分覆盖
 
 **路径验证仅记录日志**：
 
@@ -374,7 +358,7 @@ Level 4 只记录日志，不拒绝请求。
 
 **开发成本 vs 防护深度**：
 
-跳过 Level 3 确定性寻路验证，用 Level 1 + 2 + 2+ + 4 覆盖大部分场景。
+跳过 Level 3 确定性寻路验证，用 Level 1 + 2 + 4 覆盖大部分场景。
 
 **防护 vs 误杀**：
 
@@ -386,8 +370,6 @@ Level 4 不阻断请求，避免误伤正常玩家。
 - 引入机器学习异常检测
 - 客户端完整性校验（代码签名）
 - 建立人工审核工作流
-
----
 
 ## 相关文档
 

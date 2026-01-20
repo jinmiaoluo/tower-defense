@@ -30,7 +30,7 @@
   - calc_new_difficulty, calc_monster_attrs
   - calc_actual_damage, calc_hit_score, calc_life_reward
 - P1 波次生成器 (TDD): generate_wave, generate_first_wave
-- P2 验证器 (TDD): Level 1, Level 2, Level 2+, Level 4
+- P2 验证器 (TDD): Level 1, Level 2, Level 4
 - P2 API 视图 (TDD): 创建会话, 提交波次, 游戏结束, 排行榜
 - P3 管理命令: cleanup_sessions
 - P3 部署配置: Docker
@@ -157,10 +157,6 @@
 验证内容：
 - totalLifeDestroyed = Σ(被击杀怪物的 life)
 - totalDamageDealt <= 理论最大 DPS × waveDurationFrames
-
-### Level 2+: 攻击事件验证
-
-验证内容：
 - 每个攻击事件的 monsterId 必须是服务端下发的 UUID
 - originalTargetPosition 必须在建筑射程内（发射时验证）
 - 累计伤害 >= 怪物生命值时，怪物必须在 killedByType 中
@@ -207,7 +203,7 @@
 
 1. **服务端权威**：所有游戏配置和怪物属性由服务端定义，客户端不内置任何数值
 2. **怪物 ID 生成**：每波次怪物必须由服务端生成唯一 UUID，用于后续验证
-3. **验证顺序**：波次连续性 → Level 1 → Level 2 → Level 2+ → 更新状态 → Level 4
+3. **验证顺序**：波次连续性 → Level 1 → Level 2 → 更新状态 → Level 4
 4. **事务处理**：波次提交应在数据库事务中完成，验证失败时回滚
 5. **状态一致性**：GameSession 的状态必须与所有 WaveRecord 的累计结果一致
 6. **会话清理**：定时任务每小时清理超过 24 小时的过期会话

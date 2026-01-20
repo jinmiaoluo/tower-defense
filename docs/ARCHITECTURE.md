@@ -2,8 +2,6 @@
 
 本文档帮助新开发者快速理解 tower-defense 项目的整体架构。
 
----
-
 ## 目录
 
 1. [系统概述](#系统概述)
@@ -13,8 +11,6 @@
 5. [设计决策](#设计决策)
 6. [数据流](#数据流)
 7. [扩展指南](#扩展指南)
-
----
 
 ## 系统概述
 
@@ -48,8 +44,6 @@
 - 前端：SPA，包含完整游戏逻辑
 - 后端：RESTful API，无状态服务
 - 通信：HTTP JSON，每波次结束时批量提交
-
----
 
 ## 高层架构
 
@@ -96,8 +90,6 @@
 - **Calculators**：纯函数计算（成本、伤害、难度）
 - **Generators**：波次配置生成（确定性算法）
 - **Models**：数据持久化（会话、波次记录、排行榜）
-
----
 
 ## 目录结构
 
@@ -167,8 +159,6 @@ tower-defense/
 - `calculators.py`：成本、难度、伤害计算
 - `generators.py`：波次配置生成
 
----
-
 ## 核心模块
 
 ### 前端模块依赖
@@ -201,8 +191,7 @@ Views (API 入口)
     │
     ├── Validators (数据验证)
     │       ├── validate_basic (Level 1)
-    │       ├── validate_damage (Level 2)
-    │       └── validate_attacks (Level 2+)
+    │       └── validate_damage, validate_attacks (Level 2)
     │
     ├── Calculators (计算逻辑)
     │       ├── process_actions (操作处理)
@@ -214,8 +203,6 @@ Views (API 入口)
             ├── WaveRecord
             └── LeaderboardEntry
 ```
-
----
 
 ## 设计决策
 
@@ -265,8 +252,6 @@ Views (API 入口)
 - `render/` 包含 Phaser 相关代码
 - `PhaserAdapter` 作为适配层
 
----
-
 ## 数据流
 
 ### 游戏生命周期数据流
@@ -314,8 +299,6 @@ Frame Loop:
 - **服务端权威**：每波结束后用 `serverState` 覆盖本地状态
 - **配置来源**：所有游戏配置（建筑属性、怪物属性）从服务端获取，客户端不内置
 
----
-
 ## 扩展指南
 
 ### 添加新建筑类型
@@ -347,8 +330,6 @@ Frame Loop:
 - **TDD 优先**：后端采用测试驱动开发，先写测试再实现
 - **Mock 模式**：前端可通过 `VITE_USE_MOCK=true` 脱离后端开发
 - **类型安全**：前后端共享类型定义，避免接口不一致
-
----
 
 ## 相关文档
 

@@ -61,7 +61,7 @@ def _get_wave_config(next_wave: dict) -> dict:
 
 
 def _get_monsters_config(next_wave: dict) -> dict[str, dict]:
-    """构建怪物配置字典，用于 Level 2+ 验证.
+    """构建怪物配置字典，用于 Level 2 验证.
 
     Args:
         next_wave: 波次数据，包含 monsters 列表
@@ -166,7 +166,7 @@ class SubmitWaveView(APIView):
         if not ok:
             return self._validation_error(msg)
 
-        # Level 2+ 攻击事件验证
+        # Level 2 攻击事件验证
         monsters_config = _get_monsters_config(session.next_wave)
         ok, msg = validate_attacks(
             attacks,
