@@ -4,7 +4,7 @@ import uuid
 
 import pytest
 
-from game.generators import generate_first_wave, generate_wave
+from game.generators import generate_wave
 
 
 class TestGenerateWavePredefined:
@@ -214,22 +214,6 @@ class TestGenerateWaveConfig:
         monster = wave["monsters"][0]
         assert config["life"] == monster["life"]
         assert config["money"] == monster["money"]
-
-
-class TestGenerateFirstWave:
-    """generate_first_wave 测试."""
-
-    def test_returns_wave_1(self):
-        """返回第 1 波配置."""
-        wave = generate_first_wave()
-        assert wave["waveNumber"] == 1
-
-    def test_uses_default_difficulty(self):
-        """使用默认难度 1.0."""
-        wave = generate_first_wave()
-        # 验证属性是按难度 1.0 计算的
-        monster = wave["monsters"][0]
-        assert monster["life"] == 50  # 难度 1.0 时的值
 
 
 class TestGenerateWaveEdgeCases:

@@ -29,7 +29,7 @@
   - calc_total_cost, process_actions, build_validation_buildings
   - calc_new_difficulty, calc_monster_attrs
   - calc_actual_damage, calc_hit_score, calc_life_reward
-- P1 波次生成器 (TDD): generate_wave, generate_first_wave
+- P1 波次生成器 (TDD): generate_wave
 - P2 验证器 (TDD): Level 1, Level 2, Level 4
 - P2 API 视图 (TDD): 创建会话, 提交波次, 游戏结束, 排行榜
 - P3 管理命令: cleanup_sessions

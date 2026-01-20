@@ -48,17 +48,6 @@ def generate_wave(wave_number: int, difficulty: float) -> dict[str, Any]:
     }
 
 
-def generate_first_wave() -> dict[str, Any]:
-    """生成第一波配置.
-
-    使用默认难度 1.0。
-
-    Returns:
-        第一波配置字典
-    """
-    return generate_wave(1, 1.0)
-
-
 def _generate_auto_wave(wave_number: int) -> list[dict[str, int]]:
     """自动生成波次配置（波次 11+）.
 

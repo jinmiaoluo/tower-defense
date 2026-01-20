@@ -15,7 +15,7 @@ from game.calculators import (
     process_actions,
 )
 from game.config import GAME_CONFIG, INITIAL
-from game.generators import generate_first_wave, generate_wave
+from game.generators import generate_wave
 from game.models import GameSession, LeaderboardEntry, WaveRecord
 from game.validators import (
     analyze_statistics,
@@ -93,7 +93,7 @@ class CreateSessionView(APIView):
     """POST /api/game/sessions - 创建游戏会话"""
 
     def post(self, request: Request) -> Response:
-        first_wave = generate_first_wave()
+        first_wave = generate_wave(1, INITIAL["difficulty"])
 
         session = GameSession.objects.create(
             money=INITIAL["money"],
