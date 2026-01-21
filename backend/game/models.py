@@ -1,6 +1,12 @@
+from __future__ import annotations
+
 import uuid
+from typing import TYPE_CHECKING
 
 from django.db import models
+
+if TYPE_CHECKING:
+    from django.db.models.manager import RelatedManager
 
 
 class GameSession(models.Model):
@@ -35,6 +41,9 @@ class GameSession(models.Model):
     # 配置数据
     config = models.JSONField(help_text="游戏配置（建筑、怪物、地图等）")
     next_wave = models.JSONField(help_text="下一波怪物配置")
+
+    # Type hint for reverse relation (defined in WaveRecord.session)
+    waves: RelatedManager[WaveRecord]
 
     class Meta:
         db_table = "game_session"
