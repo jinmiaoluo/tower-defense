@@ -606,33 +606,12 @@ class TestValidateDamage:
         ok, err = validate_damage(result, buildings, wave_config, building_config)
         assert ok is True
 
-    def test_life_pool_mismatch(self):
-        """失败：生命池不匹配."""
-        result = {
-            "killed_by_type": {0: 3},
-            "total_life_destroyed": 200,  # 错误，应为 150
-            "total_damage_dealt": 200,
-            "wave_duration_frames": 100,
-        }
-        buildings = [
-            {"id": "b-001", "type": "cannon", "level": 1, "position": [5, 5]},
-        ]
-        wave_config = {
-            "monsters": [{"type": 0, "count": 3, "life": 50, "money": 5}]
-        }
-        building_config = {
-            "cannon": {"damage": 12, "speed": 2},
-        }
-        ok, err = validate_damage(result, buildings, wave_config, building_config)
-        assert ok is False
-        assert "生命池验证失败" in err
-
     def test_damage_insufficient(self):
-        """失败：伤害值不足以击杀."""
+        """Fail: Damage insufficient to kill."""
         result = {
             "killed_by_type": {0: 3},
             "total_life_destroyed": 150,
-            "total_damage_dealt": 100,  # 小于 150，不足以击杀
+            "total_damage_dealt": 100,  # Less than 150, insufficient to kill
             "wave_duration_frames": 100,
         }
         buildings = [
@@ -646,18 +625,18 @@ class TestValidateDamage:
         }
         ok, err = validate_damage(result, buildings, wave_config, building_config)
         assert ok is False
-        assert "伤害值不足以击杀" in err
+        assert "Damage insufficient to kill" in err
 
     def test_dps_capacity_exceeded(self):
-        """失败：DPS 容量超限."""
-        # 建筑：cannon level 1, damage=12, speed=2
+        """Fail: DPS capacity exceeded."""
+        # Building: cannon level 1, damage=12, speed=2
         # max_dps = 12 * 1 / 2 = 6
-        # 100 帧内最大伤害 = 6 * 100 = 600
-        # 允许 10% 容差 = 660
+        # Max damage in 100 frames = 6 * 100 = 600
+        # 10% tolerance = 660
         result = {
             "killed_by_type": {0: 3},
             "total_life_destroyed": 150,
-            "total_damage_dealt": 1000,  # 超出 660
+            "total_damage_dealt": 1000,  # Exceeds 660
             "wave_duration_frames": 100,
         }
         buildings = [
@@ -671,7 +650,7 @@ class TestValidateDamage:
         }
         ok, err = validate_damage(result, buildings, wave_config, building_config)
         assert ok is False
-        assert "DPS 容量超限" in err
+        assert "DPS capacity exceeded" in err
 
     def test_dps_within_tolerance(self):
         """成功：伤害在 10% 容差内."""
@@ -778,13 +757,13 @@ class TestValidateDamage:
         assert ok is True
 
     def test_high_level_building_dps_exceeds_exponential_limit(self):
-        """失败：伤害超过指数增长计算的 DPS 上限.
+        """Fail: Damage exceeds exponential growth DPS limit.
 
-        使用线性计算的值会超过指数增长的上限：
-        - Level 5 HMG 指数（保持浮点精度）: 85 伤害, DPS = 28.33, max = 2833 * 1.1 = 3116
-        - Level 5 HMG 线性: 150 伤害, DPS = 50, max = 5000
+        Linear values exceed exponential growth limit:
+        - Level 5 HMG exponential (float precision): 85 damage, DPS = 28.33, max = 2833 * 1.1 = 3116
+        - Level 5 HMG linear: 150 damage, DPS = 50, max = 5000
 
-        测试使用 4000 伤害：在线性计算内但超过指数计算上限
+        Test uses 4000 damage: within linear calc but exceeds exponential limit
         """
         result = {
             "killed_by_type": {0: 50},
@@ -803,7 +782,7 @@ class TestValidateDamage:
         }
         ok, err = validate_damage(result, buildings, wave_config, building_config)
         assert ok is False
-        assert "DPS 容量超限" in err
+        assert "DPS capacity exceeded" in err
 
     def test_cannon_high_level_upgrade_rule_transition(self):
         """成功：cannon level 10/11/12 的升级规则切换边界测试.
@@ -853,13 +832,13 @@ class TestValidateDamage:
         assert ok is True, f"Level 12 应通过: {err}"
 
     def test_cannon_high_level_linear_damage_rejected(self):
-        """失败：cannon 高等级使用线性计算的伤害值被拒绝.
+        """Fail: High level cannon with linear damage is rejected.
 
-        Level 10 cannon（保持浮点精度）:
-        - 指数计算: damage = 61, DPS = 30.5, max_damage = 3050, 10% 容差 = 3355
-        - 线性计算: damage = 120, DPS = 60, max_damage = 6000
+        Level 10 cannon (float precision):
+        - Exponential: damage = 61, DPS = 30.5, max_damage = 3050, 10% tolerance = 3355
+        - Linear: damage = 120, DPS = 60, max_damage = 6000
 
-        测试使用 5000 伤害：在线性计算内但超过指数计算上限
+        Test uses 5000 damage: within linear calc but exceeds exponential limit
         """
         result = {
             "killed_by_type": {0: 100},
@@ -878,7 +857,7 @@ class TestValidateDamage:
         }
         ok, err = validate_damage(result, buildings, wave_config, building_config)
         assert ok is False
-        assert "DPS 容量超限" in err
+        assert "DPS capacity exceeded" in err
 
     def test_no_buildings(self):
         """成功：无建筑时 DPS 为 0."""

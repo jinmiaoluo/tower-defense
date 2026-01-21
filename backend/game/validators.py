@@ -251,40 +251,34 @@ def validate_damage(
     buildings: list[dict[str, Any]],
     wave_config: dict[str, Any],
     building_config: dict[str, Any],
+    monsters_config: dict[str, Any] | None = None,
 ) -> tuple[bool, str]:
-    """Level 2 伤害验证：生命池、DPS 容量.
+    """Level 2 damage validation: DPS capacity, damage floor.
 
-    来源：SPEC.md L1018-1055
+    Source: SPEC.md L1018-1055
 
-    验证项目：
-    1. 生命池验证：total_life_destroyed == sum(killed_by_type[t] * monster[t].life)
-    2. 伤害下限验证：total_damage_dealt >= total_life_destroyed
-    3. DPS 容量验证：total_damage_dealt <= max_dps * duration * 1.1
+    Validation items:
+    1. Damage floor: total_damage_dealt >= total_life_destroyed
+    2. DPS capacity: total_damage_dealt <= max_dps * duration * 1.1
+
+    Note: Life pool validation is done by validate_cumulative_damage,
+    since each monster has independent random life values.
 
     Args:
-        result: 波次结果
-        buildings: 建筑列表
-        wave_config: 波次配置
-        building_config: 建筑配置
+        result: Wave result
+        buildings: Building list
+        wave_config: Wave config (unused, kept for backward compatibility)
+        building_config: Building config
+        monsters_config: Monster config {id: {type, life, ...}} (unused, kept for extensibility)
 
     Returns:
-        (成功标志, 错误信息)
+        (success_flag, error_message)
     """
-    killed_by_type = {int(k): v for k, v in result["killed_by_type"].items()}
-
-    # 1. 生命池验证
-    expected_life = sum(
-        killed_by_type.get(m["type"], 0) * m["life"]
-        for m in wave_config["monsters"]
-    )
-    if result["total_life_destroyed"] != expected_life:
-        return False, f"生命池验证失败: 期望 {expected_life}, 实际 {result['total_life_destroyed']}"
-
-    # 2. 伤害下限验证
+    # 1. Damage floor validation
     if result["total_damage_dealt"] < result["total_life_destroyed"]:
-        return False, "伤害值不足以击杀"
+        return False, "Damage insufficient to kill"
 
-    # 3. DPS 容量验证
+    # 2. DPS capacity validation
     max_dps = sum(
         calc_building_damage(b["type"], building_config[b["type"]]["damage"], b["level"])
         / building_config[b["type"]]["speed"]
@@ -292,8 +286,8 @@ def validate_damage(
         if building_config[b["type"]]["speed"] > 0
     )
     max_damage = max_dps * result["wave_duration_frames"]
-    if result["total_damage_dealt"] > max_damage * 1.1:  # 10% 容差
-        return False, "DPS 容量超限"
+    if result["total_damage_dealt"] > max_damage * 1.1:  # 10% tolerance
+        return False, "DPS capacity exceeded"
 
     return True, ""
 
