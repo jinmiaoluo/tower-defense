@@ -158,16 +158,17 @@ class SubmitWaveView(APIView):
         # 使用 validation_buildings 而非 submitted_buildings，
         # 因为攻击可能发生在建筑被出售之前
         validation_buildings = build_validation_buildings(actions, session.buildings)
+        monsters_config = _get_monsters_config(session.next_wave)
 
         # Level 2 伤害验证
         ok, msg = validate_damage(
-            result, validation_buildings, wave_config, GAME_CONFIG["buildings"]
+            result, validation_buildings, wave_config, GAME_CONFIG["buildings"],
+            monsters_config,
         )
         if not ok:
             return self._validation_error(msg)
 
         # Level 2 攻击事件验证
-        monsters_config = _get_monsters_config(session.next_wave)
         ok, msg = validate_attacks(
             attacks,
             validation_buildings,
@@ -343,14 +344,14 @@ class EndSessionView(APIView):
         # 使用 validation_buildings 而非 submitted_buildings，
         # 因为攻击可能发生在建筑被出售之前
         validation_buildings = build_validation_buildings(actions, session.buildings)
+        monsters_config = _get_monsters_config(session.next_wave)
 
         ok, msg = validate_damage(
-            result, validation_buildings, wave_config, GAME_CONFIG["buildings"]
+            result, validation_buildings, wave_config, GAME_CONFIG["buildings"],
+            monsters_config,
         )
         if not ok:
             return self._validation_error(msg)
-
-        monsters_config = _get_monsters_config(session.next_wave)
         ok, msg = validate_attacks(
             attacks,
             validation_buildings,
@@ -431,7 +432,7 @@ class EndSessionView(APIView):
                 if new_score <= 0:
                     raise ValueError("0 分不能提交到排行榜，至少需要击杀一只怪物")
 
-                entry = LeaderboardEntry.objects.create(
+                LeaderboardEntry.objects.create(
                     nickname=data["nickname"],
                     score=new_score,
                     waves_completed=wave_number,
@@ -475,7 +476,7 @@ class EndSessionView(APIView):
                 if session.score <= 0:
                     raise ValueError("0 分不能提交到排行榜，至少需要击杀一只怪物")
 
-                entry = LeaderboardEntry.objects.create(
+                LeaderboardEntry.objects.create(
                     nickname=data["nickname"],
                     score=session.score,
                     waves_completed=session.wave_count,
