@@ -1,9 +1,10 @@
-"""波次生成器模块.
+"""Wave generator module.
 
-生成游戏波次的怪物配置。
+Generates monster configurations for game waves.
 """
 
 import math
+import random
 import uuid
 from typing import Any
 
@@ -12,27 +13,27 @@ from game.config import MONSTERS, PREDEFINED_WAVES, WAVE_CONFIG
 
 
 def generate_wave(wave_number: int, difficulty: float) -> dict[str, Any]:
-    """生成指定波次的怪物配置.
+    """Generate monster configuration for a specific wave.
 
-    来源：
-    - 预定义波次 (1-10): PREDEFINED_WAVES 配置
-    - 自动生成 (11+): td-data-stage-1.js:296-300
+    Sources:
+    - Predefined waves (1-10): PREDEFINED_WAVES config
+    - Auto-generated (11+): td-data-stage-1.js:296-300
 
     Args:
-        wave_number: 波次号（从 1 开始）
-        difficulty: 当前难度系数
+        wave_number: Wave number (starting from 1)
+        difficulty: Current difficulty coefficient
 
     Returns:
-        波次配置字典，包含:
-        - waveNumber: 波次号
-        - monsters: 展开的怪物列表（每个怪物有唯一 ID）
-        - waveConfig: 聚合格式的波次配置（用于服务端验证）
+        Wave config dict containing:
+        - waveNumber: Wave number
+        - monsters: Expanded monster list (each with unique ID)
+        - waveConfig: Aggregated format for server validation
 
     Raises:
-        ValueError: 波次号小于等于 0 时
+        ValueError: When wave_number <= 0
     """
     if wave_number <= 0:
-        raise ValueError("波次号必须大于 0")
+        raise ValueError("Wave number must be greater than 0")
 
     if wave_number <= WAVE_CONFIG["predefined_wave_count"]:
         wave_def = PREDEFINED_WAVES[wave_number]
@@ -49,17 +50,20 @@ def generate_wave(wave_number: int, difficulty: float) -> dict[str, Any]:
 
 
 def _generate_auto_wave(wave_number: int) -> list[dict[str, int]]:
-    """自动生成波次配置（波次 11+）.
+    """Auto-generate wave configuration (wave 11+).
 
-    算法说明：
-    - 怪物总数 = min(floor(wave^1.1), max_monsters_per_wave)
-    - 使用确定性分布算法（轮询所有怪物类型）
+    Algorithm:
+    - Total monsters = min(floor(wave^1.1), max_monsters_per_wave)
+    - Group size: random 1-3
+    - Monster type: random selection (0-8)
+
+    Source: td-cfg-monsters.js:170-191 makeMonsters()
 
     Args:
-        wave_number: 波次号
+        wave_number: Wave number
 
     Returns:
-        波次定义列表 [{"type": int, "count": int}, ...]
+        Wave definition list [{"type": int, "count": int}, ...], in spawn order
     """
     total = min(
         int(math.pow(wave_number, 1.1)),
@@ -67,41 +71,36 @@ def _generate_auto_wave(wave_number: int) -> list[dict[str, int]]:
     )
 
     type_count = len(MONSTERS)
-    counts = [0] * type_count
-
+    groups = []
     remaining = total
-    type_idx = 0
-    group_sizes = [1, 2, 3]
-    group_idx = 0
 
     while remaining > 0:
-        size = min(group_sizes[group_idx % len(group_sizes)], remaining)
-        counts[type_idx] += size
-        remaining -= size
-        type_idx = (type_idx + 1) % type_count
-        group_idx += 1
+        group_size = min(random.randint(1, 3), remaining)
+        monster_type = random.randint(0, type_count - 1)
+        groups.append({"type": monster_type, "count": group_size})
+        remaining -= group_size
 
-    return [
-        {"type": t, "count": c}
-        for t, c in enumerate(counts)
-        if c > 0
-    ]
+    return groups
 
 
 def _expand_wave_def(
     wave_def: list[dict[str, int]],
     difficulty: float,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """展开波次定义为具体怪物列表.
+    """Expand wave definition into concrete monster list.
+
+    Each monster gets independently calculated random attributes,
+    ensuring same-type monsters have different life/speed values.
 
     Args:
-        wave_def: 波次定义 [{"type": int, "count": int}, ...]
-        difficulty: 难度系数
+        wave_def: Wave definition [{"type": int, "count": int}, ...]
+        difficulty: Difficulty coefficient
 
     Returns:
-        (monsters, wave_config) 元组:
-        - monsters: 怪物列表，每个怪物包含 id, type, life, speed, shield, money
-        - wave_config: 聚合格式的验证配置 [{"type", "count", "life", "money"}, ...]
+        (monsters, wave_config) tuple:
+        - monsters: Monster list, each with id, type, life, speed, shield, money
+        - wave_config: Aggregated validation config [{"type", "count", "money"}, ...]
+          (money is static, kept in waveConfig for validation)
     """
     monsters = []
     wave_config = []
@@ -111,16 +110,14 @@ def _expand_wave_def(
         count = group["count"]
         base_attrs = MONSTERS[monster_type]
 
-        attrs = calc_monster_attrs(base_attrs, difficulty)
-
         wave_config.append({
             "type": monster_type,
             "count": count,
-            "life": attrs["life"],
-            "money": attrs["money"],
+            "money": base_attrs["money"],
         })
 
         for _ in range(count):
+            attrs = calc_monster_attrs(base_attrs, difficulty)
             monsters.append({
                 "id": str(uuid.uuid4()),
                 "type": monster_type,
