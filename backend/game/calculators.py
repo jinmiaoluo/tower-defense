@@ -4,7 +4,10 @@
 """
 
 import math
+import random
 from typing import Any
+
+from game.config import MonsterConfig
 
 
 def calc_total_cost(building_type: str, level: int, config: dict) -> int:
@@ -115,32 +118,38 @@ def calc_new_difficulty(current: float, life_lost: int, wave: int) -> float:
     return max(current * factor, 1.0)
 
 
-def calc_monster_attrs(base: dict[str, Any], difficulty: float) -> dict[str, Any]:
-    """基于难度系数计算怪物实际属性.
+def calc_monster_attrs(base: MonsterConfig, difficulty: float) -> dict[str, Any]:
+    """Calculate monster attributes based on difficulty.
 
-    公式来源：
-    - 旧实现 td-obj-monster.js:24-35（去除随机因子）
-    - SPEC.md L880-899
+    Source: td-obj-monster.js:24-35
 
-    约束条件（来源：td-obj-monster.js:27-36）：
-    - speed: 最小值 1，最大值 max_speed（如有）
-    - life: 最小值 1
-    - shield: 最小值 0
+    Random factors:
+    - life: random(0.5, 1.5) i.e. Math.random() + 0.5
+    - speed: random(0.75, 1.25) i.e. Math.random() * 0.5 + 0.75
+    - shield: no random factor
+
+    Constraints (from td-obj-monster.js:27-36):
+    - speed: min 1, max max_speed (if defined)
+    - life: min 1
+    - shield: min 0
 
     Args:
-        base: 怪物基础属性字典
-        difficulty: 当前难度系数
+        base: Base monster attributes dict
+        difficulty: Current difficulty coefficient
 
     Returns:
-        计算后的怪物属性（不修改原字典）
+        Calculated monster attributes (does not mutate base)
     """
-    speed = base["speed"] + difficulty / 2
+    life_rand = random.random() + 0.5
+    speed_rand = random.random() * 0.5 + 0.75
+
+    speed = (base["speed"] + difficulty / 2) * speed_rand
     max_speed = base.get("max_speed", float("inf"))
 
     return {
         **base,
         "speed": min(max(speed, 1), max_speed),
-        "life": max(int(base["life"] * (difficulty + 1) * 0.5), 1),
+        "life": max(int(base["life"] * (difficulty + 1) * 0.5 * life_rand), 1),
         "shield": max(int(base["shield"] + difficulty / 2), 0),
     }
 

@@ -344,65 +344,72 @@ class TestCalcActualDamage:
 
 
 class TestCalcMonsterAttrs:
-    """calc_monster_attrs 测试.
+    """calc_monster_attrs tests.
 
-    公式来源：
-    - 旧实现 td-obj-monster.js:24-35（去除随机因子）
-    - SPEC.md L880-899
+    Source: td-obj-monster.js:24-35 (with random factors)
 
-    属性计算公式：
-    - speed: base + difficulty / 2
-    - life: int(base * (difficulty + 1) * 0.5)
-    - shield: int(base + difficulty / 2)
-    - money 不受 difficulty 影响
+    Formulas (with random factors):
+    - speed: (base + difficulty / 2) * random(0.75, 1.25)
+    - life: int(base * (difficulty + 1) * random(0.5, 1.5) * 0.5)
+    - shield: int(base + difficulty / 2)  # no random
+    - money is not affected by difficulty
     """
 
-    def test_default_difficulty(self):
-        """难度 1.0 时的属性计算.
+    def test_life_in_random_range(self):
+        """Life value falls within random range.
 
-        speed = 3 + 1.0 / 2 = 3.5
-        life = int(50 * (1.0 + 1) * 0.5) = int(50 * 2 * 0.5) = 50
-        shield = int(0 + 1.0 / 2) = int(0.5) = 0
+        Formula: life = int(base * (difficulty + 1) * random(0.5, 1.5) * 0.5)
+        base=50, difficulty=1.0:
+        - median = 50 * 2 * 1.0 * 0.5 = 50
+        - min = 50 * 2 * 0.5 * 0.5 = 25
+        - max = 50 * 2 * 1.5 * 0.5 = 75
         """
         base = {"life": 50, "speed": 3, "shield": 0, "money": 10}
-        result = calc_monster_attrs(base, 1.0)
-        assert result["life"] == 50
-        assert result["speed"] == 3.5
-        assert result["shield"] == 0
-        assert result["money"] == 10  # money 不受影响
+        for _ in range(20):
+            result = calc_monster_attrs(base, 1.0)
+            assert 25 <= result["life"] < 75
 
-    def test_high_difficulty(self):
-        """难度 3.0 时的属性计算.
+    def test_speed_in_random_range(self):
+        """Speed value falls within random range.
 
-        speed = 3 + 3.0 / 2 = 4.5
-        life = int(50 * (3.0 + 1) * 0.5) = int(50 * 4 * 0.5) = 100
-        shield = int(0 + 3.0 / 2) = int(1.5) = 1
+        Formula: speed = (base + difficulty / 2) * random(0.75, 1.25)
+        base=3, difficulty=1.0:
+        - base_value = 3 + 0.5 = 3.5
+        - min = 3.5 * 0.75 = 2.625
+        - max = 3.5 * 1.25 = 4.375
         """
         base = {"life": 50, "speed": 3, "shield": 0, "money": 10}
-        result = calc_monster_attrs(base, 3.0)
-        assert result["life"] == 100
-        assert result["speed"] == 4.5
-        assert result["shield"] == 1
+        for _ in range(20):
+            result = calc_monster_attrs(base, 1.0)
+            assert 2.625 <= result["speed"] < 4.375
 
-    def test_with_base_shield(self):
-        """带有基础护盾值的怪物.
+    def test_shield_is_deterministic(self):
+        """Shield calculation is deterministic (no random).
 
-        使用护盾怪配置（type 4）：
-        base shield = 20
-        difficulty = 2.0
-        shield = int(20 + 2.0 / 2) = int(21) = 21
+        Formula: shield = int(base + difficulty / 2)
+        base=10, difficulty=2.0:
+        - shield = int(10 + 1.0) = 11
         """
-        base = {"life": 50, "speed": 5, "shield": 20, "money": 30}
-        result = calc_monster_attrs(base, 2.0)
-        assert result["shield"] == 21
+        base = {"life": 50, "speed": 3, "shield": 10, "money": 10}
+        results = [calc_monster_attrs(base, 2.0)["shield"] for _ in range(10)]
+        assert all(s == 11 for s in results)
+
+    def test_randomness_produces_different_values(self):
+        """Multiple calls produce different values (verify randomness)."""
+        base = {"life": 50, "speed": 3, "shield": 0, "money": 10}
+        life_values = set()
+        speed_values = set()
+        for _ in range(50):
+            result = calc_monster_attrs(base, 1.0)
+            life_values.add(result["life"])
+            speed_values.add(round(result["speed"], 2))
+        assert len(life_values) > 10, f"life should have multiple values, got {life_values}"
+        assert len(speed_values) > 10, f"speed should have multiple values, got {speed_values}"
 
     def test_preserves_other_attributes(self):
-        """保留其他属性.
-
-        函数应保留 base 中的所有其他属性（如 name, damage 等）。
-        """
+        """Preserves other attributes. Money is not affected by difficulty."""
         base = {
-            "name": "普通怪",
+            "name": "Normal",
             "life": 50,
             "speed": 3,
             "shield": 0,
@@ -410,156 +417,73 @@ class TestCalcMonsterAttrs:
             "money": 5,
             "color": "#00ff00",
         }
-        result = calc_monster_attrs(base, 1.0)
-        assert result["name"] == "普通怪"
+        result = calc_monster_attrs(base, 5.0)
+        assert result["name"] == "Normal"
         assert result["damage"] == 1
+        assert result["money"] == 5
         assert result["color"] == "#00ff00"
 
-    def test_high_life_monster(self):
-        """高生命值怪物（血量怪 type 3）.
-
-        base life = 500, difficulty = 2.0
-        life = int(500 * (2.0 + 1) * 0.5) = int(500 * 3 * 0.5) = 750
-        """
-        base = {"life": 500, "speed": 5, "shield": 1, "money": 50}
-        result = calc_monster_attrs(base, 2.0)
-        assert result["life"] == 750
-
-    def test_extreme_difficulty(self):
-        """极高难度测试.
-
-        difficulty = 10.0
-        speed = 3 + 10.0 / 2 = 8
-        life = int(50 * (10.0 + 1) * 0.5) = int(50 * 11 * 0.5) = 275
-        shield = int(0 + 10.0 / 2) = int(5) = 5
-        """
-        base = {"life": 50, "speed": 3, "shield": 0, "money": 10}
-        result = calc_monster_attrs(base, 10.0)
-        assert result["speed"] == 8.0
-        assert result["life"] == 275
-        assert result["shield"] == 5
-
     def test_does_not_mutate_base(self):
-        """不修改原始 base 字典."""
+        """Does not mutate original base dict."""
         base = {"life": 50, "speed": 3, "shield": 0, "money": 10}
         base_copy = base.copy()
         calc_monster_attrs(base, 5.0)
         assert base == base_copy
 
     def test_max_speed_limit(self):
-        """速度不超过 max_speed.
+        """Speed does not exceed max_speed.
 
-        旧实现 td-obj-monster.js:29:
+        Source td-obj-monster.js:28:
         if (this.speed > cfg.max_speed) this.speed = cfg.max_speed;
-
-        difficulty = 20.0
-        计算速度 = 3 + 20.0 / 2 = 13
-        max_speed = 10
-        实际速度 = 10
         """
-        base = {"life": 50, "speed": 3, "max_speed": 10, "shield": 0, "money": 10}
-        result = calc_monster_attrs(base, 20.0)
-        assert result["speed"] == 10  # 被 max_speed 限制
-
-    def test_high_speed_monster_max_speed(self):
-        """极速怪的 max_speed 限制.
-
-        极速怪 base speed=30, max_speed=40
-        difficulty = 30.0
-        计算速度 = 30 + 30.0 / 2 = 45
-        实际速度 = 40（被 max_speed 限制）
-        """
-        base = {"life": 30, "speed": 30, "max_speed": 40, "shield": 1, "money": 20}
-        result = calc_monster_attrs(base, 30.0)
-        assert result["speed"] == 40
-
-    def test_speed_under_max_speed(self):
-        """速度低于 max_speed 时不受限制.
-
-        difficulty = 2.0
-        计算速度 = 3 + 2.0 / 2 = 4
-        max_speed = 10
-        实际速度 = 4（未触发限制）
-        """
-        base = {"life": 50, "speed": 3, "max_speed": 10, "shield": 0, "money": 10}
-        result = calc_monster_attrs(base, 2.0)
-        assert result["speed"] == 4.0
+        base = {"life": 50, "speed": 30, "max_speed": 10, "shield": 0, "money": 10}
+        for _ in range(20):
+            result = calc_monster_attrs(base, 20.0)
+            assert result["speed"] == 10
 
     def test_min_speed_is_1(self):
-        """速度最小值为 1.
+        """Minimum speed is 1.
 
-        旧实现 td-obj-monster.js:27:
         if (this.speed < 1) this.speed = 1;
-
-        极端情况：base speed=0, difficulty=0
-        计算速度 = 0 + 0 / 2 = 0
-        实际速度 = 1（最小值）
         """
         base = {"life": 50, "speed": 0, "max_speed": 10, "shield": 0, "money": 10}
-        result = calc_monster_attrs(base, 0.0)
-        assert result["speed"] == 1
+        for _ in range(20):
+            result = calc_monster_attrs(base, 0.0)
+            assert result["speed"] >= 1
 
     def test_min_life_is_1(self):
-        """生命值最小值为 1.
-
-        旧实现 td-obj-monster.js:34:
-        if (this.life < 1) this.life = this.life0 = 1;
-
-        极端情况：base life=1, difficulty=0.0
-        计算生命 = int(1 * (0.0 + 1) * 0.5) = int(0.5) = 0
-        实际生命 = 1（最小值）
-        """
+        """Minimum life is 1"""
         base = {"life": 1, "speed": 3, "max_speed": 10, "shield": 0, "money": 10}
-        result = calc_monster_attrs(base, 0.0)
-        assert result["life"] == 1
+        for _ in range(20):
+            result = calc_monster_attrs(base, 0.0)
+            assert result["life"] >= 1
 
     def test_min_shield_is_0(self):
-        """护盾最小值为 0.
-
-        旧实现 td-obj-monster.js:36:
-        if (this.shield < 0) this.shield = 0;
-
-        极端情况：base shield=-5, difficulty=0.0
-        计算护盾 = int(-5 + 0.0 / 2) = -5
-        实际护盾 = 0（最小值）
-        """
+        """Minimum shield is 0."""
         base = {"life": 50, "speed": 3, "max_speed": 10, "shield": -5, "money": 10}
         result = calc_monster_attrs(base, 0.0)
         assert result["shield"] == 0
 
     def test_no_max_speed_field(self):
-        """无 max_speed 字段时不限制速度.
-
-        兼容性：如果 base 中没有 max_speed，速度不受限制。
-        """
+        """Speed is unlimited when max_speed field is absent"""
         base = {"life": 50, "speed": 3, "shield": 0, "money": 10}
-        result = calc_monster_attrs(base, 100.0)
-        assert result["speed"] == 53.0  # 3 + 100 / 2
+        for _ in range(20):
+            result = calc_monster_attrs(base, 100.0)
+            # base = 3 + 50 = 53, range = 53 * 0.75 ~ 53 * 1.25
+            assert 39.75 <= result["speed"] < 66.25
 
     def test_no_max_speed_and_speed_below_1(self):
-        """无 max_speed 且计算速度 < 1 时，仍保证最小值为 1.
+        """When no max_speed and calculated speed < 1, minimum is still 1.
 
-        这是一个关键边界情况：
-        - 没有 max_speed 字段
-        - 计算出的 speed < 1
+        This is a critical edge case:
+        - No max_speed field
+        - Calculated speed < 1
 
-        错误实现会返回 0，正确实现应返回 1。
+        Wrong implementation returns 0, correct implementation returns 1.
         """
-        base = {"life": 50, "speed": 0, "shield": 0, "money": 10}  # 没有 max_speed
+        base = {"life": 50, "speed": 0, "shield": 0, "money": 10}  # no max_speed
         result = calc_monster_attrs(base, 0.0)  # speed = 0 + 0/2 = 0
-        assert result["speed"] == 1  # 最小值约束仍生效
-
-    def test_speed_capped_by_max_speed_high_difficulty(self):
-        """高难度时 speed 受 max_speed 约束.
-
-        difficulty = 50.0
-        计算速度 = 30 + 50.0 / 2 = 55
-        max_speed = 40
-        实际速度 = 40
-        """
-        base = {"life": 30, "speed": 30, "max_speed": 40, "shield": 1, "money": 20}
-        result = calc_monster_attrs(base, 50.0)
-        assert result["speed"] == 40
+        assert result["speed"] == 1  # min constraint still applies
 
 
 class TestCalcLifeReward:
