@@ -70,7 +70,6 @@
 
 **验证内容**：
 
-- 生命池验证：`totalLifeDestroyed == sum(killedByType[type] * monster[type].life)`
 - 伤害下限：`totalDamageDealt >= totalLifeDestroyed`
 - DPS 容量验证：`totalDamageDealt <= max_dps * waveDurationFrames * 1.1`
 
@@ -286,18 +285,18 @@ for attack in attacks:
 - 攻击间隔验证基于帧号差
 - 防止通过修改时间绕过验证
 
-### 确定性波次生成
+### 服务端波次生成
 
-波次 11+ 使用确定性轮询算法：
+波次 11+ 使用随机生成算法：
 
-- 组大小：1 -> 2 -> 3 -> 1 -> 2 -> 3...
-- 怪物类型：0 -> 1 -> 2 -> ... -> 8 -> 0 -> 1...
+- 组大小：随机 1-3
+- 怪物类型：随机 0-8
 
 **验证作用**：
 
-- 服务端可根据 (wave_number, difficulty) 精确重建波次配置
-- 无需存储完整怪物列表
-- 防止客户端伪造有利的波次配置
+- 服务端生成完整怪物配置（含唯一 ID）并下发给客户端
+- 验证时通过怪物 ID 精确匹配
+- 防止客户端伪造怪物或篡改属性
 
 ## 局限性与应对
 
