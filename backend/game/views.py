@@ -444,28 +444,28 @@ class EndSessionView(APIView):
         if session.wave_count < 1:
             return self._validation_error("Early end requires at least one completed wave")
 
-        try:
-            with transaction.atomic():
-                ok, msg = validate_game_end(session)
-                if not ok:
-                    raise ValueError(msg)
+        ok, msg = validate_game_end(session)
+        if not ok:
+            return self._validation_error(msg)
 
-                if session.score <= 0:
-                    raise ValueError("0 分不能提交到排行榜，至少需要击杀一只怪物")
+        if session.score <= 0:
+            return self._validation_error(
+                "Zero score cannot be submitted to leaderboard,"
+                " at least one kill is required"
+            )
 
-                LeaderboardEntry.objects.create(
-                    nickname=data["nickname"],
-                    score=session.score,
-                    waves_completed=session.wave_count,
-                )
+        with transaction.atomic():
+            LeaderboardEntry.objects.create(
+                nickname=data["nickname"],
+                score=session.score,
+                waves_completed=session.wave_count,
+            )
 
-                rank = LeaderboardEntry.objects.filter(score__gt=session.score).count() + 1
-                total = LeaderboardEntry.objects.count()
-                is_new_record = rank == 1
+            rank = LeaderboardEntry.objects.filter(score__gt=session.score).count() + 1
+            total = LeaderboardEntry.objects.count()
+            is_new_record = rank == 1
 
-                session.delete()
-        except ValueError as e:
-            return self._validation_error(str(e))
+            session.delete()
 
         return Response({
             "verified": True,
