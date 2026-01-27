@@ -6,17 +6,11 @@
 
 ```
 1. 定义数据模型 (models.py)
-       ↓
 2. 编写计算器测试 (test_calculators.py)
-       ↓
 3. 实现计算器 (calculators.py)
-       ↓
 4. 编写验证器测试 (test_validators.py)
-       ↓
 5. 实现验证器 (validators.py)
-       ↓
 6. 编写 API 测试 (test_views.py)
-       ↓
 7. 实现 API 视图 (views.py)
 ```
 

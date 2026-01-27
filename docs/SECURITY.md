@@ -160,22 +160,16 @@ expected_score = sum(floor(sqrt(attack.damage)) for attack in attacks)
 
 ```
 提交 /sessions/end
-    |
     +-- 验证 sessionId 有效性
     |       - SESSION_NOT_FOUND: 会话不存在或过期
-    |
     +-- 如有 lastWave，执行波次验证
     |       - Level 1 -> Level 2
     |       - 任一失败则拒绝入榜
-    |
     +-- 检查最终得分
     |       - score == 0: 拒绝入榜（至少需击杀一只怪物）
-    |
     +-- 执行 Level 4 统计分析
     |       - 记录异常日志，不阻断
-    |
     +-- 创建 LeaderboardEntry
-    |
     +-- 返回排名信息
 ```
 
