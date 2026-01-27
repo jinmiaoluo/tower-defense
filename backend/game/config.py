@@ -1,7 +1,6 @@
 """游戏配置模块.
 
-定义建筑、怪物、地图等游戏核心配置。
-配置来源于旧实现：/home/jinmiaoluo/repo/html5-tower-defense
+定义建筑、怪物、地图等游戏核心配置
 """
 
 from typing import TypedDict
@@ -291,7 +290,7 @@ PREDEFINED_WAVES: dict[int, list[dict[str, int]]] = {
     10: [{"type": 0, "count": 8}, {"type": 1, "count": 4}, {"type": 2, "count": 3}],
 }
 
-# 组合完整游戏配置（用于 API 响应）
+# 完整游戏配置
 GAME_CONFIG = {
     "buildings": BUILDINGS,
     "monsters": {

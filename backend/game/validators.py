@@ -706,7 +706,7 @@ def validate_attacks(
     # 1. 伤害总和一致性
     total_damage = sum(a["damage"] for a in attacks)
     if total_damage != result["total_damage_dealt"]:
-        return False, f"伤害总和不一致: 攻击记录 {total_damage}, 结果 {result['total_damage_dealt']}"
+        return False, f"Damage sum mismatch: attacks {total_damage}, result {result['total_damage_dealt']}"
 
     # 2. 攻击帧号时序验证
     for i in range(1, len(attacks)):

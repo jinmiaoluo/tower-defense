@@ -1781,7 +1781,7 @@ class TestValidateAttacks:
         assert ok is True
 
     def test_damage_sum_mismatch(self):
-        """失败：伤害总和不一致."""
+        """Fail: damage sum mismatch."""
         attacks = [
             {
                 "buildingId": "b-001",
@@ -1808,7 +1808,7 @@ class TestValidateAttacks:
             attacks, buildings, result, building_config, map_config, monsters_config
         )
         assert ok is False
-        assert "伤害总和不一致" in err
+        assert "Damage sum mismatch" in err
 
     def test_frame_order_invalid(self):
         """失败：帧号时序错误."""
