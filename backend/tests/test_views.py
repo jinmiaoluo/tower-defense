@@ -1,4 +1,4 @@
-"""API 视图单元测试."""
+"""API view unit tests."""
 
 import math
 import uuid
@@ -12,11 +12,11 @@ from game.models import GameSession, LeaderboardEntry, WaveRecord
 
 
 class TestCreateSession:
-    """POST /api/game/sessions 测试."""
+    """POST /api/game/sessions tests."""
 
     @pytest.mark.django_db
     def test_create_session_success(self, api_client):
-        """成功创建会话."""
+        """Successfully create a session."""
         response = api_client.post("/api/game/sessions")
         assert response.status_code == 200
 
@@ -27,7 +27,7 @@ class TestCreateSession:
 
     @pytest.mark.django_db
     def test_create_session_returns_valid_uuid(self, api_client):
-        """返回有效的 UUID."""
+        """Return a valid UUID."""
         response = api_client.post("/api/game/sessions")
         data = response.json()
 
@@ -36,7 +36,7 @@ class TestCreateSession:
 
     @pytest.mark.django_db
     def test_create_session_config_structure(self, api_client):
-        """配置包含必需字段."""
+        """Config contains required fields."""
         response = api_client.post("/api/game/sessions")
         data = response.json()
 
@@ -48,7 +48,7 @@ class TestCreateSession:
 
     @pytest.mark.django_db
     def test_create_session_initial_values(self, api_client):
-        """初始值正确."""
+        """Initial values are correct."""
         response = api_client.post("/api/game/sessions")
         data = response.json()
 
@@ -59,18 +59,18 @@ class TestCreateSession:
 
     @pytest.mark.django_db
     def test_create_session_first_wave_structure(self, api_client):
-        """第一波配置结构正确."""
+        """First wave config structure is correct."""
         response = api_client.post("/api/game/sessions")
         data = response.json()
 
         first_wave = data["firstWave"]
         assert first_wave["waveNumber"] == 1
         assert "monsters" in first_wave
-        assert len(first_wave["monsters"]) == 1  # 第一波只有 1 个怪物
+        assert len(first_wave["monsters"]) == 1  # first wave has only 1 monster
 
     @pytest.mark.django_db
     def test_create_session_monster_attributes(self, api_client):
-        """怪物包含必需属性."""
+        """Monster contains required attributes."""
         response = api_client.post("/api/game/sessions")
         data = response.json()
 
@@ -80,7 +80,7 @@ class TestCreateSession:
 
     @pytest.mark.django_db
     def test_create_session_persists_to_database(self, api_client):
-        """会话持久化到数据库."""
+        """Session persists to database."""
         response = api_client.post("/api/game/sessions")
         data = response.json()
 
@@ -89,7 +89,7 @@ class TestCreateSession:
 
     @pytest.mark.django_db
     def test_create_session_database_state(self, api_client):
-        """数据库中的会话状态正确."""
+        """Session state in database is correct."""
         response = api_client.post("/api/game/sessions")
         data = response.json()
 
@@ -103,7 +103,7 @@ class TestCreateSession:
 
     @pytest.mark.django_db
     def test_create_session_stores_next_wave(self, api_client):
-        """数据库中存储了下一波配置."""
+        """Next wave config stored in database."""
         response = api_client.post("/api/game/sessions")
         data = response.json()
 
@@ -113,7 +113,7 @@ class TestCreateSession:
 
     @pytest.mark.django_db
     def test_create_session_buildings_config(self, api_client):
-        """建筑配置正确."""
+        """Building config is correct."""
         response = api_client.post("/api/game/sessions")
         data = response.json()
 
@@ -130,7 +130,7 @@ class TestCreateSession:
 
     @pytest.mark.django_db
     def test_create_session_monsters_config(self, api_client):
-        """怪物配置正确（只包含展示属性）."""
+        """Monster config is correct (display-only attributes)."""
         response = api_client.post("/api/game/sessions")
         data = response.json()
 
@@ -146,7 +146,7 @@ class TestCreateSession:
 
     @pytest.mark.django_db
     def test_create_session_map_config(self, api_client):
-        """地图配置正确."""
+        """Map config is correct."""
         response = api_client.post("/api/game/sessions")
         data = response.json()
 
@@ -158,11 +158,11 @@ class TestCreateSession:
 
 
 class TestSubmitWaveView:
-    """POST /api/game/sessions/wave 测试."""
+    """POST /api/game/sessions/wave tests."""
 
     @pytest.fixture
     def session_with_first_wave(self, db) -> GameSession:
-        """创建带有第一波配置的会话."""
+        """Create a session with first wave config."""
         first_wave = generate_wave(1, INITIAL["difficulty"])
         return GameSession.objects.create(
             money=INITIAL["money"],
@@ -175,7 +175,7 @@ class TestSubmitWaveView:
         )
 
     def _make_wave_monsters_map(self, wave_config: dict) -> dict:
-        """构建怪物 ID 到怪物数据的映射."""
+        """Build a mapping from monster ID to monster data."""
         return {m["id"]: m for m in wave_config["monsters"]}
 
     def _make_valid_building(
@@ -183,10 +183,10 @@ class TestSubmitWaveView:
         building_id: str = "b-001",
         building_type: str = "LMG",
     ) -> dict:
-        """创建有效的建筑数据.
+        """Create valid building data.
 
-        默认使用 LMG（成本 100，伤害 5，射程 5-10）。
-        位置 [0, 0] 在入口，射程可以覆盖怪物路径。
+        Defaults to LMG (cost 100, damage 5, range 5-10).
+        Position [0, 0] is at the entrance, range covers the monster path.
         """
         return {
             "id": building_id,
@@ -202,9 +202,9 @@ class TestSubmitWaveView:
         wave_config: dict,
         building_type: str = "LMG",
     ) -> dict:
-        """根据波次配置生成有效的波次结果.
+        """Generate a valid wave result from wave config.
 
-        内部生成攻击事件并计算匹配的得分。
+        Internally generates attack events and calculates matching score.
         """
         attacks = self._make_valid_attacks(wave_config, building_type=building_type)
         return self._make_valid_wave_result_with_attacks(wave_config, attacks)
@@ -215,10 +215,10 @@ class TestSubmitWaveView:
         building_id: str = "b-001",
         building_type: str = "LMG",
     ) -> list[dict]:
-        """根据波次配置生成有效的攻击事件.
+        """Generate valid attack events from wave config.
 
-        位置 [4, 3] 在射程内（距离 [0,0] = 5，等于 LMG 1 级射程）。
-        每次攻击造成建筑的固定伤害，多次攻击累计击杀怪物。
+        Position [4, 3] is within range (distance from [0,0] = 5, equals LMG level 1 range).
+        Each attack deals the building's fixed damage, multiple attacks accumulate to kill monsters.
         """
         attacks = []
         frame = 100
@@ -245,9 +245,8 @@ class TestSubmitWaveView:
     def _make_valid_wave_result_with_attacks(
         self, wave_config: dict, attacks: list[dict]
     ) -> dict:
-        """根据攻击事件生成匹配的波次结果."""
+        """Generate matching wave result from attack events."""
         monsters = wave_config["monsters"]
-        monsters_map = {m["id"]: m for m in monsters}
 
         killed_by_type: dict[int, int] = {}
         total_life = 0
@@ -278,7 +277,7 @@ class TestSubmitWaveView:
     def test_submit_wave_success(
         self, api_client: APIClient, session_with_first_wave: GameSession
     ):
-        """测试成功提交波次."""
+        """Test successful wave submission."""
         session = session_with_first_wave
         wave_config = session.next_wave
 
@@ -331,7 +330,7 @@ class TestSubmitWaveView:
 
     @pytest.mark.django_db
     def test_submit_wave_session_not_found(self, api_client: APIClient, db):
-        """测试会话不存在."""
+        """Test session not found."""
         request_data = {
             "sessionId": str(uuid.uuid4()),
             "waveNumber": 1,
@@ -365,7 +364,7 @@ class TestSubmitWaveView:
     def test_submit_wave_invalid_wave_number(
         self, api_client: APIClient, session_with_first_wave: GameSession
     ):
-        """测试波次不连续."""
+        """Test non-consecutive wave number."""
         session = session_with_first_wave
 
         request_data = {
@@ -397,13 +396,13 @@ class TestSubmitWaveView:
         data = response.json()
         assert data["valid"] is False
         assert "error" in data
-        assert "波次不连续" in data["error"]["message"]
+        assert "Wave not continuous" in data["error"]["message"]
 
     @pytest.mark.django_db
     def test_submit_wave_killed_count_mismatch(
         self, api_client: APIClient, session_with_first_wave: GameSession
     ):
-        """测试击杀数量不一致."""
+        """Test killed count mismatch."""
         session = session_with_first_wave
         wave_config = session.next_wave
 
@@ -429,13 +428,13 @@ class TestSubmitWaveView:
         assert response.status_code == 400
         data = response.json()
         assert data["valid"] is False
-        assert "击杀数量不一致" in data["error"]["message"]
+        assert "Kill count mismatch" in data["error"]["message"]
 
     @pytest.mark.django_db
     def test_submit_wave_money_mismatch(
         self, api_client: APIClient, session_with_first_wave: GameSession
     ):
-        """测试金钱收益不匹配."""
+        """Test money gained mismatch."""
         session = session_with_first_wave
         wave_config = session.next_wave
 
@@ -461,13 +460,13 @@ class TestSubmitWaveView:
         assert response.status_code == 400
         data = response.json()
         assert data["valid"] is False
-        assert "金钱收益不匹配" in data["error"]["message"]
+        assert "Money gained mismatch" in data["error"]["message"]
 
     @pytest.mark.django_db
     def test_submit_wave_creates_wave_record(
         self, api_client: APIClient, session_with_first_wave: GameSession
     ):
-        """测试成功提交后创建 WaveRecord."""
+        """Test WaveRecord creation after successful submission."""
         session = session_with_first_wave
         wave_config = session.next_wave
 
@@ -513,7 +512,7 @@ class TestSubmitWaveView:
     def test_submit_wave_updates_session(
         self, api_client: APIClient, session_with_first_wave: GameSession
     ):
-        """测试成功提交后更新 GameSession."""
+        """Test GameSession update after successful submission."""
         session = session_with_first_wave
         wave_config = session.next_wave
 
@@ -560,7 +559,7 @@ class TestSubmitWaveView:
     def test_submit_wave_with_build_action(
         self, api_client: APIClient, session_with_first_wave: GameSession
     ):
-        """测试带有建造操作的波次提交."""
+        """Test wave submission with build action."""
         session = session_with_first_wave
         wave_config = session.next_wave
 
@@ -604,13 +603,11 @@ class TestSubmitWaveView:
     def test_submit_wave_insufficient_money(
         self, api_client: APIClient, session_with_first_wave: GameSession
     ):
-        """测试金钱不足."""
+        """Test insufficient money."""
         session = session_with_first_wave
         wave_config = session.next_wave
         monsters = wave_config["monsters"]
 
-        total_money = sum(m["money"] for m in monsters)
-        total_life = sum(m["life"] for m in monsters)
         killed_by_type: dict[int, int] = {}
         for m in monsters:
             t = m["type"]
@@ -666,13 +663,13 @@ class TestSubmitWaveView:
         assert response.status_code == 400
         data = response.json()
         assert data["valid"] is False
-        assert "金钱余额不足" in data["error"]["message"]
+        assert "Insufficient money" in data["error"]["message"]
 
     @pytest.mark.django_db
     def test_submit_wave_score_mismatch(
         self, api_client: APIClient, session_with_first_wave: GameSession
     ):
-        """测试得分不匹配."""
+        """Test score mismatch."""
         session = session_with_first_wave
         wave_config = session.next_wave
 
@@ -697,11 +694,11 @@ class TestSubmitWaveView:
         assert response.status_code == 400
         data = response.json()
         assert data["valid"] is False
-        assert "分数不匹配" in data["error"]["message"]
+        assert "Score mismatch" in data["error"]["message"]
 
     @pytest.mark.django_db
     def test_submit_wave_life_reward(self, api_client: APIClient, db):
-        """测试第 5 波的生命奖励."""
+        """Test life reward at wave 5."""
         wave_5 = generate_wave(5, 1.0)
         session = GameSession.objects.create(
             money=600,
@@ -751,7 +748,7 @@ class TestSubmitWaveView:
     def test_submit_wave_missing_fields(
         self, api_client: APIClient, session_with_first_wave: GameSession
     ):
-        """测试缺少必填字段."""
+        """Test missing required fields."""
         request_data = {
             "sessionId": str(session_with_first_wave.id),
         }
@@ -768,7 +765,7 @@ class TestSubmitWaveView:
 
     @pytest.mark.django_db
     def test_submit_wave_game_over(self, api_client: APIClient, db):
-        """测试生命归零时不返回下一波."""
+        """Test no next wave returned when life reaches zero."""
         wave_1 = generate_wave(1, 1.0)
         session = GameSession.objects.create(
             money=500,
@@ -817,7 +814,7 @@ class TestSubmitWaveView:
     def test_submit_wave_buildings_consistency(
         self, api_client: APIClient, session_with_first_wave: GameSession
     ):
-        """测试建筑列表一致性验证."""
+        """Test building list consistency validation."""
         session = session_with_first_wave
         wave_config = session.next_wave
         monsters = wave_config["monsters"]
@@ -863,27 +860,27 @@ class TestSubmitWaveView:
         assert response.status_code == 400
         data = response.json()
         assert data["valid"] is False
-        assert "建筑列表不一致" in data["error"]["message"]
+        assert "Building list mismatch" in data["error"]["message"]
 
-    # ========== DPS 验证使用 validation_buildings 测试 ==========
+    # ========== DPS validation using validation_buildings tests ==========
 
     @pytest.mark.django_db
     def test_submit_wave_dps_validation_with_sold_buildings(
         self, api_client: APIClient, session_with_first_wave: GameSession
     ):
-        """测试建造后卖掉建筑时 DPS 验证仍能正常工作.
+        """Test DPS validation still works when building is sold after construction.
 
-        场景（复现问题）：
-        1. 建造一个 LMG 建筑
-        2. LMG 攻击怪物，造成伤害
-        3. 卖掉 LMG
-        4. 提交波次结果，buildings 列表为空
+        Scenario (reproducing the issue):
+        1. Build an LMG building
+        2. LMG attacks monsters, dealing damage
+        3. Sell the LMG
+        4. Submit wave result with empty buildings list
 
-        修复前：DPS 验证使用 submitted_buildings（空列表），导致 max_dps=0，
-               任何伤害都会触发 "DPS 容量超限" 错误。
+        Before fix: DPS validation used submitted_buildings (empty list), causing max_dps=0,
+                    any damage would trigger "DPS capacity exceeded" error.
 
-        修复后：DPS 验证使用 validation_buildings（包含波次期间存在过的建筑），
-               正确计算 max_dps，验证应通过。
+        After fix: DPS validation uses validation_buildings (includes buildings that existed
+                   during the wave), correctly calculates max_dps, validation should pass.
         """
         session = session_with_first_wave
         wave_config = session.next_wave
@@ -971,18 +968,18 @@ class TestSubmitWaveView:
     def test_submit_wave_dps_validation_with_upgraded_then_sold_building(
         self, api_client: APIClient, session_with_first_wave: GameSession
     ):
-        """测试升级后卖掉建筑时 DPS 验证使用升级后的等级.
+        """Test DPS validation uses upgraded level when building is upgraded then sold.
 
-        场景：
-        1. 建造 LMG (level 1, damage=5)
-        2. 升级到 level 2 (damage=6)
-        3. 用 level 2 的伤害攻击怪物
-        4. 卖掉建筑
-        5. buildings 列表为空
+        Scenario:
+        1. Build LMG (level 1, damage=5)
+        2. Upgrade to level 2 (damage=6)
+        3. Attack monsters with level 2 damage
+        4. Sell the building
+        5. buildings list is empty
 
-        验证：
-        - DPS 应使用 level 2 的伤害值计算 (6 / 3 = 2)
-        - 而不是 level 1 的伤害值 (5 / 3 = 1.67)
+        Validation:
+        - DPS should use level 2 damage value (6 / 3 = 2)
+        - Not level 1 damage value (5 / 3 = 1.67)
         """
         session = session_with_first_wave
         wave_config = session.next_wave
@@ -990,7 +987,7 @@ class TestSubmitWaveView:
 
         building_id = "b-001"
         building_type = "LMG"
-        # LMG level 2 伤害: int(5 * 1.2) = 6
+        # LMG level 2 damage: int(5 * 1.2) = 6
         building_damage_level_2 = 6
 
         attacks = []
@@ -1077,23 +1074,23 @@ class TestSubmitWaveView:
     def test_submit_wave_dps_validation_with_existing_building_sold(
         self, api_client: APIClient, db
     ):
-        """测试已有建筑被升级后卖掉的场景（用户复现场景）.
+        """Test existing building upgraded then sold scenario (user reproduction).
 
-        场景（模拟波次 2）：
-        1. 波次开始时 session.buildings 已有 b-1 (LMG, level 1)
-        2. 升级 b-1 到 level 2
-        3. 卖掉 b-1
-        4. 建造 b-2 (LMG)
-        5. b-2 攻击怪物
-        6. 卖掉 b-2
-        7. buildings 列表为空
+        Scenario (simulating wave 2):
+        1. At wave start, session.buildings already has b-1 (LMG, level 1)
+        2. Upgrade b-1 to level 2
+        3. Sell b-1
+        4. Build b-2 (LMG)
+        5. b-2 attacks monsters
+        6. Sell b-2
+        7. buildings list is empty
 
-        验证：
-        - DPS 应包含 b-1 (level 2) 和 b-2 (level 1) 两个建筑
+        Validation:
+        - DPS should include both b-1 (level 2) and b-2 (level 1) buildings
         """
         wave_2 = generate_wave(2, INITIAL["difficulty"])
         session = GameSession.objects.create(
-            money=450,  # 500 - 100(LMG) + 5(怪物奖励) = 405，再加点余量
+            money=450,  # 500 - 100(LMG) + 5(monster reward) = 405, plus extra margin
             life=INITIAL["life"],
             difficulty=INITIAL["difficulty"],
             wave_count=1,
@@ -1183,18 +1180,18 @@ class TestSubmitWaveView:
     def test_submit_wave_dps_validation_with_multiple_buildings_partial_sold(
         self, api_client: APIClient, session_with_first_wave: GameSession
     ):
-        """测试多建筑部分卖掉的场景.
+        """Test multiple buildings partially sold scenario.
 
-        场景：
-        1. 建造 b-1 (LMG)
-        2. 建造 b-2 (cannon)
-        3. 两个建筑都攻击怪物
-        4. 只卖掉 b-1
-        5. buildings 列表只有 b-2
+        Scenario:
+        1. Build b-1 (LMG)
+        2. Build b-2 (cannon)
+        3. Both buildings attack monsters
+        4. Only sell b-1
+        5. buildings list only has b-2
 
-        验证：
-        - DPS 应包含 b-1 (LMG) 和 b-2 (cannon) 两个建筑
-        - 不能只计算 b-2 的 DPS
+        Validation:
+        - DPS should include both b-1 (LMG) and b-2 (cannon) buildings
+        - Cannot only calculate b-2's DPS
         """
         session = session_with_first_wave
         wave_config = session.next_wave
@@ -1210,7 +1207,7 @@ class TestSubmitWaveView:
         total_money = 0
 
         for m in monsters:
-            # LMG 先攻击几次
+            # LMG attacks first
             lmg_hits = 2
             for _ in range(lmg_hits):
                 attacks.append({
@@ -1224,7 +1221,7 @@ class TestSubmitWaveView:
                 })
                 frame += 3
 
-            # cannon 继续攻击直到击杀
+            # cannon continues attacking until kill
             remaining_life = m["life"] - lmg_hits * lmg_damage
             cannon_hits = (remaining_life + cannon_damage - 1) // cannon_damage
             for _ in range(max(cannon_hits, 1)):
@@ -1303,17 +1300,17 @@ class TestSubmitWaveView:
     def test_submit_wave_dps_validation_with_sold_building_no_attacks(
         self, api_client: APIClient, session_with_first_wave: GameSession
     ):
-        """测试建造后卖掉但无攻击的场景（零伤害边界）.
+        """Test building sold without any attacks (zero damage boundary).
 
-        场景：
-        1. 建造 LMG
-        2. 不攻击任何怪物（怪物全部穿过）
-        3. 卖掉建筑
+        Scenario:
+        1. Build LMG
+        2. No attacks on any monsters (all monsters pass through)
+        3. Sell the building
         4. total_damage_dealt = 0
 
-        验证：
+        Validation:
         - 0 <= max_dps * duration * 1.1
-        - 应该通过验证
+        - Should pass validation
         """
         session = session_with_first_wave
         wave_config = session.next_wave
@@ -1361,13 +1358,13 @@ class TestSubmitWaveView:
         data = response.json()
         assert data["valid"] is True
 
-    # ========== remaining 字段验证测试 ==========
+    # ========== remaining field validation tests ==========
 
     @pytest.fixture
     def session_with_multi_monster_wave(self, db) -> GameSession:
-        """创建带有多怪物波次配置的会话（用于测试 remaining 场景）.
+        """Create a session with multi-monster wave config (for testing remaining scenarios).
 
-        使用第 5 波配置，包含多个怪物，便于测试部分击杀场景。
+        Uses wave 5 config with multiple monsters for testing partial kill scenarios.
         """
         wave_5 = generate_wave(5, 1.0)
         return GameSession.objects.create(
@@ -1388,14 +1385,14 @@ class TestSubmitWaveView:
         building_id: str = "b-001",
         building_type: str = "LMG",
     ) -> tuple[list[dict], dict, list[str]]:
-        """生成部分击杀场景的攻击事件和结果.
+        """Generate attack events and result for partial kill scenarios.
 
         Args:
-            wave_config: 波次配置
-            killed_count: 击杀的怪物数量
-            remaining_count: 场上剩余的怪物数量
-            building_id: 建筑 ID
-            building_type: 建筑类型
+            wave_config: Wave configuration
+            killed_count: Number of monsters killed
+            remaining_count: Number of monsters remaining on the field
+            building_id: Building ID
+            building_type: Building type
 
         Returns:
             (attacks, result, remaining_monster_ids)
@@ -1458,7 +1455,7 @@ class TestSubmitWaveView:
     def test_submit_wave_with_remaining_success(
         self, api_client: APIClient, session_with_multi_monster_wave: GameSession
     ):
-        """测试提交带 remaining 的波次成功."""
+        """Test successful wave submission with remaining monsters."""
         session = session_with_multi_monster_wave
         wave_config = session.next_wave
         monsters = wave_config["monsters"]
@@ -1509,7 +1506,7 @@ class TestSubmitWaveView:
     def test_submit_wave_remaining_monster_ids_invalid(
         self, api_client: APIClient, session_with_multi_monster_wave: GameSession
     ):
-        """测试 remainingMonsterIds 包含无效 UUID 时失败."""
+        """Test failure when remainingMonsterIds contains invalid UUID."""
         session = session_with_multi_monster_wave
         wave_config = session.next_wave
         monsters = wave_config["monsters"]
@@ -1558,11 +1555,11 @@ class TestSubmitWaveView:
 
 
 class TestEndSessionView:
-    """POST /api/game/sessions/end 测试."""
+    """POST /api/game/sessions/end tests."""
 
     @pytest.fixture
     def session_with_waves(self, db) -> GameSession:
-        """创建带有波次记录的会话（模拟玩家已完成 5 波）."""
+        """Create a session with wave records (simulating player completed 5 waves)."""
         wave_6 = generate_wave(6, 1.2)
         session = GameSession.objects.create(
             money=800,
@@ -1600,7 +1597,7 @@ class TestEndSessionView:
         return session
 
     def _make_wave_monsters_map(self, wave_config: dict) -> dict:
-        """构建怪物 ID 到怪物数据的映射."""
+        """Build a mapping from monster ID to monster data."""
         return {m["id"]: m for m in wave_config["monsters"]}
 
     def _make_valid_building(
@@ -1608,7 +1605,7 @@ class TestEndSessionView:
         building_id: str = "b-001",
         building_type: str = "LMG",
     ) -> dict:
-        """创建有效的建筑数据."""
+        """Create valid building data."""
         return {
             "id": building_id,
             "type": building_type,
@@ -1624,10 +1621,10 @@ class TestEndSessionView:
         building_id: str = "b-001",
         building_type: str = "LMG",
     ) -> list[dict]:
-        """根据波次配置生成有效的攻击事件.
+        """Generate valid attack events from wave config.
 
-        位置 [4, 3] 在射程内（距离 [0,0] = 5，等于 LMG 1 级射程）。
-        使用多击模式: 每次攻击造成建筑固定伤害。
+        Position [4, 3] is within range (distance from [0,0] = 5, equals LMG level 1 range).
+        Multi-hit mode: each attack deals the building's fixed damage.
         """
         attacks = []
         frame = 100
@@ -1654,7 +1651,7 @@ class TestEndSessionView:
     def _make_valid_wave_result(
         self, wave_config: dict, attacks: list[dict]
     ) -> dict:
-        """根据攻击事件生成匹配的波次结果."""
+        """Generate matching wave result from attack events."""
         monsters = wave_config["monsters"]
         killed_by_type: dict[int, int] = {}
         total_life = 0
@@ -1682,7 +1679,7 @@ class TestEndSessionView:
         }
 
     def _make_valid_last_wave(self, session: GameSession) -> dict:
-        """生成有效的 lastWave 数据."""
+        """Generate valid lastWave data."""
         wave_config = session.next_wave
         building = self._make_valid_building()
         attacks = self._make_valid_attacks(wave_config)
@@ -1710,7 +1707,7 @@ class TestEndSessionView:
     def test_end_session_success(
         self, api_client: APIClient, session_with_waves: GameSession
     ):
-        """测试成功结束会话."""
+        """Test successful session end."""
         session = session_with_waves
         last_wave = self._make_valid_last_wave(session)
 
@@ -1738,7 +1735,7 @@ class TestEndSessionView:
     def test_end_session_creates_leaderboard_entry(
         self, api_client: APIClient, session_with_waves: GameSession
     ):
-        """测试成功后创建排行榜记录."""
+        """Test leaderboard entry creation after success."""
         session = session_with_waves
         last_wave = self._make_valid_last_wave(session)
 
@@ -1764,7 +1761,7 @@ class TestEndSessionView:
     def test_end_session_deletes_game_session(
         self, api_client: APIClient, session_with_waves: GameSession
     ):
-        """测试成功后删除游戏会话."""
+        """Test game session deletion after success."""
         session = session_with_waves
         session_id = session.id
         last_wave = self._make_valid_last_wave(session)
@@ -1786,7 +1783,7 @@ class TestEndSessionView:
 
     @pytest.mark.django_db
     def test_end_session_session_not_found(self, api_client: APIClient, db):
-        """测试会话不存在."""
+        """Test session not found."""
         request_data = {
             "sessionId": str(uuid.uuid4()),
             "nickname": "TestPlayer",
@@ -1823,7 +1820,7 @@ class TestEndSessionView:
     def test_end_session_missing_fields(
         self, api_client: APIClient, session_with_waves: GameSession
     ):
-        """测试缺少必填字段."""
+        """Test missing required fields."""
         request_data = {
             "sessionId": str(session_with_waves.id),
         }
@@ -1842,7 +1839,7 @@ class TestEndSessionView:
     def test_end_session_invalid_wave_number(
         self, api_client: APIClient, session_with_waves: GameSession
     ):
-        """测试 lastWave 波次不连续."""
+        """Test lastWave non-consecutive wave number."""
         session = session_with_waves
         last_wave = self._make_valid_last_wave(session)
         last_wave["waveNumber"] = 10
@@ -1862,13 +1859,13 @@ class TestEndSessionView:
         assert response.status_code == 400
         data = response.json()
         assert data["verified"] is False
-        assert "波次不连续" in data["error"]["message"]
+        assert "Wave not continuous" in data["error"]["message"]
 
     @pytest.mark.django_db
     def test_end_session_lastwave_validation_failure(
         self, api_client: APIClient, session_with_waves: GameSession
     ):
-        """测试 lastWave 基础验证失败."""
+        """Test lastWave basic validation failure."""
         session = session_with_waves
         last_wave = self._make_valid_last_wave(session)
         last_wave["result"]["moneyGained"] = 9999
@@ -1888,25 +1885,25 @@ class TestEndSessionView:
         assert response.status_code == 400
         data = response.json()
         assert data["verified"] is False
-        assert "金钱收益不匹配" in data["error"]["message"]
+        assert "Money gained mismatch" in data["error"]["message"]
 
     @pytest.mark.django_db
     def test_end_session_dps_validation_with_sold_buildings(
         self, api_client: APIClient, session_with_waves: GameSession
     ):
-        """测试 lastWave 中建造后卖掉建筑时 DPS 验证仍能正常工作.
+        """Test DPS validation in lastWave still works when building is sold after construction.
 
-        场景（复现问题）：
-        1. 建造一个 LMG 建筑
-        2. LMG 攻击怪物，造成伤害
-        3. 卖掉 LMG
-        4. 结束游戏，lastWave.buildings 列表为空
+        Scenario (reproducing the issue):
+        1. Build an LMG building
+        2. LMG attacks monsters, dealing damage
+        3. Sell the LMG
+        4. End game with empty lastWave.buildings list
 
-        修复前：DPS 验证使用 submitted_buildings（空列表），导致 max_dps=0，
-               任何伤害都会触发 "DPS 容量超限" 错误。
+        Before fix: DPS validation used submitted_buildings (empty list), causing max_dps=0,
+                    any damage would trigger "DPS capacity exceeded" error.
 
-        修复后：DPS 验证使用 validation_buildings（包含波次期间存在过的建筑），
-               正确计算 max_dps，验证应通过。
+        After fix: DPS validation uses validation_buildings (includes buildings that existed
+                   during the wave), correctly calculates max_dps, validation should pass.
         """
         session = session_with_waves
         wave_config = session.next_wave
@@ -1999,7 +1996,7 @@ class TestEndSessionView:
     def test_end_session_ranking_calculation(
         self, api_client: APIClient, session_with_waves: GameSession
     ):
-        """测试排名计算."""
+        """Test ranking calculation."""
         LeaderboardEntry.objects.create(
             nickname="HighScorer",
             score=99999,
@@ -2035,7 +2032,7 @@ class TestEndSessionView:
     def test_end_session_is_new_record(
         self, api_client: APIClient, session_with_waves: GameSession
     ):
-        """测试 isNewRecord 标志（第一条记录）."""
+        """Test isNewRecord flag (first entry)."""
         session = session_with_waves
         last_wave = self._make_valid_last_wave(session)
 
@@ -2060,11 +2057,10 @@ class TestEndSessionView:
     def test_end_session_final_score_calculation(
         self, api_client: APIClient, session_with_waves: GameSession
     ):
-        """测试最终得分计算."""
+        """Test final score calculation."""
         session = session_with_waves
         last_wave = self._make_valid_last_wave(session)
         last_wave_score = last_wave["result"]["scoreGained"]
-        last_wave_money = last_wave["result"]["moneyGained"]
 
         request_data = {
             "sessionId": str(session.id),
@@ -2082,7 +2078,7 @@ class TestEndSessionView:
 
         entry = LeaderboardEntry.objects.get(nickname="TestPlayer")
 
-        # 最终得分 = 累计积分（没有额外奖励）
+        # final score = accumulated score (no extra bonus)
         expected_score = session.score + last_wave_score
 
         assert entry.score == expected_score
@@ -2091,12 +2087,12 @@ class TestEndSessionView:
     def test_end_session_validate_game_end_score_mismatch(
         self, api_client: APIClient, db
     ):
-        """测试 validate_game_end 分数累计不一致."""
+        """Test validate_game_end score accumulation mismatch."""
         wave_1 = generate_wave(1, 1.0)
         session = GameSession.objects.create(
             money=500,
             life=100,
-            score=9999,  # 故意设置错误的分数
+            score=9999,  # deliberately set wrong score
             difficulty=1.0,
             wave_count=0,
             buildings=[],
@@ -2141,19 +2137,19 @@ class TestEndSessionView:
         assert response.status_code == 400
         data = response.json()
         assert data["verified"] is False
-        assert "分数累计不一致" in data["error"]["message"]
+        assert "Score accumulation mismatch" in data["error"]["message"]
 
     @pytest.mark.django_db
     def test_end_session_nickname_too_long(
         self, api_client: APIClient, session_with_waves: GameSession
     ):
-        """测试昵称过长."""
+        """Test nickname too long."""
         session = session_with_waves
         last_wave = self._make_valid_last_wave(session)
 
         request_data = {
             "sessionId": str(session.id),
-            "nickname": "A" * 33,  # 超过 32 字符限制
+            "nickname": "A" * 33,  # exceeds 32 character limit
             "lastWave": last_wave,
         }
 
@@ -2171,7 +2167,7 @@ class TestEndSessionView:
     def test_end_session_nickname_empty(
         self, api_client: APIClient, session_with_waves: GameSession
     ):
-        """测试昵称为空."""
+        """Test empty nickname."""
         session = session_with_waves
         last_wave = self._make_valid_last_wave(session)
 
@@ -2195,13 +2191,13 @@ class TestEndSessionView:
     def test_end_session_nickname_whitespace_only(
         self, api_client: APIClient, session_with_waves: GameSession
     ):
-        """测试昵称为纯空白字符."""
+        """Test whitespace-only nickname."""
         session = session_with_waves
         last_wave = self._make_valid_last_wave(session)
 
         request_data = {
             "sessionId": str(session.id),
-            "nickname": "   ",  # 纯空格
+            "nickname": "   ",  # whitespace only
             "lastWave": last_wave,
         }
 
@@ -2219,7 +2215,7 @@ class TestEndSessionView:
     def test_end_session_nickname_xss_attack(
         self, api_client: APIClient, session_with_waves: GameSession
     ):
-        """测试昵称包含 XSS 攻击代码时返回正确的错误消息."""
+        """Test correct error message when nickname contains XSS attack code."""
         session = session_with_waves
         last_wave = self._make_valid_last_wave(session)
 
@@ -2238,13 +2234,13 @@ class TestEndSessionView:
         assert response.status_code == 400
         data = response.json()
         assert data["error"]["code"] == "INVALID_REQUEST"
-        assert "昵称包含非法字符" in data["error"]["message"]
+        assert "Nickname contains illegal characters" in data["error"]["message"]
 
     @pytest.mark.django_db
     def test_end_session_without_last_wave_success(
         self, api_client: APIClient, session_with_waves: GameSession
     ):
-        """测试不带 lastWave 的提前结束（已完成的波次数据用于计算得分）."""
+        """Test early end without lastWave (completed wave data used for score calculation)."""
         session = session_with_waves
 
         request_data = {
@@ -2270,7 +2266,7 @@ class TestEndSessionView:
     def test_end_session_without_last_wave_requires_at_least_one_wave(
         self, api_client: APIClient, db
     ):
-        """测试不带 lastWave 时必须至少完成一波."""
+        """Test at least one wave must be completed when ending without lastWave."""
         wave_1 = generate_wave(1, 1.0)
         session = GameSession.objects.create(
             money=500,
@@ -2297,13 +2293,13 @@ class TestEndSessionView:
         assert response.status_code == 400
         data = response.json()
         assert data["verified"] is False
-        assert "至少完成一波" in data["error"]["message"]
+        assert "at least one completed wave" in data["error"]["message"]
 
     @pytest.mark.django_db
     def test_end_session_without_last_wave_final_score(
         self, api_client: APIClient, session_with_waves: GameSession
     ):
-        """测试不带 lastWave 时的最终得分计算."""
+        """Test final score calculation when ending without lastWave."""
         session = session_with_waves
 
         request_data = {
@@ -2321,7 +2317,7 @@ class TestEndSessionView:
 
         entry = LeaderboardEntry.objects.get(nickname="ScoreChecker")
 
-        # 最终得分 = 累计积分（没有额外奖励）
+        # final score = accumulated score (no extra bonus)
         expected_score = session.score
 
         assert entry.score == expected_score
@@ -2330,7 +2326,7 @@ class TestEndSessionView:
     def test_end_session_without_last_wave_deletes_session(
         self, api_client: APIClient, session_with_waves: GameSession
     ):
-        """测试不带 lastWave 的提前结束后删除会话."""
+        """Test session deletion after early end without lastWave."""
         session = session_with_waves
         session_id = session.id
 
@@ -2352,16 +2348,16 @@ class TestEndSessionView:
     def test_end_session_without_last_wave_validate_game_end_score_mismatch(
         self, api_client: APIClient, db
     ):
-        """测试不带 lastWave 时也应验证分数累计一致性.
+        """Test score accumulation consistency is also validated without lastWave.
 
-        这个测试验证 _end_without_last_wave 也调用 validate_game_end。
-        当 session.score 与 WaveRecord 累计分数不一致时，应返回错误。
+        This test verifies that _end_without_last_wave also calls validate_game_end.
+        When session.score does not match WaveRecord accumulated score, an error should be returned.
         """
         wave_6 = generate_wave(6, 1.0)
         session = GameSession.objects.create(
             money=500,
             life=100,
-            score=9999,  # 故意设置错误的分数（与 WaveRecord 累计不一致）
+            score=9999,  # deliberately set wrong score (inconsistent with WaveRecord accumulation)
             difficulty=1.0,
             wave_count=5,
             buildings=[],
@@ -2369,7 +2365,7 @@ class TestEndSessionView:
             next_wave=wave_6,
         )
 
-        # 创建 5 波记录，每波 30 分，累计 150 分
+        # create 5 wave records, 30 points each, 150 total
         for i in range(1, 6):
             WaveRecord.objects.create(
                 session=session,
@@ -2403,27 +2399,26 @@ class TestEndSessionView:
             format="json",
         )
 
-        # session.score=9999，但 WaveRecord 累计只有 150，应验证失败
+        # session.score=9999, but WaveRecord total is only 150, validation should fail
         assert response.status_code == 400
         data = response.json()
         assert data["verified"] is False
-        assert "分数累计不一致" in data["error"]["message"]
+        assert "Score accumulation mismatch" in data["error"]["message"]
 
-    # ========== 0 分提交拒绝测试 ==========
+    # ========== zero score submission rejection tests ==========
 
     @pytest.mark.django_db
     def test_end_session_zero_score_rejected(self, api_client: APIClient, db):
-        """测试带 lastWave 时 0 分不能提交到排行榜.
+        """Test zero score cannot be submitted to leaderboard with lastWave.
 
-        场景：玩家完成一波但没有击杀任何怪物（全部穿过终点），score = 0。
-        排行榜应记录有意义的成绩，0 分表示没有任何击杀，不应上榜。
+        Scenario: Player completes a wave but kills no monsters (all pass through), score = 0.
+        Leaderboard should record meaningful achievements, zero score means no kills and should not be listed.
         """
         wave_1 = generate_wave(1, 1.0)
-        wave_2 = generate_wave(2, 1.0)
         session = GameSession.objects.create(
             money=500,
-            life=99,  # 被怪物扣了 1 点
-            score=0,  # 没有击杀任何怪物
+            life=99,  # lost 1 point to monsters
+            score=0,  # no monsters killed
             difficulty=1.0,
             wave_count=0,
             buildings=[],
@@ -2440,14 +2435,14 @@ class TestEndSessionView:
             "lastWave": {
                 "waveNumber": 1,
                 "actions": [],
-                "attacks": [],  # 没有任何攻击
+                "attacks": [],  # no attacks
                 "result": {
                     "killed": 0,
                     "killedByType": {},
-                    "passed": total_monsters,  # 全部穿过
+                    "passed": total_monsters,  # all pass through
                     "scoreGained": 0,
                     "moneyGained": 0,
-                    "lifeLost": total_monsters,  # 每个怪物造成 1 点伤害
+                    "lifeLost": total_monsters,  # each monster deals 1 point of damage
                     "totalDamageDealt": 0,
                     "totalLifeDestroyed": 0,
                     "waveDurationFrames": 1000,
@@ -2465,37 +2460,37 @@ class TestEndSessionView:
         assert response.status_code == 400
         data = response.json()
         assert data["verified"] is False
-        assert "0 分" in data["error"]["message"] or "零分" in data["error"]["message"]
+        assert "zero score" in data["error"]["message"].lower()
 
     @pytest.mark.django_db
     def test_end_session_without_last_wave_zero_score_rejected(
         self, api_client: APIClient, db
     ):
-        """测试不带 lastWave 时 0 分不能提交到排行榜.
+        """Test zero score cannot be submitted to leaderboard without lastWave.
 
-        场景：玩家完成了一波但没有击杀任何怪物，想要提前结束游戏。
-        排行榜应记录有意义的成绩，0 分表示没有任何击杀，不应上榜。
+        Scenario: Player completed a wave but killed no monsters, wants to end the game early.
+        Leaderboard should record meaningful achievements, zero score means no kills and should not be listed.
         """
         wave_2 = generate_wave(2, 1.0)
         session = GameSession.objects.create(
             money=500,
             life=99,
-            score=0,  # 没有击杀任何怪物
+            score=0,  # no monsters killed
             difficulty=1.0,
-            wave_count=1,  # 已完成 1 波
+            wave_count=1,  # 1 wave completed
             buildings=[],
             config=GAME_CONFIG,
             next_wave=wave_2,
         )
 
-        # 创建一波 0 分的记录
+        # create a wave record with 0 score
         WaveRecord.objects.create(
             session=session,
             wave_number=1,
             killed=0,
             killed_by_type={},
             passed=1,
-            score_gained=0,  # 0 分
+            score_gained=0,  # 0 score
             money_gained=0,
             life_lost=1,
             total_damage_dealt=0,
@@ -2524,15 +2519,15 @@ class TestEndSessionView:
         assert response.status_code == 400
         data = response.json()
         assert data["verified"] is False
-        assert "0 分" in data["error"]["message"] or "零分" in data["error"]["message"]
+        assert "zero score" in data["error"]["message"].lower()
 
-    # ========== 带 remainingMonsterIds 的提前结束集成测试 ==========
+    # ========== early end with remainingMonsterIds integration tests ==========
 
     @pytest.fixture
     def session_with_multi_monster_wave(self, db) -> GameSession:
-        """创建带有多怪物波次配置的会话（模拟提前结束场景）.
+        """Create a session with multi-monster wave config (simulating early end scenario).
 
-        使用第 6 波配置，包含多个怪物，便于测试部分击杀场景。
+        Uses wave 6 config with multiple monsters for testing partial kill scenarios.
         """
         wave_6 = generate_wave(6, 1.0)
         session = GameSession.objects.create(
@@ -2576,18 +2571,18 @@ class TestEndSessionView:
         killed_count: int,
         remaining_count: int,
     ) -> dict:
-        """生成部分击杀场景的 lastWave 数据.
+        """Generate lastWave data for partial kill scenarios.
 
         Args:
-            session: 游戏会话
-            killed_count: 击杀的怪物数量
-            remaining_count: 场上剩余的怪物数量（提前结束）
+            session: Game session
+            killed_count: Number of monsters killed
+            remaining_count: Number of monsters remaining on the field (early end)
 
         Returns:
-            lastWave 请求数据
+            lastWave request data
 
         Note:
-            passed 会根据总怪物数自动计算：
+            passed is automatically calculated from total monster count:
             passed = total_monsters - killed_count - remaining_count
         """
         wave_config = session.next_wave
@@ -2667,15 +2662,15 @@ class TestEndSessionView:
     def test_end_session_with_remaining_monsters_success(
         self, api_client: APIClient, session_with_multi_monster_wave: GameSession
     ):
-        """测试带 remainingMonsterIds 的提前结束成功场景.
+        """Test successful early end with remainingMonsterIds.
 
-        场景：波次进行中，部分怪物被击杀，部分还在场上时结束游戏。
-        验证：
-        1. API 返回验证通过
-        2. LeaderboardEntry 正确创建
-        3. 会话被正确删除
+        Scenario: During a wave, some monsters are killed, game ends while others remain on field.
+        Validation:
+        1. API returns verification passed
+        2. LeaderboardEntry is correctly created
+        3. Session is correctly deleted
 
-        注意：WaveRecord 会随会话级联删除（CASCADE），因此不在此处验证。
+        Note: WaveRecords are cascade-deleted with the session (CASCADE), so not verified here.
         """
         session = session_with_multi_monster_wave
         session_id = session.id
@@ -2715,7 +2710,7 @@ class TestEndSessionView:
     def test_end_session_remaining_monster_ids_count_mismatch(
         self, api_client: APIClient, session_with_multi_monster_wave: GameSession
     ):
-        """测试 remainingMonsterIds 数量与 remaining 不一致时失败."""
+        """Test failure when remainingMonsterIds count does not match remaining."""
         session = session_with_multi_monster_wave
         last_wave = self._make_partial_kill_last_wave(session, 2, 2)
 
@@ -2744,7 +2739,7 @@ class TestEndSessionView:
     def test_end_session_remaining_monster_ids_invalid_uuid(
         self, api_client: APIClient, session_with_multi_monster_wave: GameSession
     ):
-        """测试 remainingMonsterIds 包含无效 UUID 时失败."""
+        """Test failure when remainingMonsterIds contains invalid UUID."""
         session = session_with_multi_monster_wave
         last_wave = self._make_partial_kill_last_wave(session, 2, 2)
 
@@ -2774,9 +2769,10 @@ class TestEndSessionView:
     def test_end_session_remaining_monster_should_be_killed(
         self, api_client: APIClient, session_with_multi_monster_wave: GameSession
     ):
-        """测试 remainingMonsterIds 包含应被击杀的怪物时失败.
+        """Test failure when remainingMonsterIds contains monsters that should have been killed.
 
-        场景：声称怪物在场上（remaining），但攻击记录显示累计伤害 >= 生命值。
+        Scenario: Claims monster is still on field (remaining), but attack records show
+        accumulated damage >= life.
         """
         session = session_with_multi_monster_wave
         monsters = session.next_wave["monsters"]
@@ -2858,13 +2854,13 @@ class TestEndSessionView:
         assert response.status_code == 400
         data = response.json()
         assert data["verified"] is False
-        assert "击杀" in data["error"]["message"] or "remaining" in data["error"]["message"].lower()
+        assert "kill" in data["error"]["message"].lower() or "remaining" in data["error"]["message"].lower()
 
     @pytest.mark.django_db
     def test_end_session_remaining_monster_ids_duplicate(
         self, api_client: APIClient, session_with_multi_monster_wave: GameSession
     ):
-        """测试 remainingMonsterIds 包含重复 ID 时失败."""
+        """Test failure when remainingMonsterIds contains duplicate IDs."""
         session = session_with_multi_monster_wave
         last_wave = self._make_partial_kill_last_wave(session, 2, 2)
 
@@ -2889,15 +2885,15 @@ class TestEndSessionView:
         assert response.status_code == 400
         data = response.json()
         assert data["verified"] is False
-        assert "重复" in data["error"]["message"]
+        assert "duplicates" in data["error"]["message"]
 
 
 class TestLeaderboardView:
-    """GET /api/game/leaderboard 测试."""
+    """GET /api/game/leaderboard tests."""
 
     @pytest.fixture
     def leaderboard_entries(self, db):
-        """创建测试用排行榜数据."""
+        """Create test leaderboard data."""
         from game.models import LeaderboardEntry
 
         entries = []
@@ -2915,7 +2911,7 @@ class TestLeaderboardView:
     def test_get_leaderboard_success(
         self, api_client: APIClient, leaderboard_entries
     ):
-        """成功获取排行榜."""
+        """Successfully get leaderboard."""
         response = api_client.get("/api/game/leaderboard")
 
         assert response.status_code == 200
@@ -2926,7 +2922,7 @@ class TestLeaderboardView:
     def test_get_leaderboard_default_limit(
         self, api_client: APIClient, leaderboard_entries
     ):
-        """默认返回 10 条."""
+        """Default returns 10 entries."""
         response = api_client.get("/api/game/leaderboard")
         data = response.json()
 
@@ -2936,7 +2932,7 @@ class TestLeaderboardView:
     def test_get_leaderboard_custom_limit(
         self, api_client: APIClient, leaderboard_entries
     ):
-        """自定义返回条数."""
+        """Custom return count."""
         response = api_client.get("/api/game/leaderboard?limit=5")
         data = response.json()
 
@@ -2946,7 +2942,7 @@ class TestLeaderboardView:
     def test_get_leaderboard_max_limit(
         self, api_client: APIClient, leaderboard_entries
     ):
-        """limit 最大为 100."""
+        """Maximum limit is 100."""
         response = api_client.get("/api/game/leaderboard?limit=200")
         data = response.json()
 
@@ -2956,7 +2952,7 @@ class TestLeaderboardView:
     def test_get_leaderboard_order_by_score(
         self, api_client: APIClient, leaderboard_entries
     ):
-        """按分数降序排列."""
+        """Sorted by score in descending order."""
         response = api_client.get("/api/game/leaderboard")
         data = response.json()
 
@@ -2967,7 +2963,7 @@ class TestLeaderboardView:
     def test_get_leaderboard_entry_structure(
         self, api_client: APIClient, leaderboard_entries
     ):
-        """每条记录包含必需字段."""
+        """Each entry contains required fields."""
         response = api_client.get("/api/game/leaderboard")
         data = response.json()
 
@@ -2982,7 +2978,7 @@ class TestLeaderboardView:
     def test_get_leaderboard_rank_starts_at_1(
         self, api_client: APIClient, leaderboard_entries
     ):
-        """排名从 1 开始."""
+        """Ranking starts from 1."""
         response = api_client.get("/api/game/leaderboard")
         data = response.json()
 
@@ -2991,7 +2987,7 @@ class TestLeaderboardView:
 
     @pytest.mark.django_db
     def test_get_leaderboard_empty(self, api_client: APIClient, db):
-        """空排行榜."""
+        """Empty leaderboard."""
         response = api_client.get("/api/game/leaderboard")
 
         assert response.status_code == 200
@@ -3002,7 +2998,7 @@ class TestLeaderboardView:
     def test_get_leaderboard_invalid_limit(
         self, api_client: APIClient, leaderboard_entries
     ):
-        """无效 limit 使用默认值."""
+        """Invalid limit falls back to default."""
         response = api_client.get("/api/game/leaderboard?limit=abc")
 
         assert response.status_code == 200
@@ -3013,7 +3009,7 @@ class TestLeaderboardView:
     def test_get_leaderboard_negative_limit(
         self, api_client: APIClient, leaderboard_entries
     ):
-        """负数 limit 使用默认值."""
+        """Negative limit falls back to default."""
         response = api_client.get("/api/game/leaderboard?limit=-5")
 
         assert response.status_code == 200

@@ -1,45 +1,54 @@
-"""游戏配置模块.
+"""Game configuration module."""
 
-定义建筑、怪物、地图等游戏核心配置
-"""
-
-from typing import TypedDict
+from typing import NotRequired, TypedDict
 
 
 class BuildingConfig(TypedDict):
-    """建筑配置类型.
-
-    来源：旧实现 td-cfg-buildings.js
-    """
+    """Source: td-cfg-buildings.js."""
 
     name: str
     cost: int
     damage: int
-    range: int  # 初始射程（格子数），可升级
-    max_range: int  # 射程升级上限（格子数）
-    speed: int  # 攻击间隔（帧），0 表示不攻击
-    bullet_speed: int  # 子弹速度，0 表示无子弹（如 wall）或瞬发（如 laser_gun）
-    life: int  # 建筑生命值
-    shield: int  # 建筑护盾值
+    range: int  # Initial range (grid units), upgradeable
+    max_range: int  # Max range after upgrades (grid units)
+    speed: int  # Attack speed factor; 0 means non-attacking
+    bullet_speed: int  # 0 means no bullet (wall) or instant hit (laser_gun)
+    life: int
+    shield: int
     upgradeCostRatio: float
     sellRatio: float
 
 
+class MonsterAttrs(TypedDict):
+    """Attributes used by monster calculation functions.
+
+    Required fields are directly used in calculations.
+    Optional fields are either conditionally accessed or passed through.
+    """
+
+    life: int
+    speed: int
+    shield: int
+    money: int
+    name: NotRequired[str]
+    max_speed: NotRequired[int]
+    damage: NotRequired[int]
+    color: NotRequired[str]
+
+
 class MonsterConfig(TypedDict):
-    """怪物配置类型."""
 
     name: str
-    life: int  # 基础生命值
-    speed: int  # 基础移动速度
-    max_speed: int  # 速度上限（用于高难度限制）
-    shield: int  # 基础护盾
-    damage: int  # 到达终点造成的伤害
-    money: int  # 击杀奖励金钱
-    color: str  # 显示颜色
+    life: int
+    speed: int
+    max_speed: int  # Speed cap for high difficulty
+    shield: int
+    damage: int  # Damage to player when reaching exit
+    money: int  # Kill reward
+    color: str
 
 
 class MapConfig(TypedDict):
-    """地图配置类型."""
 
     width: int
     height: int
@@ -49,7 +58,6 @@ class MapConfig(TypedDict):
 
 
 class InitialConfig(TypedDict):
-    """初始状态配置类型."""
 
     money: int
     life: int
@@ -57,7 +65,7 @@ class InitialConfig(TypedDict):
 
 
 BUILDINGS: dict[str, BuildingConfig] = {
-    # 来源：旧实现 td-cfg-buildings.js:29-94
+    # Source: td-cfg-buildings.js:29-94
     "wall": {
         "name": "路障",
         "cost": 5,
@@ -117,7 +125,7 @@ BUILDINGS: dict[str, BuildingConfig] = {
         "range": 6,
         "max_range": 10,
         "speed": 20,
-        "bullet_speed": 0,  # 激光瞬发，无子弹速度
+        "bullet_speed": 0,
         "life": 100,
         "shield": 100,
         "upgradeCostRatio": 0.75,
@@ -232,51 +240,49 @@ INITIAL: InitialConfig = {
     "difficulty": 1.0,
 }
 
-# 波次生成配置
 WAVE_CONFIG = {
     "max_monsters_per_wave": 100,
-    "predefined_wave_count": 10,  # 前 10 波使用 PREDEFINED_WAVES
+    "predefined_wave_count": 10,
 }
 
-# 波次奖励配置
-# 参考 SPEC.md 第 146-147 行，旧实现 td-data-stage-1.js:63-68
+# Wave bonus config
+# Source: SPEC.md L146-147, td-data-stage-1.js:63-68
 WAVE_BONUS = {
-    "life_per_5_waves": 5,   # 每 5 波 +5 生命
-    "life_per_10_waves": 10,  # 每 10 波 +10 生命（覆盖 5 波奖励）
+    "life_per_5_waves": 5,
+    "life_per_10_waves": 10,  # Overrides 5-wave bonus
     "max_life": 100,
 }
 
-# 难度调整配置
-# 参考旧实现：td-data-stage-1.js:266-288
+# Difficulty adjustment config
+# Source: td-data-stage-1.js:266-288
 DIFFICULTY_ADJUSTMENTS = {
-    # 无伤害时的难度提升
+    # Difficulty increase when no damage taken
     "no_damage": {
-        "early_wave_threshold": 5,  # wave < 5 时使用 early 系数
+        "early_wave_threshold": 5,
         "early_multiplier": 1.05,
-        "high_difficulty_threshold": 30,  # difficulty > 30 时使用 high 系数
+        "high_difficulty_threshold": 30,
         "high_multiplier": 1.1,
         "normal_multiplier": 1.2,
     },
-    # 受伤时的难度降低
+    # Difficulty reduction based on damage taken
     "damage_thresholds": [
-        (50, 0.6),  # 伤害 >= 50: × 0.6
-        (30, 0.7),  # 伤害 >= 30: × 0.7
-        (20, 0.8),  # 伤害 >= 20: × 0.8
-        (10, 0.9),  # 伤害 >= 10: × 0.9
+        (50, 0.6),  # damage >= 50: x0.6
+        (30, 0.7),  # damage >= 30: x0.7
+        (20, 0.8),  # damage >= 20: x0.8
+        (10, 0.9),  # damage >= 10: x0.9
     ],
-    # 低伤害且后期时的难度提升
+    # Difficulty increase in late game with low damage
     "low_damage": {
-        "wave_threshold": 10,  # wave >= 10 且伤害 < 10
+        "wave_threshold": 10,  # wave >= 10 and damage < 10
         "multiplier": 1.05,
     },
     "min_difficulty": 1.0,
 }
 
 
-# 预定义波次配置（波次 1-10）
-# 来源：旧实现 td-data-stage-1.js:184-250
-# 每个元素为 {"type": 怪物类型, "count": 数量}
-# 前 10 波只使用 type 0/1/2 三种基础怪物，难度渐进
+# Predefined wave configs (waves 1-10)
+# Source: td-data-stage-1.js:184-250
+# Only uses basic types (0/1/2) with gradual difficulty increase
 PREDEFINED_WAVES: dict[int, list[dict[str, int]]] = {
     1: [{"type": 0, "count": 1}],
     2: [{"type": 0, "count": 1}, {"type": 1, "count": 1}],
@@ -290,7 +296,6 @@ PREDEFINED_WAVES: dict[int, list[dict[str, int]]] = {
     10: [{"type": 0, "count": 8}, {"type": 1, "count": 4}, {"type": 2, "count": 3}],
 }
 
-# 完整游戏配置
 GAME_CONFIG = {
     "buildings": BUILDINGS,
     "monsters": {

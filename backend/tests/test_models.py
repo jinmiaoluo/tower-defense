@@ -7,10 +7,10 @@ from game.models import GameSession, LeaderboardEntry, WaveRecord
 
 @pytest.mark.django_db
 class TestGameSession:
-    """GameSession 模型测试."""
+    """Tests for GameSession model."""
 
     def test_create_session(self, game_config: dict, first_wave: dict) -> None:
-        """测试创建游戏会话."""
+        """Test creating a game session."""
         session = GameSession.objects.create(
             money=500,
             life=100,
@@ -27,17 +27,17 @@ class TestGameSession:
         assert session.buildings == []
 
     def test_session_str(self, game_session: GameSession) -> None:
-        """测试会话字符串表示."""
+        """Test session string representation."""
         assert "Session" in str(game_session)
         assert "Wave 0" in str(game_session)
 
 
 @pytest.mark.django_db
 class TestWaveRecord:
-    """WaveRecord 模型测试."""
+    """Tests for WaveRecord model."""
 
     def test_create_wave_record(self, game_session: GameSession) -> None:
-        """测试创建波次记录."""
+        """Test creating a wave record."""
         record = WaveRecord.objects.create(
             session=game_session,
             wave_number=1,
@@ -65,7 +65,7 @@ class TestWaveRecord:
         assert record.killed == 3
 
     def test_unique_wave_number_constraint(self, game_session: GameSession) -> None:
-        """测试波次唯一性约束."""
+        """Test unique wave number constraint."""
         WaveRecord.objects.create(
             session=game_session,
             wave_number=1,
@@ -112,10 +112,10 @@ class TestWaveRecord:
 
 @pytest.mark.django_db
 class TestLeaderboardEntry:
-    """LeaderboardEntry 模型测试."""
+    """Tests for LeaderboardEntry model."""
 
     def test_create_entry(self) -> None:
-        """测试创建排行榜记录."""
+        """Test creating a leaderboard entry."""
         entry = LeaderboardEntry.objects.create(
             nickname="TestPlayer",
             score=1000,
@@ -128,7 +128,7 @@ class TestLeaderboardEntry:
         assert entry.waves_completed == 10
 
     def test_ordering(self, leaderboard_entries: list[LeaderboardEntry]) -> None:
-        """测试排行榜排序."""
+        """Test leaderboard ordering."""
         entries = LeaderboardEntry.objects.all()[:5]
         scores = [e.score for e in entries]
 

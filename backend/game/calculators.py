@@ -1,30 +1,30 @@
-"""游戏计算器模块.
+"""Game calculator module.
 
-包含游戏核心计算逻辑，如建筑成本、伤害计算、得分计算等。
+Core game calculation logic including building costs, damage, scoring, etc.
 """
 
 import math
 import random
 from typing import Any
 
-from game.config import MonsterConfig
+from game.config import MonsterAttrs
 
 
 def calc_total_cost(building_type: str, level: int, config: dict) -> int:
-    """计算建筑升级到指定等级的总花费.
+    """Calculate the total cost of a building at the given level.
 
-    公式：总花费 = 建造成本 + Σ(升级成本)
-    升级成本 = int(累计花费 × upgradeCostRatio)
+    Formula: total = build_cost + sum(upgrade_costs)
+    where upgrade_cost = int(accumulated_cost * upgradeCostRatio)
 
-    来源：旧实现 td-obj-building.js:56-66
+    Source: td-obj-building.js:56-66
 
     Args:
-        building_type: 建筑类型标识符
-        level: 目标等级（1 表示初始建造）
-        config: 完整游戏配置（包含 buildings 键）
+        building_type: Building type identifier.
+        level: Target level (1 means initial build).
+        config: Full game config (must contain a "buildings" key).
 
     Returns:
-        升级到指定等级的总花费
+        Total cost to reach the specified level.
     """
     building = config["buildings"][building_type]
     total = building["cost"]
@@ -41,17 +41,17 @@ def process_actions(
     session_buildings: list[dict[str, Any]],
     config: dict,
 ) -> tuple[int, int, list[dict[str, Any]]]:
-    """处理建筑操作序列，计算花费和收入.
+    """Process a sequence of building actions and compute spending and income.
 
-    来源：SPEC.md L771-789
+    Source: SPEC.md L771-789
 
     Args:
-        actions: 操作列表，每个操作包含 type, buildingId, frame 等字段
-        session_buildings: 当前会话中的建筑列表
-        config: 完整游戏配置
+        actions: List of actions, each containing type, buildingId, frame, etc.
+        session_buildings: Current buildings in the session.
+        config: Full game config.
 
     Returns:
-        (spent, income, updated_buildings) 元组
+        A (spent, income, updated_buildings) tuple.
     """
     buildings = {b["id"]: b.copy() for b in session_buildings}
     spent, income = 0, 0
@@ -81,19 +81,19 @@ def process_actions(
 
 
 def calc_new_difficulty(current: float, life_lost: int, wave: int) -> float:
-    """根据上一波受伤情况调整难度.
+    """Adjust difficulty based on life lost in the previous wave.
 
-    来源：旧实现 td-data-stage-1.js:264-288
+    Source: td-data-stage-1.js:264-288
 
     Args:
-        current: 当前难度系数
-        life_lost: 上一波损失的生命值
-        wave: 当前波次号
+        current: Current difficulty coefficient.
+        life_lost: Life points lost in the previous wave.
+        wave: Current wave number.
 
     Returns:
-        新的难度系数（最小为 1.0）
+        New difficulty coefficient (minimum 1.0).
     """
-    # Wave 1 不调整难度（教学波）
+    # Wave 1 is the tutorial wave; no adjustment
     if wave == 1:
         return current
 
@@ -101,7 +101,7 @@ def calc_new_difficulty(current: float, life_lost: int, wave: int) -> float:
         if wave < 5:
             factor = 1.05
         elif current > 30:
-            factor = 1.1  # 高难度时减缓增长
+            factor = 1.1  # Slow down scaling at high difficulty
         else:
             factor = 1.2
     elif life_lost >= 50:
@@ -118,7 +118,7 @@ def calc_new_difficulty(current: float, life_lost: int, wave: int) -> float:
     return max(current * factor, 1.0)
 
 
-def calc_monster_attrs(base: MonsterConfig, difficulty: float) -> dict[str, Any]:
+def calc_monster_attrs(base: MonsterAttrs, difficulty: float) -> dict[str, Any]:
     """Calculate monster attributes based on difficulty.
 
     Source: td-obj-monster.js:24-35
@@ -134,11 +134,11 @@ def calc_monster_attrs(base: MonsterConfig, difficulty: float) -> dict[str, Any]
     - shield: min 0
 
     Args:
-        base: Base monster attributes dict
-        difficulty: Current difficulty coefficient
+        base: Base monster attributes dict.
+        difficulty: Current difficulty coefficient.
 
     Returns:
-        Calculated monster attributes (does not mutate base)
+        Calculated monster attributes (does not mutate base).
     """
     life_rand = random.random() + 0.5
     speed_rand = random.random() * 0.5 + 0.75
@@ -155,41 +155,43 @@ def calc_monster_attrs(base: MonsterConfig, difficulty: float) -> dict[str, Any]
 
 
 def calc_actual_damage(raw_damage: int, shield: int) -> int:
-    """计算实际伤害.
+    """Calculate actual damage after shield reduction.
 
-    公式：actual = max(raw - shield, ceil(raw * 0.1))
-    最低伤害为原始伤害的 10%（向上取整），保证高攻武器对高护盾怪有效。
+    Formula: actual = max(raw - shield, ceil(raw * 0.1))
+    Minimum damage is 10% of raw damage (rounded up), ensuring high-attack
+    buildings remain effective against high-shield monsters.
 
-    来源：旧实现 td-obj-monster.js:78-83
+    Source: td-obj-monster.js:78-83
 
     Args:
-        raw_damage: 原始伤害值（建筑攻击力）
-        shield: 怪物护盾值
+        raw_damage: Raw damage value (building attack power).
+        shield: Monster shield value.
 
     Returns:
-        实际造成的伤害
+        Actual damage dealt.
     """
     min_damage = math.ceil(raw_damage * 0.1)
     return max(raw_damage - shield, min_damage)
 
 
 def calc_life_reward(wave: int) -> int:
-    """计算波次生命奖励.
+    """Calculate the life reward for completing a wave.
 
-    规则：
-    - 每 10 波: +10 生命
-    - 每 5 波（非 10 的倍数）: +5 生命
-    - 其他波次: 0
+    Rules:
+    - Every 10th wave: +10 life
+    - Every 5th wave (not a multiple of 10): +5 life
+    - All other waves: 0
 
-    注意：生命上限 100 的约束在应用奖励时处理，此函数只计算应得奖励值。
+    Note:
+        The life cap of 100 is enforced when the reward is applied, not here.
 
-    来源：旧实现 td-data-stage-1.js:62-73
+    Source: td-data-stage-1.js:62-73
 
     Args:
-        wave: 当前波次号
+        wave: Current wave number.
 
     Returns:
-        生命奖励值
+        Life reward value.
     """
     if wave % 10 == 0:
         return 10
@@ -199,18 +201,18 @@ def calc_life_reward(wave: int) -> int:
 
 
 def calc_hit_score(actual_damage: int) -> int:
-    """计算命中得分.
+    """Calculate the score awarded for a single hit.
 
-    公式：score = floor(√actual_damage)
-    每次攻击命中时立即加分，而非击杀时加分。
+    Formula: score = floor(sqrt(actual_damage))
+    Score is awarded on each hit, not on kill.
 
-    来源：旧实现 td-obj-monster.js:85
+    Source: td-obj-monster.js:85
 
     Args:
-        actual_damage: 实际造成的伤害
+        actual_damage: Actual damage dealt.
 
     Returns:
-        本次命中获得的分数
+        Score earned from this hit.
     """
     return int(math.sqrt(actual_damage))
 
@@ -219,17 +221,18 @@ def build_validation_buildings(
     actions: list[dict[str, Any]],
     session_buildings: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """构建用于攻击验证的建筑列表.
+    """Build the building list used for attack validation.
 
-    与 process_actions 的区别：不执行 SELL 操作。
-    因为攻击可能发生在建筑被出售之前，验证时需要保留所有参与过攻击的建筑。
+    Unlike process_actions, SELL actions are ignored here because attacks
+    may occur before a building is sold, so all buildings that ever
+    participated in combat must be retained for validation.
 
     Args:
-        actions: 操作列表，每个操作包含 type, buildingId, frame 等字段
-        session_buildings: 当前会话中的建筑列表
+        actions: List of actions, each containing type, buildingId, frame, etc.
+        session_buildings: Current buildings in the session.
 
     Returns:
-        用于验证的建筑列表（包含 id, type, level, position）
+        Building list for validation (each with id, type, level, position).
     """
     buildings = {b["id"]: b.copy() for b in session_buildings}
 
@@ -247,6 +250,6 @@ def build_validation_buildings(
         elif atype == "UPGRADE":
             buildings[bid]["level"] += 1
 
-        # SELL 操作被忽略，建筑保留在列表中
+        # SELL is intentionally ignored; buildings are kept for validation
 
     return list(buildings.values())

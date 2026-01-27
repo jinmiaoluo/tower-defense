@@ -33,15 +33,13 @@ from game.validators import (
 
 
 def _require_fields(data: dict, *fields: str) -> tuple[bool, str]:
-    """检查必填字段."""
     missing = [f for f in fields if f not in data]
     if missing:
-        return False, f"缺少必填字段: {', '.join(missing)}"
+        return False, f"Missing required fields: {', '.join(missing)}"
     return True, ""
 
 
 def _convert_keys_to_snake_case(result: dict[str, Any]) -> dict[str, Any]:
-    """将 camelCase 键转换为 snake_case."""
     mapping = {
         "killedByType": "killed_by_type",
         "scoreGained": "score_gained",
@@ -56,41 +54,25 @@ def _convert_keys_to_snake_case(result: dict[str, Any]) -> dict[str, Any]:
 
 
 def _get_wave_config(next_wave: dict) -> dict:
-    """获取用于验证的波次配置."""
     return {"monsters": next_wave["waveConfig"]}
 
 
 def _get_monsters_config(next_wave: dict) -> dict[str, dict]:
-    """构建怪物配置字典，用于 Level 2 验证.
-
-    Args:
-        next_wave: 波次数据，包含 monsters 列表
-
-    Returns:
-        {monster_id: {type, life, ...}} 格式的字典
-    """
+    """Build {monster_id: monster_data} lookup dict."""
     return {m["id"]: m for m in next_wave["monsters"]}
 
 
 def _get_monsters_list(next_wave: dict) -> list[str]:
-    """获取有序的怪物 ID 列表，用于 spawned 验证.
-
-    Args:
-        next_wave: 波次数据，包含 monsters 列表
-
-    Returns:
-        有序的怪物 ID 列表
-    """
+    """Extract ordered monster ID list for spawn validation."""
     return [m["id"] for m in next_wave["monsters"]]
 
 
 def _strip_wave_config(wave_data: dict) -> dict:
-    """移除波次数据中的 waveConfig，用于 API 响应."""
     return {k: v for k, v in wave_data.items() if k != "waveConfig"}
 
 
 class CreateSessionView(APIView):
-    """POST /api/game/sessions - 创建游戏会话"""
+    """POST /api/game/sessions - Create game session."""
 
     def post(self, request: Request) -> Response:
         first_wave = generate_wave(1, INITIAL["difficulty"])
@@ -113,7 +95,7 @@ class CreateSessionView(APIView):
 
 
 class SubmitWaveView(APIView):
-    """POST /api/game/sessions/wave - 提交波次结果"""
+    """POST /api/game/sessions/wave - Submit wave result."""
 
     def post(self, request: Request) -> Response:
         data = request.data
@@ -131,7 +113,7 @@ class SubmitWaveView(APIView):
             session = GameSession.objects.get(id=data["sessionId"])
         except GameSession.DoesNotExist:
             return Response(
-                {"error": {"code": "SESSION_NOT_FOUND", "message": "会话不存在"}},
+                {"error": {"code": "SESSION_NOT_FOUND", "message": "Session not found"}},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
@@ -154,13 +136,11 @@ class SubmitWaveView(APIView):
         if not ok:
             return self._validation_error(msg)
 
-        # 构建用于验证的建筑列表
-        # 使用 validation_buildings 而非 submitted_buildings，
-        # 因为攻击可能发生在建筑被出售之前
+        # Use validation_buildings instead of submitted_buildings
+        # because attacks may occur before buildings are sold.
         validation_buildings = build_validation_buildings(actions, session.buildings)
         monsters_config = _get_monsters_config(session.next_wave)
 
-        # Level 2 伤害验证
         ok, msg = validate_damage(
             result, validation_buildings, wave_config, GAME_CONFIG["buildings"],
             monsters_config,
@@ -168,7 +148,6 @@ class SubmitWaveView(APIView):
         if not ok:
             return self._validation_error(msg)
 
-        # Level 2 攻击事件验证
         ok, msg = validate_attacks(
             attacks,
             validation_buildings,
@@ -180,7 +159,6 @@ class SubmitWaveView(APIView):
         if not ok:
             return self._validation_error(msg)
 
-        # remaining 怪物验证（防作弊）
         monsters_list = _get_monsters_list(session.next_wave)
         ok, msg = validate_remaining_monsters(
             attacks, result, monsters_config, monsters_list
@@ -249,7 +227,7 @@ class SubmitWaveView(APIView):
             session.buildings = calculated_buildings
             session.save()
 
-        # Level 4 统计分析（在事务提交后执行，只记录日志不影响验证结果）
+        # Run after transaction commit; only logs, does not affect validation.
         analyze_statistics(session, result, spent)
 
         response_data: dict[str, Any] = {
@@ -268,7 +246,6 @@ class SubmitWaveView(APIView):
         return Response(response_data)
 
     def _validation_error(self, message: str) -> Response:
-        """返回验证错误响应."""
         return Response(
             {
                 "valid": False,
@@ -279,11 +256,11 @@ class SubmitWaveView(APIView):
 
 
 class EndSessionView(APIView):
-    """POST /api/game/sessions/end - 结束游戏会话
+    """POST /api/game/sessions/end - End game session
 
-    支持两种模式：
-    1. 带 lastWave: 提交最后一波数据并结束
-    2. 不带 lastWave: 直接结束游戏（提前结束），使用已提交的波次数据
+    Two modes:
+    1. With lastWave: submit final wave data and end
+    2. Without lastWave: end early using already-submitted wave data
     """
 
     def post(self, request: Request) -> Response:
@@ -307,7 +284,7 @@ class EndSessionView(APIView):
             session = GameSession.objects.get(id=data["sessionId"])
         except GameSession.DoesNotExist:
             return Response(
-                {"error": {"code": "SESSION_NOT_FOUND", "message": "会话不存在"}},
+                {"error": {"code": "SESSION_NOT_FOUND", "message": "Session not found"}},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
@@ -319,7 +296,7 @@ class EndSessionView(APIView):
     def _end_with_last_wave(
         self, session: GameSession, data: dict
     ) -> Response:
-        """处理带 lastWave 的结束请求（原有逻辑）."""
+        """End with lastWave: validate and submit final wave data."""
         last_wave_data = data["lastWave"]
         wave_number = last_wave_data["waveNumber"]
         actions = last_wave_data["actions"]
@@ -340,9 +317,8 @@ class EndSessionView(APIView):
         if not ok:
             return self._validation_error(msg)
 
-        # 构建用于验证的建筑列表
-        # 使用 validation_buildings 而非 submitted_buildings，
-        # 因为攻击可能发生在建筑被出售之前
+        # Use validation_buildings instead of submitted_buildings
+        # because attacks may occur before buildings are sold.
         validation_buildings = build_validation_buildings(actions, session.buildings)
         monsters_config = _get_monsters_config(session.next_wave)
 
@@ -430,7 +406,10 @@ class EndSessionView(APIView):
                     raise ValueError(msg)
 
                 if new_score <= 0:
-                    raise ValueError("0 分不能提交到排行榜，至少需要击杀一只怪物")
+                    raise ValueError(
+                        "Zero score cannot be submitted to leaderboard,"
+                        " at least one kill is required"
+                    )
 
                 LeaderboardEntry.objects.create(
                     nickname=data["nickname"],
@@ -458,14 +437,12 @@ class EndSessionView(APIView):
     def _end_without_last_wave(
         self, session: GameSession, data: dict
     ) -> Response:
-        """处理不带 lastWave 的提前结束请求.
+        """End early without lastWave, using current session score.
 
-        使用当前会话状态的积分作为最终得分，适用于：
-        - 用户在波次完成后主动选择结束游戏
-        - 必须至少完成一波才能使用此模式
+        Requires at least one completed wave.
         """
         if session.wave_count < 1:
-            return self._validation_error("提前结束需要至少完成一波")
+            return self._validation_error("Early end requires at least one completed wave")
 
         try:
             with transaction.atomic():
@@ -500,7 +477,6 @@ class EndSessionView(APIView):
         })
 
     def _validation_error(self, message: str) -> Response:
-        """返回验证错误响应."""
         return Response(
             {
                 "verified": False,
@@ -511,7 +487,7 @@ class EndSessionView(APIView):
 
 
 class LeaderboardView(APIView):
-    """GET /api/game/leaderboard - 获取排行榜"""
+    """GET /api/game/leaderboard - Get leaderboard."""
 
     DEFAULT_LIMIT = 10
     MAX_LIMIT = 100

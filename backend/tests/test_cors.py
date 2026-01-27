@@ -1,11 +1,11 @@
-"""CORS 跨域请求测试."""
+"""CORS cross-origin request tests."""
 
 import pytest
 from rest_framework.test import APIClient
 
 
 class TestCORSHeaders:
-    """测试 CORS 响应头."""
+    """Tests for CORS response headers."""
 
     @pytest.fixture
     def api_client(self) -> APIClient:
@@ -14,7 +14,7 @@ class TestCORSHeaders:
 
     @pytest.mark.django_db
     def test_cors_preflight_request(self, api_client: APIClient):
-        """测试 CORS preflight OPTIONS 请求."""
+        """Test CORS preflight OPTIONS request."""
         response = api_client.options(
             "/api/game/sessions",
             HTTP_ORIGIN="http://localhost:8080",
@@ -27,7 +27,7 @@ class TestCORSHeaders:
 
     @pytest.mark.django_db
     def test_post_without_csrf_token(self, api_client: APIClient):
-        """测试 POST 请求无需 CSRF token（游戏 API 不使用用户认证）."""
+        """Test POST request works without CSRF token."""
         response = api_client.post(
             "/api/game/sessions",
             HTTP_ORIGIN="http://localhost:8080",
@@ -38,7 +38,7 @@ class TestCORSHeaders:
 
     @pytest.mark.django_db
     def test_cors_allowed_origin(self, api_client: APIClient):
-        """测试允许的源可以跨域请求."""
+        """Test allowed origin receives CORS headers."""
         response = api_client.post(
             "/api/game/sessions",
             HTTP_ORIGIN="http://localhost:8080",
@@ -49,7 +49,7 @@ class TestCORSHeaders:
 
     @pytest.mark.django_db
     def test_cors_127_0_0_1_origin(self, api_client: APIClient):
-        """测试 127.0.0.1:8080 也是允许的源."""
+        """Test 127.0.0.1:8080 is also an allowed origin."""
         response = api_client.post(
             "/api/game/sessions",
             HTTP_ORIGIN="http://127.0.0.1:8080",
@@ -60,7 +60,7 @@ class TestCORSHeaders:
 
     @pytest.mark.django_db
     def test_cors_credentials_header(self, api_client: APIClient):
-        """测试 Access-Control-Allow-Credentials 头."""
+        """Test Access-Control-Allow-Credentials header is present."""
         response = api_client.post(
             "/api/game/sessions",
             HTTP_ORIGIN="http://localhost:8080",
@@ -70,7 +70,7 @@ class TestCORSHeaders:
 
     @pytest.mark.django_db
     def test_cors_disallowed_origin(self, api_client: APIClient):
-        """测试不允许的源不会返回 CORS 头."""
+        """Test disallowed origin does not receive CORS headers."""
         response = api_client.post(
             "/api/game/sessions",
             HTTP_ORIGIN="http://malicious-site.com",

@@ -26,23 +26,40 @@ class Migration(migrations.Migration):
                     ),
                 ),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
-                ("money", models.IntegerField(help_text="当前金钱")),
-                ("score", models.IntegerField(default=0, help_text="累计分数")),
-                ("life", models.IntegerField(help_text="当前生命值")),
+                ("money", models.IntegerField(help_text="Current money")),
+                (
+                    "score",
+                    models.IntegerField(
+                        default=0, help_text="Cumulative score"
+                    ),
+                ),
+                ("life", models.IntegerField(help_text="Current life points")),
                 (
                     "wave_count",
-                    models.IntegerField(default=0, help_text="已完成的波次数"),
+                    models.IntegerField(
+                        default=0, help_text="Completed wave count"
+                    ),
                 ),
                 (
                     "difficulty",
-                    models.FloatField(default=1.0, help_text="当前难度系数"),
+                    models.FloatField(
+                        default=1.0, help_text="Current difficulty multiplier"
+                    ),
                 ),
-                ("buildings", models.JSONField(default=list, help_text="当前建筑列表")),
+                (
+                    "buildings",
+                    models.JSONField(default=list, help_text="Current building list"),
+                ),
                 (
                     "config",
-                    models.JSONField(help_text="游戏配置（建筑、怪物、地图等）"),
+                    models.JSONField(
+                        help_text="Game config (buildings, monsters, map, etc.)"
+                    ),
                 ),
-                ("next_wave", models.JSONField(help_text="下一波怪物配置")),
+                (
+                    "next_wave",
+                    models.JSONField(help_text="Next wave monster config"),
+                ),
             ],
             options={
                 "db_table": "game_session",
@@ -65,9 +82,15 @@ class Migration(migrations.Migration):
                         serialize=False,
                     ),
                 ),
-                ("nickname", models.CharField(help_text="玩家昵称", max_length=32)),
-                ("score", models.IntegerField(help_text="最终得分")),
-                ("waves_completed", models.IntegerField(help_text="完成的波次数")),
+                (
+                    "nickname",
+                    models.CharField(help_text="Player nickname", max_length=32),
+                ),
+                ("score", models.IntegerField(help_text="Final score")),
+                (
+                    "waves_completed",
+                    models.IntegerField(help_text="Waves completed"),
+                ),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
             ],
             options={
@@ -96,38 +119,93 @@ class Migration(migrations.Migration):
                         serialize=False,
                     ),
                 ),
-                ("wave_number", models.IntegerField(help_text="波次编号（从 1 开始）")),
+                (
+                    "wave_number",
+                    models.IntegerField(
+                        help_text="Wave number (starting from 1)"
+                    ),
+                ),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
-                ("killed", models.IntegerField(help_text="击杀怪物数")),
+                (
+                    "killed",
+                    models.IntegerField(help_text="Monsters killed"),
+                ),
                 (
                     "killed_by_type",
                     models.JSONField(
-                        default=dict, help_text="每种怪物类型的击杀数 {type_id: count}"
+                        default=dict,
+                        help_text="Kills per monster type {type_id: count}",
                     ),
                 ),
-                ("passed", models.IntegerField(help_text="穿过终点的怪物数")),
-                ("score_gained", models.IntegerField(help_text="本波获得的分数")),
-                ("money_gained", models.IntegerField(help_text="本波获得的金钱")),
-                ("life_lost", models.IntegerField(help_text="本波损失的生命值")),
+                (
+                    "passed",
+                    models.IntegerField(
+                        help_text="Monsters that reached the end"
+                    ),
+                ),
+                (
+                    "score_gained",
+                    models.IntegerField(help_text="Score gained this wave"),
+                ),
+                (
+                    "money_gained",
+                    models.IntegerField(help_text="Money gained this wave"),
+                ),
+                (
+                    "life_lost",
+                    models.IntegerField(help_text="Life lost this wave"),
+                ),
                 (
                     "total_damage_dealt",
-                    models.IntegerField(help_text="本波造成的总伤害"),
+                    models.IntegerField(
+                        help_text="Total damage dealt this wave"
+                    ),
                 ),
                 (
                     "total_life_destroyed",
-                    models.IntegerField(default=0, help_text="击杀怪物的总生命值"),
+                    models.IntegerField(
+                        default=0,
+                        help_text="Total HP of killed monsters",
+                    ),
                 ),
-                ("wave_duration_frames", models.IntegerField(help_text="波次持续帧数")),
-                ("money_spent", models.IntegerField(help_text="本波花费的金钱")),
-                ("money_income", models.IntegerField(help_text="本波出售建筑的收入")),
+                (
+                    "wave_duration_frames",
+                    models.IntegerField(help_text="Wave duration in frames"),
+                ),
+                (
+                    "money_spent",
+                    models.IntegerField(help_text="Money spent this wave"),
+                ),
+                (
+                    "money_income",
+                    models.IntegerField(
+                        help_text="Income from selling buildings this wave"
+                    ),
+                ),
                 (
                     "building_count",
-                    models.IntegerField(help_text="波次结束时的建筑数量"),
+                    models.IntegerField(
+                        help_text="Building count at wave end"
+                    ),
                 ),
-                ("end_money", models.IntegerField(help_text="波次结束时的金钱")),
-                ("end_score", models.IntegerField(help_text="波次结束时的分数")),
-                ("end_life", models.IntegerField(help_text="波次结束时的生命值")),
-                ("end_difficulty", models.FloatField(help_text="波次结束时的难度系数")),
+                (
+                    "end_money",
+                    models.IntegerField(help_text="Money at wave end"),
+                ),
+                (
+                    "end_score",
+                    models.IntegerField(help_text="Score at wave end"),
+                ),
+                (
+                    "end_life",
+                    models.IntegerField(help_text="Life at wave end"),
+                ),
+                (
+                    "end_difficulty",
+                    models.FloatField(
+                        help_text="Difficulty multiplier at wave end"
+                    ),
+                ),
                 (
                     "session",
                     models.ForeignKey(

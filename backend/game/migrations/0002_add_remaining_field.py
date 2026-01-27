@@ -14,7 +14,7 @@ class Migration(migrations.Migration):
             model_name="waverecord",
             name="remaining",
             field=models.IntegerField(
-                default=0, help_text="提前结束时场上剩余的怪物数"
+                default=0, help_text="Monsters remaining on early end"
             ),
         ),
     ]

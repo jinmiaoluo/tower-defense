@@ -22,16 +22,16 @@ def api_client() -> APIClient:
 
 @pytest.fixture
 def game_config() -> dict:
-    """游戏配置."""
+    """Game configuration dictionary."""
     return GAME_CONFIG
 
 
 @pytest.fixture
 def first_wave() -> dict:
-    """第一波怪物配置.
+    """First wave configuration.
 
-    与旧实现一致：第一波只有 1 个 type 0 怪物。
-    参考 td-data-stage-1.js:189-191
+    Matches the legacy implementation: wave 1 contains a single type-0 monster.
+    See td-data-stage-1.js:189-191.
     """
     monster = MONSTERS[0]
     return {
@@ -51,7 +51,7 @@ def first_wave() -> dict:
 
 @pytest.fixture
 def game_session(db, game_config: dict, first_wave: dict) -> GameSession:
-    """创建测试用游戏会话."""
+    """Game session initialized with default settings and first wave."""
     return GameSession.objects.create(
         money=INITIAL["money"],
         life=INITIAL["life"],
@@ -65,7 +65,7 @@ def game_session(db, game_config: dict, first_wave: dict) -> GameSession:
 
 @pytest.fixture
 def game_session_with_waves(game_session: GameSession) -> GameSession:
-    """创建带有波次记录的游戏会话."""
+    """Game session with five pre-populated wave records."""
     monster = MONSTERS[0]
     money_per_wave = monster["money"] * 3
 
@@ -98,7 +98,7 @@ def game_session_with_waves(game_session: GameSession) -> GameSession:
 
 @pytest.fixture
 def leaderboard_entries(db) -> list[LeaderboardEntry]:
-    """创建测试用排行榜数据."""
+    """Twenty leaderboard entries with descending scores."""
     entries = []
     for i in range(20):
         entries.append(

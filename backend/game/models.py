@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from django.db import models
 
 if TYPE_CHECKING:
-    from django.db.models.manager import RelatedManager
+    from django.db.models.fields.related_descriptors import RelatedManager
 
 
 class GameSession(models.Model):
@@ -39,7 +39,7 @@ class GameSession(models.Model):
             models.Index(fields=["created_at"]),
         ]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"Session {self.id} (Wave {self.wave_count}, Score {self.score})"
 
 
@@ -54,6 +54,9 @@ class WaveRecord(models.Model):
     session = models.ForeignKey(
         GameSession, on_delete=models.CASCADE, related_name="waves"
     )
+    # Explicit annotation for the auto-created FK column attribute.
+    # Django creates this at runtime; the annotation aids static analysis.
+    session_id: uuid.UUID
     wave_number = models.IntegerField(help_text="Wave number (starting from 1)")
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -97,20 +100,20 @@ class WaveRecord(models.Model):
             models.Index(fields=["session", "wave_number"]),
         ]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"Wave {self.wave_number} of {self.session_id}"
 
 
 class LeaderboardEntry(models.Model):
-    """排行榜记录模型
+    """Leaderboard entry model.
 
-    存储游戏结束后的最终成绩，用于排行榜展示
+    Stores final results after a game ends, used for leaderboard display.
     """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    nickname = models.CharField(max_length=32, help_text="玩家昵称")
-    score = models.IntegerField(help_text="最终得分")
-    waves_completed = models.IntegerField(help_text="完成的波次数")
+    nickname = models.CharField(max_length=32, help_text="Player nickname")
+    score = models.IntegerField(help_text="Final score")
+    waves_completed = models.IntegerField(help_text="Waves completed")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -121,5 +124,5 @@ class LeaderboardEntry(models.Model):
             models.Index(fields=["-score", "-waves_completed"]),
         ]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.nickname}: {self.score} points ({self.waves_completed} waves)"
