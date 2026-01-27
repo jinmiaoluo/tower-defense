@@ -125,13 +125,11 @@ tower-defense/
 
 ### 前端架构风格
 
-目录命名借鉴 ECS（Entity-Component-System）概念，但实际实现是 **OOP 为主**：
+目录命名借鉴 ECS（Entity-Component-System）概念，但实际实现是 OOP：
 
-- `entities/`：OOP 类，包含数据和行为（Monster、Building）
-- `systems/`：服务层，提供跨实体的工具函数
-- `render/`：渲染层，与实体解耦
-
-塔防游戏实体类型少，OOP 足够清晰，无需纯 ECS 的复杂性。
+- `entities`：OOP 类，包含数据和行为（Monster、Building）
+- `systems`：服务层，提供跨实体的工具函数
+- `render`：渲染层，与实体解耦
 
 ### 关键目录说明
 
@@ -186,18 +184,14 @@ GameSceneLogic (协调者)
 
 ```
 Views (API 入口)
-    │
     ├── Generators (波次生成)
-    │
     ├── Validators (数据验证)
     │       ├── validate_basic (Level 1)
     │       └── validate_damage, validate_attacks (Level 2)
-    │
     ├── Calculators (计算逻辑)
     │       ├── process_actions (操作处理)
     │       ├── calc_new_difficulty (难度调整)
     │       └── calc_monster_attrs (怪物属性)
-    │
     └── Models (数据持久化)
             ├── GameSession
             ├── WaveRecord
@@ -246,11 +240,11 @@ Views (API 入口)
 
 **背景**：游戏逻辑需要单元测试，但 Phaser 依赖浏览器环境。
 
-**决策**：将游戏逻辑（systems/）与渲染（render/）分离。
+**决策**：将游戏逻辑（systems 目录）与渲染（render 目录）分离。
 
 **实现**：
-- `systems/` 包含纯 TypeScript 逻辑，可在 Node.js 测试
-- `render/` 包含 Phaser 相关代码
+- `systems` 包含纯 TypeScript 逻辑，可在 Node.js 测试
+- `render` 包含 Phaser 相关代码
 - `PhaserAdapter` 作为适配层
 
 ## 数据流
@@ -281,10 +275,10 @@ Frame Loop:
 │  WaveManager.update()                                   │
 │      │                                                  │
 │      ▼                                                  │
-│  Spawn Monster ──► Monster.update() ──► PathSystem     │
+│  Spawn Monster ──► Monster.update() ──► PathSystem      │
 │                           │                             │
 │                           ▼                             │
-│  Building.findTarget() ──► BulletSystem.update()       │
+│  Building.findTarget() ──► BulletSystem.update()        │
 │                                   │                     │
 │                                   ▼                     │
 │                           DamageSystem.calculate()      │
