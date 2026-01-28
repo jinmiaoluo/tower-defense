@@ -243,6 +243,85 @@ POST /sessions    无请求     POST /sessions/wave  POST /sessions/end
 - **波次进行**: 每波结束时提交操作记录，服务端验证后返回下一波配置
 - **游戏结束**: 提交昵称和最后一波数据，记录排行榜
 
+## HTTP 状态码与错误响应
+
+### 状态码
+
+- `200`：请求成功
+- `400`：请求参数错误或验证失败
+- `404`：会话不存在或已过期
+
+### 错误响应格式
+
+所有错误响应使用统一的 JSON 格式：
+
+```json
+{
+  "code": "BUSINESS_ERROR_CODE",
+  "message": "Human-readable error description"
+}
+```
+
+- `code`：业务状态码，用于程序判断错误类型
+- `message`：人类可读的错误描述
+
+### 业务状态码
+
+- `MISSING_FIELDS`：缺少必填字段
+- `SESSION_NOT_FOUND`：会话不存在或已过期
+- `WAVE_NOT_CONTINUOUS`：波次号不连续
+- `BASIC_VALIDATION_FAILED`：Level 1 基础验证失败
+- `SCORE_VALIDATION_FAILED`：得分计算不匹配
+- `DAMAGE_VALIDATION_FAILED`：Level 2 伤害验证失败
+- `ATTACK_VALIDATION_FAILED`：Level 2 攻击事件验证失败
+- `REMAINING_VALIDATION_FAILED`：剩余怪物验证失败
+- `MONEY_VALIDATION_FAILED`：金钱余额验证失败
+- `BUILDINGS_VALIDATION_FAILED`：建筑一致性验证失败
+- `INVALID_NICKNAME`：昵称验证失败
+- `GAME_END_VALIDATION_FAILED`：游戏结束验证失败
+- `EARLY_END_REQUIRES_WAVE`：提前结束需至少完成一波
+- `ZERO_SCORE`：零分不能上榜
+
+### 各端点错误场景
+
+**POST /api/game/sessions**：
+
+- 无错误响应（总是成功创建会话）
+
+**POST /api/game/sessions/wave**：
+
+- `MISSING_FIELDS` (400)：缺少必填字段
+- `SESSION_NOT_FOUND` (404)：会话不存在
+- `WAVE_NOT_CONTINUOUS` (400)：波次号不连续
+- `BASIC_VALIDATION_FAILED` (400)：数量不一致、金钱收益不匹配等
+- `SCORE_VALIDATION_FAILED` (400)：得分计算不匹配
+- `DAMAGE_VALIDATION_FAILED` (400)：DPS 超限、伤害值异常等
+- `ATTACK_VALIDATION_FAILED` (400)：无效怪物 ID、射程超限等
+- `REMAINING_VALIDATION_FAILED` (400)：剩余怪物验证失败
+- `MONEY_VALIDATION_FAILED` (400)：金钱余额为负
+- `BUILDINGS_VALIDATION_FAILED` (400)：建筑一致性验证失败
+
+**POST /api/game/sessions/end**：
+
+- `MISSING_FIELDS` (400)：缺少必填字段
+- `INVALID_NICKNAME` (400)：昵称为空、超长或含非法字符
+- `SESSION_NOT_FOUND` (404)：会话不存在
+- 波次验证（带 lastWave 时）：同 wave 端点的验证状态码
+- `GAME_END_VALIDATION_FAILED` (400)：得分累计不一致
+- `EARLY_END_REQUIRES_WAVE` (400)：提前结束需至少完成一波
+- `ZERO_SCORE` (400)：零分不能上榜
+
+**GET /api/game/leaderboard**：
+
+- 无错误响应（无效 limit 参数自动回退为默认值 10）
+
+### 前端错误处理
+
+当收到 `SESSION_NOT_FOUND` 错误时：
+
+- 显示提示告知用户会话已失效
+- 自动重启游戏创建新会话
+
 ## 详细规范
 
 以下内容已拆分到专门的规范文档：

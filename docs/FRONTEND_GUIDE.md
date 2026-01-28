@@ -410,7 +410,6 @@ export const gameApi = {
    - 这些怪物必须确实没有被击杀（累计伤害 < 生命值）
    - 这些怪物 ID 必须是前 `spawned` 个已生成的怪物（不能使用未生成的怪物 ID）
    - 使用 `WaveRecorder.recordRemainingMonster(monsterId)` 记录在场怪物
-10. **会话过期处理**：当服务端返回 `SESSION_NOT_FOUND` 错误时
+10. **会话过期处理**：当服务端返回会话不存在错误（HTTP 404）时
     - 显示提示告知用户会话已失效
     - 自动重启游戏创建新会话
-    - 详见 SPEC.md 错误处理章节

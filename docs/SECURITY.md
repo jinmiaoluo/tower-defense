@@ -153,7 +153,7 @@ expected_score = sum(floor(sqrt(attack.damage)) for attack in attacks)
 ```
 提交 /sessions/end
     +-- 验证 sessionId 有效性
-    |       - SESSION_NOT_FOUND: 会话不存在或过期
+    |       - 会话不存在或过期时返回错误
     +-- 如有 lastWave，执行波次验证
     |       - Level 1 -> Level 2
     |       - 任一失败则拒绝入榜
