@@ -17,6 +17,7 @@ from game.calculators import (
 from game.config import GAME_CONFIG, INITIAL
 from game.generators import generate_wave
 from game.models import GameSession, LeaderboardEntry, WaveRecord
+from game.responses import ErrorCode, error_response
 from game.validators import (
     analyze_statistics,
     validate_attacks,
@@ -104,17 +105,13 @@ class SubmitWaveView(APIView):
             data, "sessionId", "waveNumber", "actions", "attacks", "result", "buildings"
         )
         if not ok:
-            return Response(
-                {"error": {"code": "INVALID_REQUEST", "message": msg}},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            return error_response(ErrorCode.MISSING_FIELDS, msg, status.HTTP_400_BAD_REQUEST)
 
         try:
             session = GameSession.objects.get(id=data["sessionId"])
         except GameSession.DoesNotExist:
-            return Response(
-                {"error": {"code": "SESSION_NOT_FOUND", "message": "Session not found"}},
-                status=status.HTTP_404_NOT_FOUND,
+            return error_response(
+                ErrorCode.SESSION_NOT_FOUND, "Session not found", status.HTTP_404_NOT_FOUND
             )
 
         wave_number = data["waveNumber"]
@@ -125,16 +122,20 @@ class SubmitWaveView(APIView):
 
         ok, msg = validate_wave_continuity(session, wave_number)
         if not ok:
-            return self._validation_error(msg)
+            return error_response(ErrorCode.WAVE_NOT_CONTINUOUS, msg, status.HTTP_400_BAD_REQUEST)
 
         wave_config = _get_wave_config(session.next_wave)
         ok, msg = validate_basic(result, wave_config)
         if not ok:
-            return self._validation_error(msg)
+            return error_response(
+                ErrorCode.BASIC_VALIDATION_FAILED, msg, status.HTTP_400_BAD_REQUEST
+            )
 
         ok, msg = validate_score(attacks, result)
         if not ok:
-            return self._validation_error(msg)
+            return error_response(
+                ErrorCode.SCORE_VALIDATION_FAILED, msg, status.HTTP_400_BAD_REQUEST
+            )
 
         # Use validation_buildings instead of submitted_buildings
         # because attacks may occur before buildings are sold.
@@ -146,7 +147,9 @@ class SubmitWaveView(APIView):
             monsters_config,
         )
         if not ok:
-            return self._validation_error(msg)
+            return error_response(
+                ErrorCode.DAMAGE_VALIDATION_FAILED, msg, status.HTTP_400_BAD_REQUEST
+            )
 
         ok, msg = validate_attacks(
             attacks,
@@ -157,14 +160,18 @@ class SubmitWaveView(APIView):
             monsters_config,
         )
         if not ok:
-            return self._validation_error(msg)
+            return error_response(
+                ErrorCode.ATTACK_VALIDATION_FAILED, msg, status.HTTP_400_BAD_REQUEST
+            )
 
         monsters_list = _get_monsters_list(session.next_wave)
         ok, msg = validate_remaining_monsters(
             attacks, result, monsters_config, monsters_list
         )
         if not ok:
-            return self._validation_error(msg)
+            return error_response(
+                ErrorCode.REMAINING_VALIDATION_FAILED, msg, status.HTTP_400_BAD_REQUEST
+            )
 
         spent, income, calculated_buildings = process_actions(
             actions, session.buildings, GAME_CONFIG
@@ -175,11 +182,15 @@ class SubmitWaveView(APIView):
 
         ok, msg = validate_money_balance(new_state)
         if not ok:
-            return self._validation_error(msg)
+            return error_response(
+                ErrorCode.MONEY_VALIDATION_FAILED, msg, status.HTTP_400_BAD_REQUEST
+            )
 
         ok, msg = validate_buildings_consistency(calculated_buildings, submitted_buildings)
         if not ok:
-            return self._validation_error(msg)
+            return error_response(
+                ErrorCode.BUILDINGS_VALIDATION_FAILED, msg, status.HTTP_400_BAD_REQUEST
+            )
 
         new_score = session.score + result["score_gained"]
         new_life = session.life - result["life_lost"]
@@ -245,15 +256,6 @@ class SubmitWaveView(APIView):
 
         return Response(response_data)
 
-    def _validation_error(self, message: str) -> Response:
-        return Response(
-            {
-                "valid": False,
-                "error": {"code": "VALIDATION_FAILED", "message": message},
-            },
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
 
 class EndSessionView(APIView):
     """POST /api/game/sessions/end - End game session
@@ -268,24 +270,17 @@ class EndSessionView(APIView):
 
         ok, msg = _require_fields(data, "sessionId", "nickname")
         if not ok:
-            return Response(
-                {"error": {"code": "INVALID_REQUEST", "message": msg}},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            return error_response(ErrorCode.MISSING_FIELDS, msg, status.HTTP_400_BAD_REQUEST)
 
         ok, msg = validate_nickname(data["nickname"])
         if not ok:
-            return Response(
-                {"error": {"code": "INVALID_REQUEST", "message": msg}},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            return error_response(ErrorCode.INVALID_NICKNAME, msg, status.HTTP_400_BAD_REQUEST)
 
         try:
             session = GameSession.objects.get(id=data["sessionId"])
         except GameSession.DoesNotExist:
-            return Response(
-                {"error": {"code": "SESSION_NOT_FOUND", "message": "Session not found"}},
-                status=status.HTTP_404_NOT_FOUND,
+            return error_response(
+                ErrorCode.SESSION_NOT_FOUND, "Session not found", status.HTTP_404_NOT_FOUND
             )
 
         if "lastWave" in data:
@@ -306,16 +301,20 @@ class EndSessionView(APIView):
 
         ok, msg = validate_wave_continuity(session, wave_number)
         if not ok:
-            return self._validation_error(msg)
+            return error_response(ErrorCode.WAVE_NOT_CONTINUOUS, msg, status.HTTP_400_BAD_REQUEST)
 
         wave_config = _get_wave_config(session.next_wave)
         ok, msg = validate_basic(result, wave_config)
         if not ok:
-            return self._validation_error(msg)
+            return error_response(
+                ErrorCode.BASIC_VALIDATION_FAILED, msg, status.HTTP_400_BAD_REQUEST
+            )
 
         ok, msg = validate_score(attacks, result)
         if not ok:
-            return self._validation_error(msg)
+            return error_response(
+                ErrorCode.SCORE_VALIDATION_FAILED, msg, status.HTTP_400_BAD_REQUEST
+            )
 
         # Use validation_buildings instead of submitted_buildings
         # because attacks may occur before buildings are sold.
@@ -327,7 +326,9 @@ class EndSessionView(APIView):
             monsters_config,
         )
         if not ok:
-            return self._validation_error(msg)
+            return error_response(
+                ErrorCode.DAMAGE_VALIDATION_FAILED, msg, status.HTTP_400_BAD_REQUEST
+            )
         ok, msg = validate_attacks(
             attacks,
             validation_buildings,
@@ -337,14 +338,18 @@ class EndSessionView(APIView):
             monsters_config,
         )
         if not ok:
-            return self._validation_error(msg)
+            return error_response(
+                ErrorCode.ATTACK_VALIDATION_FAILED, msg, status.HTTP_400_BAD_REQUEST
+            )
 
         monsters_list = _get_monsters_list(session.next_wave)
         ok, msg = validate_remaining_monsters(
             attacks, result, monsters_config, monsters_list
         )
         if not ok:
-            return self._validation_error(msg)
+            return error_response(
+                ErrorCode.REMAINING_VALIDATION_FAILED, msg, status.HTTP_400_BAD_REQUEST
+            )
 
         spent, income, calculated_buildings = process_actions(
             actions, session.buildings, GAME_CONFIG
@@ -355,11 +360,15 @@ class EndSessionView(APIView):
 
         ok, msg = validate_money_balance(new_state)
         if not ok:
-            return self._validation_error(msg)
+            return error_response(
+                ErrorCode.MONEY_VALIDATION_FAILED, msg, status.HTTP_400_BAD_REQUEST
+            )
 
         ok, msg = validate_buildings_consistency(calculated_buildings, submitted_buildings)
         if not ok:
-            return self._validation_error(msg)
+            return error_response(
+                ErrorCode.BUILDINGS_VALIDATION_FAILED, msg, status.HTTP_400_BAD_REQUEST
+            )
 
         new_score = session.score + result["score_gained"]
         new_life = session.life - result["life_lost"]
@@ -367,63 +376,72 @@ class EndSessionView(APIView):
             session.difficulty, result["life_lost"], wave_number
         )
 
-        try:
-            with transaction.atomic():
-                WaveRecord.objects.create(
-                    session=session,
-                    wave_number=wave_number,
-                    killed=result["killed"],
-                    killed_by_type=result["killed_by_type"],
-                    passed=result["passed"],
-                    remaining=result.get("remaining", 0),
-                    score_gained=result["score_gained"],
-                    money_gained=result["money_gained"],
-                    life_lost=result["life_lost"],
-                    total_damage_dealt=result["total_damage_dealt"],
-                    total_life_destroyed=result["total_life_destroyed"],
-                    wave_duration_frames=result["wave_duration_frames"],
-                    money_spent=spent,
-                    money_income=income,
-                    building_count=len(calculated_buildings),
-                    end_money=new_money,
-                    end_score=new_score,
-                    end_life=new_life,
-                    end_difficulty=new_difficulty,
-                )
+        with transaction.atomic():
+            WaveRecord.objects.create(
+                session=session,
+                wave_number=wave_number,
+                killed=result["killed"],
+                killed_by_type=result["killed_by_type"],
+                passed=result["passed"],
+                remaining=result.get("remaining", 0),
+                score_gained=result["score_gained"],
+                money_gained=result["money_gained"],
+                life_lost=result["life_lost"],
+                total_damage_dealt=result["total_damage_dealt"],
+                total_life_destroyed=result["total_life_destroyed"],
+                wave_duration_frames=result["wave_duration_frames"],
+                money_spent=spent,
+                money_income=income,
+                building_count=len(calculated_buildings),
+                end_money=new_money,
+                end_score=new_score,
+                end_life=new_life,
+                end_difficulty=new_difficulty,
+            )
 
-                session.money = new_money
-                session.score = new_score
-                session.life = new_life
-                session.difficulty = new_difficulty
-                session.wave_count = wave_number
-                session.buildings = calculated_buildings
-                session.save()
+            session.money = new_money
+            session.score = new_score
+            session.life = new_life
+            session.difficulty = new_difficulty
+            session.wave_count = wave_number
+            session.buildings = calculated_buildings
+            session.save()
 
-                analyze_statistics(session, result, spent)
+            analyze_statistics(session, result, spent)
 
-                ok, msg = validate_game_end(session)
-                if not ok:
-                    raise ValueError(msg)
+            ok, msg = validate_game_end(session)
+            if not ok:
+                # Rollback transaction by raising, then return error outside
+                transaction.set_rollback(True)
 
-                if new_score <= 0:
-                    raise ValueError(
-                        "Zero score cannot be submitted to leaderboard,"
-                        " at least one kill is required"
-                    )
+        # Check if transaction was rolled back due to game end validation
+        if not ok:
+            return error_response(
+                ErrorCode.GAME_END_VALIDATION_FAILED, msg, status.HTTP_400_BAD_REQUEST
+            )
 
-                LeaderboardEntry.objects.create(
-                    nickname=data["nickname"],
-                    score=new_score,
-                    waves_completed=wave_number,
-                )
+        if new_score <= 0:
+            # Delete the wave record we just created since score is invalid
+            WaveRecord.objects.filter(session=session, wave_number=wave_number).delete()
+            return error_response(
+                ErrorCode.ZERO_SCORE,
+                "Zero score cannot be submitted to leaderboard,"
+                " at least one kill is required",
+                status.HTTP_400_BAD_REQUEST,
+            )
 
-                rank = LeaderboardEntry.objects.filter(score__gt=new_score).count() + 1
-                total = LeaderboardEntry.objects.count()
-                is_new_record = rank == 1
+        with transaction.atomic():
+            LeaderboardEntry.objects.create(
+                nickname=data["nickname"],
+                score=new_score,
+                waves_completed=wave_number,
+            )
 
-                session.delete()
-        except ValueError as e:
-            return self._validation_error(str(e))
+            rank = LeaderboardEntry.objects.filter(score__gt=new_score).count() + 1
+            total = LeaderboardEntry.objects.count()
+            is_new_record = rank == 1
+
+            session.delete()
 
         return Response({
             "verified": True,
@@ -442,16 +460,24 @@ class EndSessionView(APIView):
         Requires at least one completed wave.
         """
         if session.wave_count < 1:
-            return self._validation_error("Early end requires at least one completed wave")
+            return error_response(
+                ErrorCode.EARLY_END_REQUIRES_WAVE,
+                "Early end requires at least one completed wave",
+                status.HTTP_400_BAD_REQUEST,
+            )
 
         ok, msg = validate_game_end(session)
         if not ok:
-            return self._validation_error(msg)
+            return error_response(
+                ErrorCode.GAME_END_VALIDATION_FAILED, msg, status.HTTP_400_BAD_REQUEST
+            )
 
         if session.score <= 0:
-            return self._validation_error(
+            return error_response(
+                ErrorCode.ZERO_SCORE,
                 "Zero score cannot be submitted to leaderboard,"
-                " at least one kill is required"
+                " at least one kill is required",
+                status.HTTP_400_BAD_REQUEST,
             )
 
         with transaction.atomic():
@@ -475,15 +501,6 @@ class EndSessionView(APIView):
                 "isNewRecord": is_new_record,
             },
         })
-
-    def _validation_error(self, message: str) -> Response:
-        return Response(
-            {
-                "verified": False,
-                "error": {"code": "VALIDATION_FAILED", "message": message},
-            },
-            status=status.HTTP_400_BAD_REQUEST,
-        )
 
 
 class LeaderboardView(APIView):
