@@ -1,8 +1,9 @@
-import App from './App.vue'
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
-import { useThemeStore } from './stores'
+
+import App from './App.vue'
 import { getTranslator } from './i18n'
+import { useThemeStore } from './stores'
 import { AppEventBus } from './utils/EventEmitter'
 
 function updateRotateScreenText() {
