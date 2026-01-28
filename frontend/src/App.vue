@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
+
 import PhaserGame from './PhaserGame.vue'
 import GameOverModal from './components/GameOverModal.vue'
 import LeaderboardView from './components/LeaderboardView.vue'
@@ -8,10 +9,13 @@ import ThemeToggle from './components/ThemeToggle.vue'
 import LocaleToggle from './components/LocaleToggle.vue'
 import LeaderboardButton from './components/LeaderboardButton.vue'
 import HelpButton from './components/HelpButton.vue'
+
 import { EventBus } from './game/EventBus'
 import { gameApi, ApiError } from './api'
+
 import { WakeLockManager } from './utils/WakeLockManager'
 import { isMobileDevice } from './utils/device'
+
 import type { Scene } from 'phaser'
 import type { WaveResult, BuildingSnapshot, Action, AttackEvent } from './types'
 
@@ -22,8 +26,12 @@ interface GameOverData {
   isEarlyEnd: boolean
 }
 
+// -- Template refs --
+
 const gameOverModalRef = ref<InstanceType<typeof GameOverModal>>()
 const leaderboardRef = ref<InstanceType<typeof LeaderboardView>>()
+
+// -- State --
 
 const showGameOver = ref(false)
 const showLeaderboard = ref(false)
@@ -33,7 +41,6 @@ const gameOverData = ref<GameOverData | null>(null)
 // Screen wake lock manager (mobile only)
 const wakeLockManager = isMobileDevice() ? new WakeLockManager() : null
 
-// Store last wave data for submission
 const lastWaveData = ref<{
   waveNumber: number
   actions: Action[]
@@ -42,8 +49,31 @@ const lastWaveData = ref<{
   buildings: BuildingSnapshot[]
 } | null>(null)
 
-const currentScene = (_scene: Scene) => {
-  // Acquire screen wake lock when scene is ready
+// -- Helpers --
+
+function buildEndRequest(data: GameOverData, nickname: string) {
+  if (data.isEarlyEnd) {
+    return { sessionId: data.sessionId, nickname }
+  }
+
+  return {
+    sessionId: data.sessionId,
+    nickname,
+    lastWave: lastWaveData.value
+      ? {
+          waveNumber: lastWaveData.value.waveNumber,
+          actions: lastWaveData.value.actions,
+          attacks: lastWaveData.value.attacks,
+          result: lastWaveData.value.result,
+          buildings: lastWaveData.value.buildings,
+        }
+      : undefined,
+  }
+}
+
+// -- Event handlers --
+
+function handleSceneReady(_scene: Scene) {
   wakeLockManager?.acquire()
 }
 
@@ -51,49 +81,24 @@ async function handleSubmitScore(nickname: string) {
   if (!gameOverData.value) return
 
   try {
-    // Include lastWave data only if not an early end
-    const endRequest = gameOverData.value.isEarlyEnd
-      ? {
-          sessionId: gameOverData.value.sessionId,
-          nickname,
-        }
-      : {
-          sessionId: gameOverData.value.sessionId,
-          nickname,
-          lastWave: lastWaveData.value
-            ? {
-                waveNumber: lastWaveData.value.waveNumber,
-                actions: lastWaveData.value.actions,
-                attacks: lastWaveData.value.attacks,
-                result: lastWaveData.value.result,
-                buildings: lastWaveData.value.buildings,
-              }
-            : undefined,
-        }
-
-    const response = await gameApi.endGame(endRequest)
+    const response = await gameApi.endGame(buildEndRequest(gameOverData.value, nickname))
 
     if (response.verified && response.ranking) {
       gameOverModalRef.value?.setRankingResult(response.ranking)
     } else {
-      // Handle SESSION_NOT_FOUND in mock mode
-      if (response.error?.code === 'SESSION_NOT_FOUND') {
-        gameOverModalRef.value?.setError('Session expired. Please restart the game.')
-      } else {
-        gameOverModalRef.value?.setError(response.error?.message || 'Verification failed')
-      }
+      gameOverModalRef.value?.setError('Verification failed')
     }
   } catch (error) {
-    // Error handling for real API mode
     if (error instanceof ApiError) {
-      if (error.code === 'SESSION_NOT_FOUND') {
-        gameOverModalRef.value?.setError('Session expired. Please restart the game.')
+      if (error.isSessionNotFound()) {
+        gameOverModalRef.value?.setError('Session expired. Restarting game...')
+        setTimeout(() => {
+          handleRestart()
+        }, 2000)
       } else {
-        // Show specific error message from the server
         gameOverModalRef.value?.setError(error.message)
       }
     } else {
-      // Network error or other unknown errors
       gameOverModalRef.value?.setError('Network error')
     }
   }
@@ -131,13 +136,12 @@ function handleRestart() {
   gameOverData.value = null
   lastWaveData.value = null
   gameOverModalRef.value?.resetState()
-
-  // Notify Game scene to restart via EventBus
   EventBus.emit('restart-game')
 }
 
+// -- Lifecycle --
+
 onMounted(() => {
-  // Listen to game-over event
   EventBus.on('game-over', (data: {
     score: number
     wavesCompleted: number
@@ -155,8 +159,7 @@ onMounted(() => {
       isEarlyEnd: data.isEarlyEnd,
     }
 
-    // Only set lastWaveData when not an early end
-    // Note: waveNumber is the current wave number (wavesCompleted + 1) for API submission
+    // waveNumber is the current wave number (wavesCompleted + 1) for API submission
     if (!data.isEarlyEnd && data.lastWaveActions && data.lastWaveResult && data.buildings) {
       lastWaveData.value = {
         waveNumber: data.wavesCompleted + 1,
@@ -169,19 +172,16 @@ onMounted(() => {
       lastWaveData.value = null
     }
 
-    // Release screen wake lock when game ends
     wakeLockManager?.release()
-
     showGameOver.value = true
   })
 
-  // Listen to show-leaderboard event (triggered from game UI button)
+  // Triggered from in-game UI button
   EventBus.on('show-leaderboard', () => {
     showLeaderboard.value = true
     leaderboardRef.value?.refresh()
   })
 
-  // Listen to game-restarted event and reacquire screen wake lock
   EventBus.on('game-restarted', () => {
     wakeLockManager?.acquire()
   })
@@ -191,7 +191,6 @@ onUnmounted(() => {
   EventBus.off('game-over')
   EventBus.off('show-leaderboard')
   EventBus.off('game-restarted')
-  // Release screen wake lock when component unmounts
   wakeLockManager?.release()
 })
 </script>
@@ -204,7 +203,7 @@ onUnmounted(() => {
     <ThemeToggle />
   </div>
 
-  <PhaserGame @current-active-scene="currentScene" />
+  <PhaserGame @current-active-scene="handleSceneReady" />
 
   <GameOverModal
     ref="gameOverModalRef"

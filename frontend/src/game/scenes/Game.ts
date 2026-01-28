@@ -1611,17 +1611,6 @@ export class Game extends Scene {
     gameApi.submitWave(
       waveRecorder.toWaveRequest(this.sessionId, buildingSnapshots),
     ).then((response) => {
-      if (!response.valid) {
-        console.error('Wave validation failed:', response.error)
-        // Handle SESSION_NOT_FOUND in mock mode
-        if (response.error?.code === 'SESSION_NOT_FOUND') {
-          this.handleSessionNotFound()
-          return
-        }
-        this.uiState.isSubmittingWave = false
-        return
-      }
-
       // Check if game is over
       // Wave was already submitted via /wave, call gameOver(true) to avoid duplicate lastWave submission
       if (state.life <= 0 || !response.nextWave) {
@@ -1642,16 +1631,14 @@ export class Game extends Scene {
       this.uiState.waveIntervalCounter = WAVE_INTERVAL_FRAMES
       this.uiState.isSubmittingWave = false
     }).catch((error) => {
-      // Handle errors in real API mode
       console.error('Submit wave error:', error)
       this.uiState.isSubmittingWave = false
 
-      if (error instanceof ApiError && error.code === 'SESSION_NOT_FOUND') {
+      if (error instanceof ApiError && error.isSessionNotFound()) {
         this.handleSessionNotFound()
         return
       }
 
-      // Other network errors, show tip
       this.showTip(this.t('error_network'))
     })
   }
