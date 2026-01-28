@@ -31,6 +31,8 @@ export {
 
 // API types
 export type {
+  ErrorCode,
+  ErrorResponse,
   GameStartResponse,
   WaveConfig,
   MonsterConfig,
@@ -47,8 +49,6 @@ export type {
   RankingInfo,
   LeaderboardResponse,
   LeaderboardEntry,
-  ApiError,
-  ApiErrorCode,
 } from './api'
 
 // Game state types

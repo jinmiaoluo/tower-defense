@@ -27,6 +27,35 @@ export type {
 }
 
 // ============================================================================
+// Error response types
+// ============================================================================
+
+/** Business error codes returned by the API */
+export type ErrorCode =
+  | 'MISSING_FIELDS'
+  | 'SESSION_NOT_FOUND'
+  | 'WAVE_NOT_CONTINUOUS'
+  | 'BASIC_VALIDATION_FAILED'
+  | 'SCORE_VALIDATION_FAILED'
+  | 'DAMAGE_VALIDATION_FAILED'
+  | 'ATTACK_VALIDATION_FAILED'
+  | 'REMAINING_VALIDATION_FAILED'
+  | 'MONEY_VALIDATION_FAILED'
+  | 'BUILDINGS_VALIDATION_FAILED'
+  | 'INVALID_NICKNAME'
+  | 'GAME_END_VALIDATION_FAILED'
+  | 'EARLY_END_REQUIRES_WAVE'
+  | 'ZERO_SCORE'
+
+/** API error response format */
+export interface ErrorResponse {
+  /** Business error code */
+  code: ErrorCode
+  /** Human-readable error message */
+  message: string
+}
+
+// ============================================================================
 // POST /api/game/sessions - Create game session
 // ============================================================================
 
@@ -162,8 +191,6 @@ export interface WaveResponse {
     /** Life recovery reward */
     lifeReward?: number
   }
-  /** Returned on validation failure */
-  error?: ApiError
 }
 
 /** Server state (for synchronization) */
@@ -197,8 +224,6 @@ export interface GameEndResponse {
   verified: boolean
   /** Ranking information */
   ranking?: RankingInfo
-  /** Returned on validation failure */
-  error?: ApiError
 }
 
 /** Ranking information */
@@ -233,19 +258,3 @@ export interface LeaderboardEntry {
   /** Record time (ISO 8601) */
   createdAt: string
 }
-
-// ============================================================================
-// Common types
-// ============================================================================
-
-/** API error */
-export interface ApiError {
-  code: ApiErrorCode
-  message: string
-}
-
-/** Error code enum */
-export type ApiErrorCode =
-  | 'SESSION_NOT_FOUND'
-  | 'VALIDATION_FAILED'
-  | 'INVALID_REQUEST'
