@@ -122,11 +122,11 @@
   - difficulty > 30: difficulty × 1.1
   - 其他: difficulty × 1.2
 - 上波造成伤害时
-  - >= 50 点: difficulty × 0.6
-  - >= 30 点: difficulty × 0.7
-  - >= 20 点: difficulty × 0.8
-  - >= 10 点: difficulty × 0.9
-  - < 10 点且 wave >= 10: difficulty × 1.05
+  - `>= 50` 点: difficulty × 0.6
+  - `>= 30` 点: difficulty × 0.7
+  - `>= 20` 点: difficulty × 0.8
+  - `>= 10` 点: difficulty × 0.9
+  - `< 10` 点且 wave >= 10: difficulty × 1.05
 - difficulty 最小值为 1
 
 ### 防御塔系统
