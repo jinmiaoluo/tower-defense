@@ -8,7 +8,5 @@
     "Vue.volar",
     "vitest.explorer",
     "dbaeumer.vscode-eslint",
-    "esbenp.prettier-vscode",
-    "Vue.vscode-typescript-vue-plugin",
   ]
 }
