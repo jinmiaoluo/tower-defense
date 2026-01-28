@@ -472,14 +472,15 @@ describe('GameApi', () => {
       }
     })
 
-    it('VALIDATION_FAILED error should contain server error message', async () => {
+    it('VALIDATION_FAILED error should have fallback message when server returns empty', async () => {
       const { ApiError } = await import('./game')
 
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 400,
         json: () => Promise.resolve({
-          message: 'Money gain mismatch',
+          code: 'VALIDATION_FAILED',
+          message: '',
         }),
       })
 
@@ -505,7 +506,9 @@ describe('GameApi', () => {
         expect.fail('Should have thrown')
       } catch (error) {
         expect(error).toBeInstanceOf(ApiError)
-        expect((error as InstanceType<typeof ApiError>).message).toBe('Money gain mismatch')
+        expect((error as InstanceType<typeof ApiError>).code).toBe('VALIDATION_FAILED')
+        // API client uses fallback message when server returns empty
+        expect((error as InstanceType<typeof ApiError>).message).toBe('HTTP 400')
         expect((error as InstanceType<typeof ApiError>).status).toBe(400)
       }
     })

@@ -1,5 +1,6 @@
 """Game API views."""
 
+import logging
 from typing import Any
 
 from django.db import transaction
@@ -31,6 +32,8 @@ from game.validators import (
     validate_score,
     validate_wave_continuity,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _require_fields(data: dict, *fields: str) -> tuple[bool, str]:
@@ -127,15 +130,13 @@ class SubmitWaveView(APIView):
         wave_config = _get_wave_config(session.next_wave)
         ok, msg = validate_basic(result, wave_config)
         if not ok:
-            return error_response(
-                ErrorCode.BASIC_VALIDATION_FAILED, msg, status.HTTP_400_BAD_REQUEST
-            )
+            logger.warning("Validation failed: %s", msg)
+            return error_response(ErrorCode.VALIDATION_FAILED, "", status.HTTP_400_BAD_REQUEST)
 
         ok, msg = validate_score(attacks, result)
         if not ok:
-            return error_response(
-                ErrorCode.SCORE_VALIDATION_FAILED, msg, status.HTTP_400_BAD_REQUEST
-            )
+            logger.warning("Validation failed: %s", msg)
+            return error_response(ErrorCode.VALIDATION_FAILED, "", status.HTTP_400_BAD_REQUEST)
 
         # Use validation_buildings instead of submitted_buildings
         # because attacks may occur before buildings are sold.
@@ -147,9 +148,8 @@ class SubmitWaveView(APIView):
             monsters_config,
         )
         if not ok:
-            return error_response(
-                ErrorCode.DAMAGE_VALIDATION_FAILED, msg, status.HTTP_400_BAD_REQUEST
-            )
+            logger.warning("Validation failed: %s", msg)
+            return error_response(ErrorCode.VALIDATION_FAILED, "", status.HTTP_400_BAD_REQUEST)
 
         ok, msg = validate_attacks(
             attacks,
@@ -160,18 +160,16 @@ class SubmitWaveView(APIView):
             monsters_config,
         )
         if not ok:
-            return error_response(
-                ErrorCode.ATTACK_VALIDATION_FAILED, msg, status.HTTP_400_BAD_REQUEST
-            )
+            logger.warning("Validation failed: %s", msg)
+            return error_response(ErrorCode.VALIDATION_FAILED, "", status.HTTP_400_BAD_REQUEST)
 
         monsters_list = _get_monsters_list(session.next_wave)
         ok, msg = validate_remaining_monsters(
             attacks, result, monsters_config, monsters_list
         )
         if not ok:
-            return error_response(
-                ErrorCode.REMAINING_VALIDATION_FAILED, msg, status.HTTP_400_BAD_REQUEST
-            )
+            logger.warning("Validation failed: %s", msg)
+            return error_response(ErrorCode.VALIDATION_FAILED, "", status.HTTP_400_BAD_REQUEST)
 
         spent, income, calculated_buildings = process_actions(
             actions, session.buildings, GAME_CONFIG
@@ -182,15 +180,13 @@ class SubmitWaveView(APIView):
 
         ok, msg = validate_money_balance(new_state)
         if not ok:
-            return error_response(
-                ErrorCode.MONEY_VALIDATION_FAILED, msg, status.HTTP_400_BAD_REQUEST
-            )
+            logger.warning("Validation failed: %s", msg)
+            return error_response(ErrorCode.VALIDATION_FAILED, "", status.HTTP_400_BAD_REQUEST)
 
         ok, msg = validate_buildings_consistency(calculated_buildings, submitted_buildings)
         if not ok:
-            return error_response(
-                ErrorCode.BUILDINGS_VALIDATION_FAILED, msg, status.HTTP_400_BAD_REQUEST
-            )
+            logger.warning("Validation failed: %s", msg)
+            return error_response(ErrorCode.VALIDATION_FAILED, "", status.HTTP_400_BAD_REQUEST)
 
         new_score = session.score + result["score_gained"]
         new_life = session.life - result["life_lost"]
@@ -306,15 +302,13 @@ class EndSessionView(APIView):
         wave_config = _get_wave_config(session.next_wave)
         ok, msg = validate_basic(result, wave_config)
         if not ok:
-            return error_response(
-                ErrorCode.BASIC_VALIDATION_FAILED, msg, status.HTTP_400_BAD_REQUEST
-            )
+            logger.warning("Validation failed: %s", msg)
+            return error_response(ErrorCode.VALIDATION_FAILED, "", status.HTTP_400_BAD_REQUEST)
 
         ok, msg = validate_score(attacks, result)
         if not ok:
-            return error_response(
-                ErrorCode.SCORE_VALIDATION_FAILED, msg, status.HTTP_400_BAD_REQUEST
-            )
+            logger.warning("Validation failed: %s", msg)
+            return error_response(ErrorCode.VALIDATION_FAILED, "", status.HTTP_400_BAD_REQUEST)
 
         # Use validation_buildings instead of submitted_buildings
         # because attacks may occur before buildings are sold.
@@ -326,9 +320,9 @@ class EndSessionView(APIView):
             monsters_config,
         )
         if not ok:
-            return error_response(
-                ErrorCode.DAMAGE_VALIDATION_FAILED, msg, status.HTTP_400_BAD_REQUEST
-            )
+            logger.warning("Validation failed: %s", msg)
+            return error_response(ErrorCode.VALIDATION_FAILED, "", status.HTTP_400_BAD_REQUEST)
+
         ok, msg = validate_attacks(
             attacks,
             validation_buildings,
@@ -338,18 +332,16 @@ class EndSessionView(APIView):
             monsters_config,
         )
         if not ok:
-            return error_response(
-                ErrorCode.ATTACK_VALIDATION_FAILED, msg, status.HTTP_400_BAD_REQUEST
-            )
+            logger.warning("Validation failed: %s", msg)
+            return error_response(ErrorCode.VALIDATION_FAILED, "", status.HTTP_400_BAD_REQUEST)
 
         monsters_list = _get_monsters_list(session.next_wave)
         ok, msg = validate_remaining_monsters(
             attacks, result, monsters_config, monsters_list
         )
         if not ok:
-            return error_response(
-                ErrorCode.REMAINING_VALIDATION_FAILED, msg, status.HTTP_400_BAD_REQUEST
-            )
+            logger.warning("Validation failed: %s", msg)
+            return error_response(ErrorCode.VALIDATION_FAILED, "", status.HTTP_400_BAD_REQUEST)
 
         spent, income, calculated_buildings = process_actions(
             actions, session.buildings, GAME_CONFIG
@@ -360,15 +352,13 @@ class EndSessionView(APIView):
 
         ok, msg = validate_money_balance(new_state)
         if not ok:
-            return error_response(
-                ErrorCode.MONEY_VALIDATION_FAILED, msg, status.HTTP_400_BAD_REQUEST
-            )
+            logger.warning("Validation failed: %s", msg)
+            return error_response(ErrorCode.VALIDATION_FAILED, "", status.HTTP_400_BAD_REQUEST)
 
         ok, msg = validate_buildings_consistency(calculated_buildings, submitted_buildings)
         if not ok:
-            return error_response(
-                ErrorCode.BUILDINGS_VALIDATION_FAILED, msg, status.HTTP_400_BAD_REQUEST
-            )
+            logger.warning("Validation failed: %s", msg)
+            return error_response(ErrorCode.VALIDATION_FAILED, "", status.HTTP_400_BAD_REQUEST)
 
         new_score = session.score + result["score_gained"]
         new_life = session.life - result["life_lost"]
@@ -416,9 +406,8 @@ class EndSessionView(APIView):
 
         # Check if transaction was rolled back due to game end validation
         if not ok:
-            return error_response(
-                ErrorCode.GAME_END_VALIDATION_FAILED, msg, status.HTTP_400_BAD_REQUEST
-            )
+            logger.warning("Validation failed: %s", msg)
+            return error_response(ErrorCode.VALIDATION_FAILED, "", status.HTTP_400_BAD_REQUEST)
 
         if new_score <= 0:
             # Delete the wave record we just created since score is invalid
@@ -468,9 +457,8 @@ class EndSessionView(APIView):
 
         ok, msg = validate_game_end(session)
         if not ok:
-            return error_response(
-                ErrorCode.GAME_END_VALIDATION_FAILED, msg, status.HTTP_400_BAD_REQUEST
-            )
+            logger.warning("Validation failed: %s", msg)
+            return error_response(ErrorCode.VALIDATION_FAILED, "", status.HTTP_400_BAD_REQUEST)
 
         if session.score <= 0:
             return error_response(

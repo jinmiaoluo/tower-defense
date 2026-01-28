@@ -76,6 +76,7 @@ export const en: Record<MessageKey, string> = {
   entrance_or_exit_be_blocked: "Can't build on the entrance or exit!",
   error_session_expired: 'Session expired, restarting...',
   error_network: 'Network error, please try again',
+  error_validation_failed: 'Verification failed',
 
   // Game over
   game_over: 'GAME OVER',

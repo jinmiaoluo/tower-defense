@@ -270,15 +270,8 @@ POST /sessions    无请求     POST /sessions/wave  POST /sessions/end
 - `MISSING_FIELDS`：缺少必填字段
 - `SESSION_NOT_FOUND`：会话不存在或已过期
 - `WAVE_NOT_CONTINUOUS`：波次号不连续
-- `BASIC_VALIDATION_FAILED`：Level 1 基础验证失败
-- `SCORE_VALIDATION_FAILED`：得分计算不匹配
-- `DAMAGE_VALIDATION_FAILED`：Level 2 伤害验证失败
-- `ATTACK_VALIDATION_FAILED`：Level 2 攻击事件验证失败
-- `REMAINING_VALIDATION_FAILED`：剩余怪物验证失败
-- `MONEY_VALIDATION_FAILED`：金钱余额验证失败
-- `BUILDINGS_VALIDATION_FAILED`：建筑一致性验证失败
+- `VALIDATION_FAILED`：服务端验证失败（详细信息仅记录在服务端日志）
 - `INVALID_NICKNAME`：昵称验证失败
-- `GAME_END_VALIDATION_FAILED`：游戏结束验证失败
 - `EARLY_END_REQUIRES_WAVE`：提前结束需至少完成一波
 - `ZERO_SCORE`：零分不能上榜
 
@@ -293,21 +286,14 @@ POST /sessions    无请求     POST /sessions/wave  POST /sessions/end
 - `MISSING_FIELDS` (400)：缺少必填字段
 - `SESSION_NOT_FOUND` (404)：会话不存在
 - `WAVE_NOT_CONTINUOUS` (400)：波次号不连续
-- `BASIC_VALIDATION_FAILED` (400)：数量不一致、金钱收益不匹配等
-- `SCORE_VALIDATION_FAILED` (400)：得分计算不匹配
-- `DAMAGE_VALIDATION_FAILED` (400)：DPS 超限、伤害值异常等
-- `ATTACK_VALIDATION_FAILED` (400)：无效怪物 ID、射程超限等
-- `REMAINING_VALIDATION_FAILED` (400)：剩余怪物验证失败
-- `MONEY_VALIDATION_FAILED` (400)：金钱余额为负
-- `BUILDINGS_VALIDATION_FAILED` (400)：建筑一致性验证失败
+- `VALIDATION_FAILED` (400)：服务端验证失败
 
 **POST /api/game/sessions/end**：
 
 - `MISSING_FIELDS` (400)：缺少必填字段
 - `INVALID_NICKNAME` (400)：昵称为空、超长或含非法字符
 - `SESSION_NOT_FOUND` (404)：会话不存在
-- 波次验证（带 lastWave 时）：同 wave 端点的验证状态码
-- `GAME_END_VALIDATION_FAILED` (400)：得分累计不一致
+- `VALIDATION_FAILED` (400)：服务端验证失败
 - `EARLY_END_REQUIRES_WAVE` (400)：提前结束需至少完成一波
 - `ZERO_SCORE` (400)：零分不能上榜
 

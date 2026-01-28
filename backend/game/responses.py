@@ -21,32 +21,11 @@ class ErrorCode(str, Enum):
     # Wave continuity errors
     WAVE_NOT_CONTINUOUS = "WAVE_NOT_CONTINUOUS"
 
-    # Level 1 basic validation errors
-    BASIC_VALIDATION_FAILED = "BASIC_VALIDATION_FAILED"
-
-    # Score validation errors
-    SCORE_VALIDATION_FAILED = "SCORE_VALIDATION_FAILED"
-
-    # Level 2 damage validation errors
-    DAMAGE_VALIDATION_FAILED = "DAMAGE_VALIDATION_FAILED"
-
-    # Level 2 attack event validation errors
-    ATTACK_VALIDATION_FAILED = "ATTACK_VALIDATION_FAILED"
-
-    # Remaining monsters validation errors
-    REMAINING_VALIDATION_FAILED = "REMAINING_VALIDATION_FAILED"
-
-    # Money balance validation errors
-    MONEY_VALIDATION_FAILED = "MONEY_VALIDATION_FAILED"
-
-    # Buildings consistency validation errors
-    BUILDINGS_VALIDATION_FAILED = "BUILDINGS_VALIDATION_FAILED"
+    # Generic validation failure
+    VALIDATION_FAILED = "VALIDATION_FAILED"
 
     # Nickname validation errors
     INVALID_NICKNAME = "INVALID_NICKNAME"
-
-    # Game end validation errors
-    GAME_END_VALIDATION_FAILED = "GAME_END_VALIDATION_FAILED"
 
     # Early end requirements not met
     EARLY_END_REQUIRES_WAVE = "EARLY_END_REQUIRES_WAVE"

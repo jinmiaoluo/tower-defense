@@ -74,6 +74,7 @@ export const zh = {
   entrance_or_exit_be_blocked: '不能在起点或终点处修建建筑！',
   error_session_expired: '会话已失效，正在重新开始...',
   error_network: '网络错误，请稍后重试',
+  error_validation_failed: '验证失败',
 
   // 游戏结束
   game_over: '游戏结束',

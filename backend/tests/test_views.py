@@ -428,8 +428,8 @@ class TestSubmitWaveView:
 
         assert response.status_code == 400
         data = response.json()
-        assert data["code"] == ErrorCode.BASIC_VALIDATION_FAILED.value
-        assert "Kill count mismatch" in data["message"]
+        assert data["code"] == ErrorCode.VALIDATION_FAILED.value
+        assert data["message"] == ""
 
     @pytest.mark.django_db
     def test_submit_wave_money_mismatch(
@@ -460,8 +460,8 @@ class TestSubmitWaveView:
 
         assert response.status_code == 400
         data = response.json()
-        assert "message" in data
-        assert "Money gained mismatch" in data["message"]
+        assert data["code"] == ErrorCode.VALIDATION_FAILED.value
+        assert data["message"] == ""
 
     @pytest.mark.django_db
     def test_submit_wave_creates_wave_record(
@@ -663,8 +663,8 @@ class TestSubmitWaveView:
 
         assert response.status_code == 400
         data = response.json()
-        assert "message" in data
-        assert "Insufficient money" in data["message"]
+        assert data["code"] == ErrorCode.VALIDATION_FAILED.value
+        assert data["message"] == ""
 
     @pytest.mark.django_db
     def test_submit_wave_score_mismatch(
@@ -694,8 +694,8 @@ class TestSubmitWaveView:
 
         assert response.status_code == 400
         data = response.json()
-        assert "message" in data
-        assert "Score mismatch" in data["message"]
+        assert data["code"] == ErrorCode.VALIDATION_FAILED.value
+        assert data["message"] == ""
 
     @pytest.mark.django_db
     def test_submit_wave_life_reward(self, api_client: APIClient, db):
@@ -861,8 +861,8 @@ class TestSubmitWaveView:
 
         assert response.status_code == 400
         data = response.json()
-        assert "message" in data
-        assert "Building list mismatch" in data["message"]
+        assert data["code"] == ErrorCode.VALIDATION_FAILED.value
+        assert data["message"] == ""
 
     # ========== DPS validation using validation_buildings tests ==========
 
@@ -1552,8 +1552,8 @@ class TestSubmitWaveView:
 
         assert response.status_code == 400
         data = response.json()
-        assert "message" in data
-        assert "remainingMonsterId" in data["message"]
+        assert data["code"] == ErrorCode.VALIDATION_FAILED.value
+        assert data["message"] == ""
 
 
 class TestEndSessionView:
@@ -1888,8 +1888,8 @@ class TestEndSessionView:
 
         assert response.status_code == 400
         data = response.json()
-        assert "message" in data
-        assert "Money gained mismatch" in data["message"]
+        assert data["code"] == ErrorCode.VALIDATION_FAILED.value
+        assert data["message"] == ""
 
     @pytest.mark.django_db
     def test_end_session_dps_validation_with_sold_buildings(
@@ -2140,8 +2140,8 @@ class TestEndSessionView:
 
         assert response.status_code == 400
         data = response.json()
-        assert "message" in data
-        assert "Score accumulation mismatch" in data["message"]
+        assert data["code"] == ErrorCode.VALIDATION_FAILED.value
+        assert data["message"] == ""
 
     @pytest.mark.django_db
     def test_end_session_nickname_too_long(
@@ -2406,8 +2406,8 @@ class TestEndSessionView:
         # session.score=9999, but WaveRecord total is only 150, validation should fail
         assert response.status_code == 400
         data = response.json()
-        assert "message" in data
-        assert "Score accumulation mismatch" in data["message"]
+        assert data["code"] == ErrorCode.VALIDATION_FAILED.value
+        assert data["message"] == ""
 
     # ========== zero score submission rejection tests ==========
 
@@ -2736,8 +2736,8 @@ class TestEndSessionView:
 
         assert response.status_code == 400
         data = response.json()
-        assert "message" in data
-        assert "remainingMonsterIds" in data["message"]
+        assert data["code"] == ErrorCode.VALIDATION_FAILED.value
+        assert data["message"] == ""
 
     @pytest.mark.django_db
     def test_end_session_remaining_monster_ids_invalid_uuid(
@@ -2766,8 +2766,8 @@ class TestEndSessionView:
 
         assert response.status_code == 400
         data = response.json()
-        assert "message" in data
-        assert "remainingMonsterId" in data["message"]
+        assert data["code"] == ErrorCode.VALIDATION_FAILED.value
+        assert data["message"] == ""
 
     @pytest.mark.django_db
     def test_end_session_remaining_monster_should_be_killed(
@@ -2857,8 +2857,8 @@ class TestEndSessionView:
 
         assert response.status_code == 400
         data = response.json()
-        assert "message" in data
-        assert "kill" in data["message"].lower() or "remaining" in data["message"].lower()
+        assert data["code"] == ErrorCode.VALIDATION_FAILED.value
+        assert data["message"] == ""
 
     @pytest.mark.django_db
     def test_end_session_remaining_monster_ids_duplicate(
@@ -2888,8 +2888,8 @@ class TestEndSessionView:
 
         assert response.status_code == 400
         data = response.json()
-        assert "message" in data
-        assert "duplicates" in data["message"]
+        assert data["code"] == ErrorCode.VALIDATION_FAILED.value
+        assert data["message"] == ""
 
 
 class TestLeaderboardView:

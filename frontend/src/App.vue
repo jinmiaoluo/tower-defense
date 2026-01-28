@@ -12,6 +12,7 @@ import HelpButton from './components/HelpButton.vue'
 
 import { EventBus } from './game/EventBus'
 import { gameApi, ApiError } from './api'
+import { useI18n } from './i18n'
 
 import { WakeLockManager } from './utils/WakeLockManager'
 import { isMobileDevice } from './utils/device'
@@ -25,6 +26,10 @@ interface GameOverData {
   sessionId: string
   isEarlyEnd: boolean
 }
+
+// -- i18n --
+
+const { t } = useI18n()
 
 // -- Template refs --
 
@@ -91,15 +96,17 @@ async function handleSubmitScore(nickname: string) {
   } catch (error) {
     if (error instanceof ApiError) {
       if (error.isSessionNotFound()) {
-        gameOverModalRef.value?.setError('Session expired. Restarting game...')
+        gameOverModalRef.value?.setError(t('error_session_expired'))
         setTimeout(() => {
           handleRestart()
         }, 2000)
+      } else if (error.code === 'VALIDATION_FAILED') {
+        gameOverModalRef.value?.setError(t('error_validation_failed'))
       } else {
-        gameOverModalRef.value?.setError(error.message)
+        gameOverModalRef.value?.setError(error.message || t('error_network'))
       }
     } else {
-      gameOverModalRef.value?.setError('Network error')
+      gameOverModalRef.value?.setError(t('error_network'))
     }
   }
 }
