@@ -1,2 +1,2 @@
-- 避免使用 emoji
-- 使用多层级 markdown list 取代 markdown table
+- Avoid using emojis
+- Prefer multi-level Markdown lists over tables

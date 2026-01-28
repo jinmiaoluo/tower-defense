@@ -1,109 +1,81 @@
 # Tower Defense
 
-基于 Vue 3 + Phaser 3 + Django 的塔防游戏，包含防作弊验证机制和排行榜功能。
+A tower defense game built with Vue 3 + Phaser 3 + Django, featuring anti-cheat validation and leaderboard functionality.
 
-这是对 [html5-tower-defense](https://github.com/oldj/html5-tower-defense) 的现代化重写。
+This is a modern rewrite of [html5-tower-defense](https://github.com/oldj/html5-tower-defense).
 
-## 项目结构
+## Quick Start
 
-```
-tower-defense/
-├── frontend/          # 前端 (Vue 3 + Phaser 3)
-├── backend/           # 后端 (Django + DRF)
-└── docs/              # 设计文档
-```
-
-## 快速开始
-
-### VSCode 开发
-
-推荐使用 VSCode 打开项目：
-
-```bash
-git clone git@github.com:jinmiaoluo/tower-defense.git
-code tower-defense
-```
-
-### 后端
+### Backend
 
 ```bash
 cd backend
 
-# 安装依赖
+# Install dependencies
 uv sync --all-extras
 
-# 激活虚拟环境
+# Activate virtual environment
 source .venv/bin/activate
 
-# 创建环境配置文件
+# Create environment configuration
 cp .env.example .env
 
-# 运行数据库迁移
+# Run database migrations
 python manage.py migrate
 
-# 启动开发服务器
+# Start development server
 python manage.py runserver
 
-# 测试
+# Run tests
 pytest
 ```
 
-### 前端
+### Frontend
 
 ```bash
 cd frontend
 
-# 安装依赖
+# Install dependencies
 npm install
 
-# 创建本地开发环境配置
+# Create local development configuration
 cp .env.example .env.local
 
-# 开发模式
-# 开发服务器默认运行在 http://localhost:8080
+# Development mode
+# Dev server runs at http://localhost:8080 by default
 npm run dev
 
-# 构建生产版本
+# Build for production
 npm run build
 
-# 预览生产构建
+# Preview production build
 npm run preview
 
-# 测试
+# Run tests
 npm run test
 ```
 
-## Docker 部署
+## Deployment
 
 ```bash
-# 构建并启动所有服务
+# Build and start all services
 docker compose up -d
 
-# 查看日志
+# View logs
 docker compose logs -f
 
-# 停止服务
+# Stop services
 docker compose down
 
-# 停止并清除数据
+# Stop and remove data
 docker compose down -v
 ```
 
-启动后访问 http://localhost:8580 即可开始游戏。
+Once started, visit http://localhost:8580 to play the game.
 
-## 提交成绩与排行榜
+## Documentation
 
-游戏结束时（生命值归零），会弹出成绩提交窗口：
-
-- 输入昵称（1-32 字符）
-- 提交后查看本次排名和排行榜
-- 最低上榜要求：得分大于 0（至少击杀一只怪物）
-
-游戏过程中也可随时结束并提交当前成绩。
-
-## 开发文档
-
-- [架构文档](./docs/ARCHITECTURE.md)
-- [技术规范](./docs/SPEC.md)
-- [前端开发指南](./docs/FRONTEND_GUIDE.md)
-- [后端开发指南](./docs/BACKEND_GUIDE.md)
+- [Architecture](./docs/ARCHITECTURE.md)
+- [Technical Specification](./docs/SPEC.md)
+- [Frontend Guide](./docs/FRONTEND_GUIDE.md)
+- [Backend Guide](./docs/BACKEND_GUIDE.md)
