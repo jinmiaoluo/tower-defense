@@ -2,16 +2,6 @@
 
 本文档帮助新开发者快速理解 tower-defense 项目的整体架构。
 
-## 目录
-
-1. [系统概述](#系统概述)
-2. [高层架构](#高层架构)
-3. [目录结构](#目录结构)
-4. [核心模块](#核心模块)
-5. [设计决策](#设计决策)
-6. [数据流](#数据流)
-7. [扩展指南](#扩展指南)
-
 ## 系统概述
 
 ### 项目目标
@@ -108,7 +98,6 @@ tower-defense/
 │       ├── stores/           # Pinia 状态管理
 │       ├── types/            # TypeScript 类型定义
 │       └── i18n/             # 国际化
-│
 ├── backend/
 │   ├── config/               # Django 配置
 │   ├── game/                 # 游戏应用
@@ -119,7 +108,6 @@ tower-defense/
 │   │   ├── generators.py     # 波次生成
 │   │   └── config.py         # 游戏配置
 │   └── tests/                # 测试文件
-│
 └── docs/                     # 文档
 ```
 
@@ -163,19 +151,14 @@ tower-defense/
 
 ```
 GameSceneLogic (协调者)
-    │
     ├── WaveManager (波次状态)
     │       └── Monster (游戏实体)
-    │
     ├── GridSystem (地图状态)
     │       └── PathSystem (寻路)
-    │
     ├── BuildingSystem (建筑计算)
     │       └── Building (游戏实体)
-    │
     ├── BulletSystem (子弹物理)
     │       └── DamageSystem (伤害计算)
-    │
     └── WaveRecorder (数据记录)
             └── API Layer (提交)
 ```
@@ -298,27 +281,27 @@ Frame Loop:
 
 ### 添加新建筑类型
 
-1. **后端配置**：`backend/game/config.py` 添加建筑属性
-2. **前端渲染**：`frontend/src/game/render/BuildingRenderer.ts` 添加渲染逻辑
-3. **测试**：添加计算器和渲染器测试
+- **后端配置**：`backend/game/config.py` 添加建筑属性
+- **前端渲染**：`frontend/src/game/render/BuildingRenderer.ts` 添加渲染逻辑
+- **测试**：添加计算器和渲染器测试
 
 ### 添加新怪物类型
 
-1. **后端配置**：`backend/game/config.py` 添加怪物属性
-2. **前端渲染**：`frontend/src/game/render/MonsterRenderer.ts` 添加渲染逻辑
-3. **波次生成**：如需出现在自动生成波次，检查 `generators.py` 的轮询逻辑
+- **后端配置**：`backend/game/config.py` 添加怪物属性
+- **前端渲染**：`frontend/src/game/render/MonsterRenderer.ts` 添加渲染逻辑
+- **波次生成**：如需出现在自动生成波次，检查 `generators.py` 的轮询逻辑
 
 ### 添加新验证规则
 
-1. **定义验证函数**：`backend/game/validators.py`
-2. **集成到视图**：`backend/game/views.py` 的验证流程
-3. **测试用例**：`backend/tests/test_validators.py`
+- **定义验证函数**：`backend/game/validators.py`
+- **集成到视图**：`backend/game/views.py` 的验证流程
+- **测试用例**：`backend/tests/test_validators.py`
 
 ### 修改游戏规则
 
-1. **更新规范**：`docs/SPEC.md` 记录规则变更
-2. **同步修改**：前端 systems/ 和后端 calculators/validators
-3. **版本兼容**：考虑是否需要数据库迁移
+- **更新规范**：`docs/SPEC.md` 记录规则变更
+- **同步修改**：前端 systems/ 和后端 calculators/validators
+- **版本兼容**：考虑是否需要数据库迁移
 
 ### 开发注意事项
 

@@ -4,17 +4,11 @@
 
 采用 Mock + TDD 模式，前后端并行开发：
 
-```
-1. 定义类型 (types/)
-       ↓
-2. 编写 Mock 数据 (mocks/)
-       ↓
+1. 定义类型 (types)
+2. 编写 Mock 数据 (mocks)
 3. 编写测试用例 (*.spec.ts)
-       ↓
 4. 实现功能代码
-       ↓
 5. 测试通过后，替换 Mock 为真实 API
-```
 
 ## 开发优先级
 
@@ -47,7 +41,7 @@
 - 每步有 10% 概率自动重新寻路（模拟随机移动）
 - 下一步格子变为不可通行时（如被新建筑占据）
 
-> **来源**: 旧实现 `td-obj-monster.js:184-203` getNextGrid()
+**来源**: 旧实现 `td-obj-monster.js:184-203` getNextGrid()
 
 ```typescript
 interface PathSystem {
@@ -69,9 +63,9 @@ interface PathSystem {
 1. 路径检查: 确保入口到出口的路径不被完全阻断
 2. 怪物检查: 确保地图上已有的怪物不会被新建筑完全阻塞
 
-> **注意**: 可以阻断怪物的当前最短路线（怪物会重新寻路走更远的路线），但不能使怪物完全无路可走。
+**注意**: 可以阻断怪物的当前最短路线（怪物会重新寻路走更远的路线），但不能使怪物完全无路可走。
 
-> **来源**: 旧实现 `td-obj-grid.js:47-77` checkBlock()
+**来源**: 旧实现 `td-obj-grid.js:47-77` checkBlock()
 
 ```typescript
 interface GridSystem {
