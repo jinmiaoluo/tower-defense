@@ -4,6 +4,7 @@
  */
 
 import type {
+  ErrorCode,
   GameStartResponse,
   WaveRequest,
   WaveResponse,
@@ -16,6 +17,7 @@ import {
   mockSubmitWave,
   mockEndGame,
   mockGetLeaderboard,
+  type MockErrorResponse,
 } from '@/mocks'
 
 /** API configuration options */
@@ -52,14 +54,46 @@ export function createGameApi(options: GameApiOptions = {}): GameApi {
   return createRealApi(baseUrl)
 }
 
+/** Check if response is a MockErrorResponse */
+function isMockErrorResponse(response: unknown): response is MockErrorResponse {
+  if (response === null || typeof response !== 'object') {
+    return false
+  }
+  const obj = response as Record<string, unknown>
+  if (!obj.error || typeof obj.error !== 'object' || obj.error === null) {
+    return false
+  }
+  const err = obj.error as Record<string, unknown>
+  return typeof err.code === 'string' && typeof err.message === 'string'
+}
+
 /**
  * Create mock API implementation
+ *
+ * Mock functions may return a MockErrorResponse (with an `error` field).
+ * This adapter converts those into thrown ApiError instances, matching real API behavior
+ * where HTTP 4xx responses become exceptions.
  */
 function createMockApi(): GameApi {
+  function assertNotError<T>(response: T | MockErrorResponse): asserts response is T {
+    if (isMockErrorResponse(response)) {
+      const status = response.error.code === 'SESSION_NOT_FOUND' ? 404 : 400
+      throw new ApiError(status, response.error.code, response.error.message)
+    }
+  }
+
   return {
     createSession: mockStartGame,
-    submitWave: mockSubmitWave,
-    endGame: mockEndGame,
+    async submitWave(request): Promise<WaveResponse> {
+      const response = await mockSubmitWave(request)
+      assertNotError(response)
+      return response
+    },
+    async endGame(request): Promise<GameEndResponse> {
+      const response = await mockEndGame(request)
+      assertNotError(response)
+      return response
+    },
     getLeaderboard: (limit?: number) => mockGetLeaderboard(limit),
   }
 }
@@ -85,8 +119,8 @@ function createRealApi(baseUrl: string): GameApi {
       const errorData = await response.json().catch(() => ({}))
       throw new ApiError(
         response.status,
-        errorData.error?.code || 'UNKNOWN_ERROR',
-        errorData.error?.message || `HTTP ${response.status}`,
+        errorData.code,
+        errorData.message || `HTTP ${response.status}`,
       )
     }
 
@@ -118,11 +152,16 @@ function createRealApi(baseUrl: string): GameApi {
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
-    public readonly code: string,
+    public readonly code: ErrorCode | undefined,
     message: string,
   ) {
     super(message)
     this.name = 'ApiError'
+  }
+
+  /** Check if this is a session not found error */
+  isSessionNotFound(): boolean {
+    return this.code === 'SESSION_NOT_FOUND' || this.status === 404
   }
 }
 

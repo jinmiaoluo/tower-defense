@@ -103,7 +103,9 @@ describe('GameApi', () => {
       expect(response.nextWave?.waveNumber).toBe(2)
     })
 
-    it('submitWave should return error for non-existent session', async () => {
+    it('submitWave should throw for non-existent session', async () => {
+      const { ApiError } = await import('./game')
+
       const waveRequest: WaveRequest = {
         sessionId: 'non-existent-session',
         waveNumber: 1,
@@ -123,11 +125,13 @@ describe('GameApi', () => {
         buildings: [],
       }
 
-      const response = await api.submitWave(waveRequest)
-
-      expect(response.valid).toBe(false)
-      expect(response.error).toBeDefined()
-      expect(response.error?.code).toBe('SESSION_NOT_FOUND')
+      try {
+        await api.submitWave(waveRequest)
+        expect.fail('Should have thrown')
+      } catch (error) {
+        expect(error).toBeInstanceOf(ApiError)
+        expect((error as InstanceType<typeof ApiError>).status).toBe(404)
+      }
     })
 
     it('submitWave should calculate life reward (every 5 waves)', async () => {
@@ -440,21 +444,21 @@ describe('GameApi', () => {
         ok: false,
         status: 404,
         json: () => Promise.resolve({
-          error: { code: 'SESSION_NOT_FOUND', message: 'Session not found' },
+          message: 'Session not found',
         }),
       })
 
       await expect(api.createSession()).rejects.toThrow()
     })
 
-    it('SESSION_NOT_FOUND error should contain the correct error code', async () => {
+    it('SESSION_NOT_FOUND error should contain the correct status code', async () => {
       const { ApiError } = await import('./game')
 
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 404,
         json: () => Promise.resolve({
-          error: { code: 'SESSION_NOT_FOUND', message: 'Session not found' },
+          message: 'Session not found',
         }),
       })
 
@@ -463,8 +467,8 @@ describe('GameApi', () => {
         expect.fail('Should have thrown')
       } catch (error) {
         expect(error).toBeInstanceOf(ApiError)
-        expect((error as InstanceType<typeof ApiError>).code).toBe('SESSION_NOT_FOUND')
         expect((error as InstanceType<typeof ApiError>).status).toBe(404)
+        expect((error as InstanceType<typeof ApiError>).message).toBe('Session not found')
       }
     })
 
@@ -475,7 +479,7 @@ describe('GameApi', () => {
         ok: false,
         status: 400,
         json: () => Promise.resolve({
-          error: { code: 'VALIDATION_FAILED', message: 'Money gain mismatch' },
+          message: 'Money gain mismatch',
         }),
       })
 
@@ -501,7 +505,6 @@ describe('GameApi', () => {
         expect.fail('Should have thrown')
       } catch (error) {
         expect(error).toBeInstanceOf(ApiError)
-        expect((error as InstanceType<typeof ApiError>).code).toBe('VALIDATION_FAILED')
         expect((error as InstanceType<typeof ApiError>).message).toBe('Money gain mismatch')
         expect((error as InstanceType<typeof ApiError>).status).toBe(400)
       }
@@ -514,7 +517,7 @@ describe('GameApi', () => {
         ok: false,
         status: 400,
         json: () => Promise.resolve({
-          error: { code: 'INVALID_REQUEST', message: 'Nickname contains invalid characters' },
+          message: 'Nickname contains invalid characters',
         }),
       })
 
@@ -526,7 +529,6 @@ describe('GameApi', () => {
         expect.fail('Should have thrown')
       } catch (error) {
         expect(error).toBeInstanceOf(ApiError)
-        expect((error as InstanceType<typeof ApiError>).code).toBe('INVALID_REQUEST')
         expect((error as InstanceType<typeof ApiError>).message).toBe('Nickname contains invalid characters')
         expect((error as InstanceType<typeof ApiError>).status).toBe(400)
       }
