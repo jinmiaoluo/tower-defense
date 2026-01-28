@@ -1,6 +1,6 @@
 /**
- * 简单的事件发射器，用于 Vue 层与游戏层的通信
- * 不依赖 Phaser，可在测试环境中使用
+ * Simple event emitter for communication between Vue layer and game layer.
+ * Does not depend on Phaser; can be used in test environments.
  */
 
 type EventCallback = (...args: unknown[]) => void

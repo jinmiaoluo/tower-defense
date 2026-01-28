@@ -1,7 +1,7 @@
 /**
- * DamageSystem 测试用例
- * 测试伤害计算核心逻辑（得分计算已移至 ScoreSystem）
- * 参考旧实现：html5-tower-defense/src/js/td-obj-monster.js:beHit
+ * DamageSystem test cases
+ * Tests core damage calculation logic (score calculation moved to ScoreSystem)
+ * Reference: html5-tower-defense/src/js/td-obj-monster.js:beHit
  */
 
 import { beforeEach, describe, expect, it } from 'vitest'
@@ -9,7 +9,7 @@ import { createDamageSystem, type DamageSystem } from './DamageSystem'
 import { createScoreSystem, type ScoreSystem } from './ScoreSystem'
 import type { IMonster } from '@/types/entities'
 
-/** 创建 Mock Monster */
+/** Create a mock monster */
 function createMockMonster(overrides: Partial<IMonster> = {}): IMonster {
   const damage = overrides.damage ?? 1
   const radius = Math.max(4, Math.min(12, Math.floor(damage * 1.2)))
@@ -45,168 +45,168 @@ describe('DamageSystem', () => {
   })
 
   // ============================================================================
-  // calculate - 实际伤害计算
+  // calculate - Actual damage calculation
   // ============================================================================
 
   describe('calculate', () => {
-    it('无护盾时伤害等于原始伤害', () => {
+    it('damage equals raw damage when no shield', () => {
       expect(system.calculate(12, 0)).toBe(12)
       expect(system.calculate(30, 0)).toBe(30)
       expect(system.calculate(1, 0)).toBe(1)
     })
 
-    it('护盾减免伤害', () => {
-      // 原始伤害 12，护盾 5，实际伤害 = 12 - 5 = 7
+    it('shield reduces damage', () => {
+      // Raw damage 12, shield 5, actual damage = 12 - 5 = 7
       expect(system.calculate(12, 5)).toBe(7)
-      // 原始伤害 30，护盾 10，实际伤害 = 30 - 10 = 20
+      // Raw damage 30, shield 10, actual damage = 30 - 10 = 20
       expect(system.calculate(30, 10)).toBe(20)
     })
 
-    it('护盾高于伤害时使用最低伤害（10%）', () => {
-      // 原始伤害 12，护盾 20
-      // 减免后 = 12 - 20 = -8，最低伤害 = ceil(12 * 0.1) = 2
+    it('uses minimum damage (10%) when shield exceeds damage', () => {
+      // Raw damage 12, shield 20
+      // After reduction = 12 - 20 = -8, minimum damage = ceil(12 * 0.1) = 2
       expect(system.calculate(12, 20)).toBe(2)
     })
 
-    it('护盾刚好等于伤害时使用最低伤害', () => {
-      // 原始伤害 10，护盾 10
-      // 减免后 = 0，最低伤害 = ceil(10 * 0.1) = 1
+    it('uses minimum damage when shield equals damage', () => {
+      // Raw damage 10, shield 10
+      // After reduction = 0, minimum damage = ceil(10 * 0.1) = 1
       expect(system.calculate(10, 10)).toBe(1)
     })
 
-    it('高伤害武器对高护盾怪的优势', () => {
-      // HMG 伤害 30，护盾 100
-      // 减免后 = 30 - 100 = -70，最低伤害 = ceil(30 * 0.1) = 3
+    it('high damage weapons have advantage against high shield monsters', () => {
+      // HMG damage 30, shield 100
+      // After reduction = 30 - 100 = -70, minimum damage = ceil(30 * 0.1) = 3
       expect(system.calculate(30, 100)).toBe(3)
-      // LMG 伤害 5，护盾 100
-      // 减免后 = 5 - 100 = -95，最低伤害 = ceil(5 * 0.1) = 1
+      // LMG damage 5, shield 100
+      // After reduction = 5 - 100 = -95, minimum damage = ceil(5 * 0.1) = 1
       expect(system.calculate(5, 100)).toBe(1)
-      // HMG 的最低伤害是 LMG 的 3 倍
+      // HMG minimum damage is 3x that of LMG
     })
 
-    it('最低伤害向上取整', () => {
-      // 原始伤害 15，护盾 20
-      // 最低伤害 = ceil(15 * 0.1) = ceil(1.5) = 2
+    it('minimum damage rounds up', () => {
+      // Raw damage 15, shield 20
+      // Minimum damage = ceil(15 * 0.1) = ceil(1.5) = 2
       expect(system.calculate(15, 20)).toBe(2)
-      // 原始伤害 11，护盾 20
-      // 最低伤害 = ceil(11 * 0.1) = ceil(1.1) = 2
+      // Raw damage 11, shield 20
+      // Minimum damage = ceil(11 * 0.1) = ceil(1.1) = 2
       expect(system.calculate(11, 20)).toBe(2)
     })
 
-    it('伤害为 1 时最低伤害也为 1', () => {
-      // 原始伤害 1，护盾 10
-      // 减免后 = 1 - 10 = -9，最低伤害 = ceil(1 * 0.1) = ceil(0.1) = 1
+    it('minimum damage is 1 when raw damage is 1', () => {
+      // Raw damage 1, shield 10
+      // After reduction = 1 - 10 = -9, minimum damage = ceil(1 * 0.1) = ceil(0.1) = 1
       expect(system.calculate(1, 10)).toBe(1)
     })
 
-    it('边界情况：减免后刚好等于最低伤害', () => {
-      // 原始伤害 10，护盾 9
-      // 减免后 = 10 - 9 = 1，最低伤害 = ceil(10 * 0.1) = 1
-      // 应该取较大值 = 1
+    it('edge case: reduced damage exactly equals minimum damage', () => {
+      // Raw damage 10, shield 9
+      // After reduction = 10 - 9 = 1, minimum damage = ceil(10 * 0.1) = 1
+      // Should take the greater = 1
       expect(system.calculate(10, 9)).toBe(1)
     })
 
-    it('护盾减免后大于最低伤害时使用减免值', () => {
-      // 原始伤害 100，护盾 50
-      // 减免后 = 50，最低伤害 = ceil(100 * 0.1) = 10
-      // 应该取较大值 = 50
+    it('uses reduced value when it exceeds minimum damage', () => {
+      // Raw damage 100, shield 50
+      // After reduction = 50, minimum damage = ceil(100 * 0.1) = 10
+      // Should take the greater = 50
       expect(system.calculate(100, 50)).toBe(50)
     })
   })
 
   // ============================================================================
-  // isKilled - 击杀判定
+  // isKilled - Kill determination
   // ============================================================================
 
   describe('isKilled', () => {
-    it('伤害足以击杀时返回 true', () => {
+    it('returns true when damage is enough to kill', () => {
       const monster = createMockMonster({ currentLife: 10 })
       expect(system.isKilled(monster, 10)).toBe(true)
       expect(system.isKilled(monster, 15)).toBe(true)
     })
 
-    it('伤害不足以击杀时返回 false', () => {
+    it('returns false when damage is not enough to kill', () => {
       const monster = createMockMonster({ currentLife: 10 })
       expect(system.isKilled(monster, 5)).toBe(false)
       expect(system.isKilled(monster, 9)).toBe(false)
     })
 
-    it('怪物已死亡时返回 true', () => {
+    it('returns true when monster is already dead', () => {
       const monster = createMockMonster({ currentLife: 0 })
       expect(system.isKilled(monster, 0)).toBe(true)
     })
 
-    it('边界情况：伤害刚好等于剩余生命', () => {
+    it('edge case: damage exactly equals remaining life', () => {
       const monster = createMockMonster({ currentLife: 25 })
       expect(system.isKilled(monster, 25)).toBe(true)
     })
   })
 
   // ============================================================================
-  // wouldKill - 预判击杀（不实际造成伤害）
+  // wouldKill - Kill prediction (without dealing actual damage)
   // ============================================================================
 
   describe('wouldKill', () => {
-    it('考虑护盾的击杀预判', () => {
+    it('kill prediction considering shield', () => {
       const monster = createMockMonster({ currentLife: 10, shield: 5 })
-      // 原始伤害 20，护盾 5，实际伤害 15 > 生命 10
+      // Raw damage 20, shield 5, actual damage 15 > life 10
       expect(system.wouldKill(monster, 20)).toBe(true)
     })
 
-    it('护盾导致无法击杀', () => {
+    it('shield prevents kill', () => {
       const monster = createMockMonster({ currentLife: 10, shield: 15 })
-      // 原始伤害 12，护盾 15，实际伤害 = ceil(12*0.1) = 2 < 生命 10
+      // Raw damage 12, shield 15, actual damage = ceil(12*0.1) = 2 < life 10
       expect(system.wouldKill(monster, 12)).toBe(false)
     })
   })
 
   // ============================================================================
-  // getEffectiveDamage - 获取对特定怪物的有效伤害
+  // getEffectiveDamage - Get effective damage against a specific monster
   // ============================================================================
 
   describe('getEffectiveDamage', () => {
-    it('根据怪物当前护盾计算有效伤害', () => {
+    it('calculates effective damage based on current shield', () => {
       const monster = createMockMonster({ shield: 5 })
-      // 原始伤害 12，护盾 5，有效伤害 7
+      // Raw damage 12, shield 5, effective damage 7
       expect(system.getEffectiveDamage(monster, 12)).toBe(7)
     })
 
-    it('护盾耗尽后有效伤害等于原始伤害', () => {
+    it('effective damage equals raw damage when shield is depleted', () => {
       const monster = createMockMonster({ shield: 0 })
       expect(system.getEffectiveDamage(monster, 12)).toBe(12)
     })
   })
 
   // ============================================================================
-  // getDamageToKill - 计算击杀所需总伤害
+  // getDamageToKill - Calculate total damage needed to kill
   // ============================================================================
 
   describe('getDamageToKill', () => {
-    it('无护盾时等于剩余生命', () => {
+    it('equals remaining life when no shield', () => {
       const monster = createMockMonster({ currentLife: 50, shield: 0 })
       expect(system.getDamageToKill(monster)).toBe(50)
     })
 
-    it('有护盾时考虑护盾吸收', () => {
+    it('considers shield absorption when shield is present', () => {
       const monster = createMockMonster({ currentLife: 50, shield: 10 })
-      // 需要的总伤害 = 生命 + 护盾 = 60（简化计算）
+      // Total damage needed = life + shield = 60 (simplified calculation)
       expect(system.getDamageToKill(monster)).toBe(60)
     })
   })
 
   // ============================================================================
-  // 集成场景测试（与 ScoreSystem 配合）
+  // Integration scenarios (with ScoreSystem)
   // ============================================================================
 
   describe('Integration scenarios', () => {
-    it('激光枪高频攻击得分优势', () => {
-      // 激光枪：伤害 25，速度 20（每秒 20 次）
-      // 1 秒内攻击 20 次，每次得分 5，总得分 100
+    it('laser gun high-frequency attack scoring advantage', () => {
+      // Laser gun: damage 25, speed 20 (20 attacks per second)
+      // 20 attacks in 1 second, 5 points each, total 100
       const laserDamages = Array(20).fill(25)
       const laserScore = scoreSystem.calculateTotalHitScore(laserDamages)
 
-      // HMG：伤害 30，速度 3（每秒 3 次）
-      // 1 秒内攻击 3 次，每次得分 5，总得分 15
+      // HMG: damage 30, speed 3 (3 attacks per second)
+      // 3 attacks in 1 second, 5 points each, total 15
       const hmgDamages = Array(3).fill(30)
       const hmgScore = scoreSystem.calculateTotalHitScore(hmgDamages)
 
@@ -215,24 +215,24 @@ describe('DamageSystem', () => {
       expect(hmgScore).toBe(15)
     })
 
-    it('护盾怪战斗场景', () => {
-      // 护盾怪：生命 50，护盾 20
+    it('shield monster combat scenario', () => {
+      // Shield monster: life 50, shield 20
       const shieldMonster = createMockMonster({
         currentLife: 50,
         shield: 20,
       })
 
-      // LMG 攻击（伤害 5）
+      // LMG attack (damage 5)
       const lmgEffective = system.getEffectiveDamage(shieldMonster, 5)
-      // 5 - 20 = -15，最低伤害 = ceil(5*0.1) = 1
+      // 5 - 20 = -15, minimum damage = ceil(5*0.1) = 1
       expect(lmgEffective).toBe(1)
 
-      // HMG 攻击（伤害 30）
+      // HMG attack (damage 30)
       const hmgEffective = system.getEffectiveDamage(shieldMonster, 30)
       // 30 - 20 = 10 > ceil(30*0.1) = 3
       expect(hmgEffective).toBe(10)
 
-      // HMG 对护盾怪的效率是 LMG 的 10 倍
+      // HMG efficiency against shield monster is 10x that of LMG
       expect(hmgEffective / lmgEffective).toBe(10)
     })
   })

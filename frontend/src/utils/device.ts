@@ -1,5 +1,5 @@
 /**
- * 设备检测工具函数
+ * Device detection utilities
  */
 
 export function isMobileDevice(): boolean {

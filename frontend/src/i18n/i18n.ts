@@ -1,32 +1,32 @@
 /**
- * i18n 多语言模块
- * 参考旧实现的 TD._t() 函数，提供类型安全的翻译功能
+ * i18n module
+ * Provides type-safe translation, inspired by the legacy TD._t() function.
  */
 
 import { zh, en, type MessageKey } from './locales'
 
-/** 支持的语言类型 */
+/** Supported locale types */
 export type Locale = 'zh' | 'en'
 
-/** 语言包映射 */
+/** Locale-to-messages mapping */
 const messages: Record<Locale, Record<string, string>> = {
   zh,
   en,
 }
 
-/** i18n 实例接口 */
+/** i18n instance interface */
 export interface I18n {
-  /** 翻译文本，支持参数替换 */
+  /** Translate text with optional parameter substitution */
   t(key: string, args?: (string | number)[]): string
-  /** 设置当前语言 */
+  /** Set the current locale */
   setLocale(locale: Locale): void
-  /** 获取当前语言 */
+  /** Get the current locale */
   getLocale(): Locale
 }
 
 /**
- * 创建 i18n 实例
- * @param initialLocale 初始语言，默认为浏览器语言
+ * Create an i18n instance.
+ * @param initialLocale Initial locale, defaults to browser locale
  */
 export function createI18n(initialLocale: Locale = 'zh'): I18n {
   let currentLocale: Locale = initialLocale
@@ -39,7 +39,7 @@ export function createI18n(initialLocale: Locale = 'zh'): I18n {
         return key
       }
 
-      // 替换参数 ${0}, ${1}, ...
+      // Replace parameters ${0}, ${1}, ...
       let result = message
       for (let i = 0; i < args.length; i++) {
         result = result.replace(`\${${i}}`, String(args[i]))
@@ -59,7 +59,7 @@ export function createI18n(initialLocale: Locale = 'zh'): I18n {
 }
 
 /**
- * 检测浏览器语言并返回最匹配的 Locale
+ * Detect the browser language and return the best matching Locale.
  */
 export function detectBrowserLocale(): Locale {
   if (typeof navigator === 'undefined' || !navigator?.language) {
@@ -68,28 +68,28 @@ export function detectBrowserLocale(): Locale {
 
   const browserLang = navigator.language.toLowerCase()
 
-  // 中文（简体、繁体）
+  // Chinese (Simplified or Traditional)
   if (browserLang.startsWith('zh')) {
     return 'zh'
   }
 
-  // 默认英文
+  // Default to English
   return 'en'
 }
 
 /**
- * 创建带浏览器自动检测的 i18n 实例
+ * Create an i18n instance with automatic browser locale detection.
  */
 export function createAutoI18n(): I18n {
   return createI18n(detectBrowserLocale())
 }
 
 /**
- * 根据 Locale 获取 Date API 使用的本地化字符串
+ * Get the locale string used by the Date API for the given Locale.
  */
 export function getDateLocale(locale: Locale): string {
   return locale === 'zh' ? 'zh-CN' : 'en-US'
 }
 
-// 导出类型
+// Export types
 export type { MessageKey }

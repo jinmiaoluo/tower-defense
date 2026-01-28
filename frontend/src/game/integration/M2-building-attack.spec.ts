@@ -1,13 +1,13 @@
 /**
- * M2 里程碑集成测试
- * 验证：Building → Bullet → Monster 完整攻击流程
+ * M2 milestone integration test
+ * Verify: Building -> Bullet -> Monster complete attack flow
  *
- * 测试场景：
- * 1. 建筑发现射程内的目标
- * 2. 建筑攻击创建子弹（或激光枪即时命中）
- * 3. 子弹飞行并命中怪物
- * 4. 怪物受到伤害（考虑护盾减免）
- * 5. 怪物死亡时 isValid 变为 false
+ * Test scenarios:
+ * 1. Building detects a target within range
+ * 2. Building attacks and creates a bullet (or laser gun hits instantly)
+ * 3. Bullet flies and hits the monster
+ * 4. Monster takes damage (considering shield reduction)
+ * 5. Monster dies when isValid becomes false
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
@@ -27,10 +27,10 @@ import { MOCK_GAME_CONFIG, MOCK_BUILDINGS } from '@/mocks'
 const { GRID_SIZE } = GAME_CONSTANTS
 
 // ============================================================================
-// 测试配置
+// Test configuration
 // ============================================================================
 
-/** 创建小型测试地图（便于控制距离） */
+/** Create a small test map (easy to control distances) */
 function createTestMapConfig(): MapConfig {
   return {
     width: 10,
@@ -41,7 +41,7 @@ function createTestMapConfig(): MapConfig {
   }
 }
 
-/** 创建 Mock WaveRecorder */
+/** Create mock WaveRecorder */
 function createMockRecorder(): IWaveRecorder & { attacks: AttackRecordData[] } {
   const attacks: AttackRecordData[] = []
 
@@ -94,7 +94,7 @@ function createMockRecorder(): IWaveRecorder & { attacks: AttackRecordData[] } {
   }
 }
 
-/** 创建 Building 依赖 */
+/** Create Building dependencies */
 function createBuildingDeps(buildingSystem: BuildingSystem): BuildingDependencies {
   return {
     getDamageAtLevel: buildingSystem.getDamageAtLevel,
@@ -109,7 +109,7 @@ function createBuildingDeps(buildingSystem: BuildingSystem): BuildingDependencie
   }
 }
 
-/** 创建 Monster 依赖 */
+/** Create Monster dependencies */
 function createMonsterDeps(gridSystem: GridSystem, pathSystem: PathSystem): MonsterDependencies {
   return {
     generatePathFrom: (startPosition) => {
@@ -123,7 +123,7 @@ function createMonsterDeps(gridSystem: GridSystem, pathSystem: PathSystem): Mons
   }
 }
 
-/** 获取地图边界 */
+/** Get map bounds */
 function getMapBounds(mapConfig: MapConfig): Rect {
   return {
     x: 0,
@@ -134,10 +134,10 @@ function getMapBounds(mapConfig: MapConfig): Rect {
 }
 
 // ============================================================================
-// M2 集成测试
+// M2 integration tests
 // ============================================================================
 
-describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
+describe('M2: Building -> Bullet -> Monster complete attack flow', () => {
   let pathSystem: PathSystem
   let gridSystem: GridSystem
   let buildingSystem: BuildingSystem
@@ -158,12 +158,12 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
     recorder = createMockRecorder()
   })
 
-  describe('建筑目标搜索', () => {
-    it('建筑应能发现射程内的怪物', () => {
+  describe('Building target search', () => {
+    it('Building should detect monsters within range', () => {
       const buildingDeps = createBuildingDeps(buildingSystem)
       const monsterDeps = createMonsterDeps(gridSystem, pathSystem)
 
-      // 在 [5, 5] 放置 LMG（射程 5-10）
+      // Place LMG at [5, 5] (range 5-10)
       const building = createBuilding({
         id: 'building-001',
         type: 'LMG',
@@ -171,7 +171,7 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
         level: 1,
       }, buildingDeps)
 
-      // 创建怪物在 [5, 3]（距离 2，在最小射程内）
+      // Create monster at [5, 3] (distance 2, within minimum range)
       const monsterNear = createMonster({
         id: 'monster-near',
         type: 0 as MonsterTypeId,
@@ -182,14 +182,14 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
         color: '#00ff00',
         damage: 1,
       }, monsterDeps)
-      // 设置怪物位置到 [5, 3]
+      // Set monster position to [5, 3]
       const path = gridSystem.getCurrentPath()
       const nearIndex = path.findIndex(([x, y]) => x === 5 && y === 3)
       if (nearIndex >= 0) {
         monsterNear.progress = nearIndex / (path.length - 1)
       }
 
-      // 创建怪物在 [0, 5]（距离 5，在射程内）
+      // Create monster at [0, 5] (distance 5, within range)
       const monsterInRange = createMonster({
         id: 'monster-in-range',
         type: 0 as MonsterTypeId,
@@ -200,20 +200,20 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
         color: '#00ff00',
         damage: 1,
       }, monsterDeps)
-      monsterInRange.progress = 0 // 在入口位置
+      monsterInRange.progress = 0 // at entrance
 
       const monsters = [monsterNear, monsterInRange]
       const target = building.findTarget(monsters)
 
-      // 应该找到在射程内的怪物（入口位置的怪物距离为 5，刚好在 LMG 射程边界）
+      // Should find a monster within range (entrance monster is distance 5, right at LMG range boundary)
       expect(target).not.toBeNull()
     })
 
-    it('建筑应选择路径进度最高的目标', () => {
+    it('Building should select the target with highest path progress', () => {
       const buildingDeps = createBuildingDeps(buildingSystem)
       const monsterDeps = createMonsterDeps(gridSystem, pathSystem)
 
-      // 在 [5, 5] 放置 cannon（射程 4-8）
+      // Place cannon at [5, 5] (range 4-8)
       const building = createBuilding({
         id: 'building-001',
         type: 'cannon',
@@ -221,7 +221,7 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
         level: 1,
       }, buildingDeps)
 
-      // 创建两个怪物，都在射程内
+      // Create two monsters, both within range
       const monster1 = createMonster({
         id: 'monster-1',
         type: 0 as MonsterTypeId,
@@ -244,14 +244,14 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
         color: '#00ff00',
         damage: 1,
       }, monsterDeps)
-      monster2.progress = 0.6 // 进度更高
+      monster2.progress = 0.6 // higher progress
 
       const monsters = [monster1, monster2]
       const target = building.findTarget(monsters)
 
-      // 如果两个怪物都在射程内，应该选择进度更高的
+      // If both monsters are within range, should select the one with higher progress
       if (target !== null) {
-        // 验证选择逻辑：进度高的优先
+        // Verify selection logic: higher progress is prioritized
         const validTargets = monsters.filter(m => {
           const pos = m.getGridPosition()
           return buildingSystem.isInRange({ type: 'cannon', level: 1, position: [5, 5] }, pos)
@@ -263,11 +263,11 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
       }
     })
 
-    it('射程外的怪物不应被选为目标', () => {
+    it('Monsters outside range should not be selected as targets', () => {
       const buildingDeps = createBuildingDeps(buildingSystem)
       const monsterDeps = createMonsterDeps(gridSystem, pathSystem)
 
-      // 在 [0, 0] 放置 HMG（射程 3-5，范围很小）
+      // Place HMG at [0, 0] (range 3-5, very small)
       const building = createBuilding({
         id: 'building-001',
         type: 'HMG',
@@ -275,7 +275,7 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
         level: 1,
       }, buildingDeps)
 
-      // 创建怪物在 [9, 5]（距离约 10，远超射程）
+      // Create monster at [9, 5] (distance ~10, far beyond range)
       const monster = createMonster({
         id: 'monster-far',
         type: 0 as MonsterTypeId,
@@ -286,7 +286,7 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
         color: '#00ff00',
         damage: 1,
       }, monsterDeps)
-      monster.progress = 0.9 // 接近出口
+      monster.progress = 0.9 // near exit
 
       const target = building.findTarget([monster])
 
@@ -294,12 +294,12 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
     })
   })
 
-  describe('激光枪即时命中', () => {
-    it('激光枪应立即对目标造成伤害', () => {
+  describe('Laser gun instant hit', () => {
+    it('Laser gun should immediately deal damage to the target', () => {
       const buildingDeps = createBuildingDeps(buildingSystem)
       const monsterDeps = createMonsterDeps(gridSystem, pathSystem)
 
-      // 在路径中间放置激光枪
+      // Place laser gun in the middle of the path
       const building = createBuilding({
         id: 'laser-001',
         type: 'laser_gun',
@@ -307,7 +307,7 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
         level: 1,
       }, buildingDeps) as IBuilding & IBuildingRuntime
 
-      // 创建怪物
+      // Create monster
       const monster = createMonster({
         id: 'monster-001',
         type: 0 as MonsterTypeId,
@@ -322,8 +322,8 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
       const initialLife = monster.currentLife
       const expectedDamage = buildingSystem.getDamageAtLevel('laser_gun', 1) // 25
 
-      // 将怪物移动到建筑射程内
-      // 激光枪射程 6-10，需要将怪物放到距离 6-10 的位置
+      // Move monster into building range
+      // Laser gun range 6-10, need to place monster at distance 6-10
       const path = gridSystem.getCurrentPath()
       for (let i = 0; i < path.length; i++) {
         monster.progress = i / (path.length - 1)
@@ -337,16 +337,16 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
       if (target) {
         building.attack(target, recorder, 1)
 
-        // 激光枪立即造成伤害
+        // Laser gun deals damage instantly
         expect(monster.currentLife).toBe(initialLife - expectedDamage)
 
-        // 应该记录攻击事件
+        // Should record the attack event
         expect(recorder.attacks.length).toBe(1)
         expect(recorder.attacks[0].damage).toBe(expectedDamage)
       }
     })
 
-    it('激光枪攻击有护盾怪物应考虑护盾减免', () => {
+    it('Laser gun attacking shielded monster should consider shield reduction', () => {
       const buildingDeps = createBuildingDeps(buildingSystem)
       const monsterDeps = createMonsterDeps(gridSystem, pathSystem)
 
@@ -357,10 +357,10 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
         level: 1,
       }, buildingDeps) as IBuilding & IBuildingRuntime
 
-      // 创建护盾怪物（shield: 20）
+      // Create shielded monster (shield: 20)
       const monster = createMonster({
         id: 'monster-shield',
-        type: 4 as MonsterTypeId, // 护盾怪
+        type: 4 as MonsterTypeId, // shielded monster
         life: 50,
         speed: 5,
         shield: 20,
@@ -372,7 +372,7 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
       const laserDamage = buildingSystem.getDamageAtLevel('laser_gun', 1) // 25
       const expectedDamage = damageSystem.calculate(laserDamage, 20) // max(25-20, ceil(25*0.1)) = max(5, 3) = 5
 
-      // 将怪物移动到射程内
+      // Move monster into range
       const path = gridSystem.getCurrentPath()
       for (let i = 0; i < path.length; i++) {
         monster.progress = i / (path.length - 1)
@@ -391,7 +391,7 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
       }
     })
 
-    it('激光枪不应产生子弹', () => {
+    it('Laser gun should not produce bullets', () => {
       const buildingDeps = createBuildingDeps(buildingSystem)
       const monsterDeps = createMonsterDeps(gridSystem, pathSystem)
 
@@ -413,14 +413,14 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
         damage: 1,
       }, monsterDeps)
 
-      // 激光枪 getBulletParams 应返回 null
+      // Laser gun getBulletParams should return null
       const bulletParams = building.getBulletParams(monster)
       expect(bulletParams).toBeNull()
     })
   })
 
-  describe('子弹攻击流程', () => {
-    it('非激光武器应产生子弹', () => {
+  describe('Bullet attack flow', () => {
+    it('Non-laser weapons should produce bullets', () => {
       const buildingDeps = createBuildingDeps(buildingSystem)
       const monsterDeps = createMonsterDeps(gridSystem, pathSystem)
 
@@ -450,7 +450,7 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
       expect(bulletParams!.speed).toBe(MOCK_BUILDINGS.LMG.bullet_speed)
     })
 
-    it('子弹应能创建并飞行', () => {
+    it('Bullet should be created and fly', () => {
       const buildingDeps = createBuildingDeps(buildingSystem)
       const monsterDeps = createMonsterDeps(gridSystem, pathSystem)
 
@@ -473,14 +473,14 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
       }, monsterDeps)
       monster.progress = 0.5
 
-      // 计算建筑中心像素位置
+      // Calculate building center pixel position
       const startX = building.position[0] * GRID_SIZE + GRID_SIZE / 2
       const startY = building.position[1] * GRID_SIZE + GRID_SIZE / 2
 
-      // 获取子弹参数
+      // Get bullet params
       const bulletParams = building.getBulletParams(monster)!
 
-      // 创建子弹
+      // Create bullet
       const bullet = bulletSystem.createBullet({
         building: bulletParams.building,
         target: monster,
@@ -494,21 +494,21 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
       expect(bullet.x).toBe(startX)
       expect(bullet.y).toBe(startY)
 
-      // 子弹飞行一帧
+      // Bullet flies for one frame
       const initialX = bullet.x
       const initialY = bullet.y
       bulletSystem.update([monster], mapBounds, recorder, 1)
 
-      // 子弹位置应该改变
+      // Bullet position should change
       const hasMoved = bullet.x !== initialX || bullet.y !== initialY
-      expect(hasMoved || !bullet.isValid).toBe(true) // 要么移动了，要么已经命中
+      expect(hasMoved || !bullet.isValid).toBe(true) // either moved or already hit
     })
 
-    it('子弹命中怪物应造成伤害', () => {
+    it('Bullet hitting monster should deal damage', () => {
       const buildingDeps = createBuildingDeps(buildingSystem)
       const monsterDeps = createMonsterDeps(gridSystem, pathSystem)
 
-      // 建筑和怪物靠近，确保子弹能快速命中
+      // Building and monster close together, ensuring bullet hits quickly
       const building = createBuilding({
         id: 'cannon-001',
         type: 'cannon',
@@ -527,7 +527,7 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
         damage: 1,
       }, monsterDeps)
 
-      // 将怪物放在建筑附近
+      // Place monster near the building
       const path = gridSystem.getCurrentPath()
       for (let i = 0; i < path.length; i++) {
         monster.progress = i / (path.length - 1)
@@ -540,7 +540,7 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
       const initialLife = monster.currentLife
       const expectedDamage = buildingSystem.getDamageAtLevel('cannon', 1) // 12
 
-      // 创建子弹
+      // Create bullet
       const startX = building.position[0] * GRID_SIZE + GRID_SIZE / 2
       const startY = building.position[1] * GRID_SIZE + GRID_SIZE / 2
 
@@ -553,24 +553,24 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
         startY,
       })
 
-      // 模拟多帧，直到子弹命中或飞出
+      // Simulate multiple frames until bullet hits or exits
       const maxFrames = 100
       for (let frame = 0; frame < maxFrames; frame++) {
         bulletSystem.update([monster], mapBounds, recorder, frame)
 
         if (bulletSystem.getBullets().length === 0) {
-          break // 子弹已经命中或消失
+          break // bullet has hit or disappeared
         }
       }
 
-      // 检查是否造成了伤害
+      // Check if damage was dealt
       if (recorder.attacks.length > 0) {
         expect(monster.currentLife).toBe(initialLife - expectedDamage)
         expect(recorder.attacks[0].damage).toBe(expectedDamage)
       }
     })
 
-    it('子弹命中护盾怪物应考虑护盾减免', () => {
+    it('Bullet hitting shielded monster should consider shield reduction', () => {
       const buildingDeps = createBuildingDeps(buildingSystem)
       const monsterDeps = createMonsterDeps(gridSystem, pathSystem)
 
@@ -581,7 +581,7 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
         level: 1,
       }, buildingDeps) as IBuilding & IBuildingRuntime
 
-      // 护盾怪物
+      // Shielded monster
       const monster = createMonster({
         id: 'monster-shield',
         type: 4 as MonsterTypeId,
@@ -593,7 +593,7 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
         damage: 3,
       }, monsterDeps)
 
-      // 将怪物放在射程内
+      // Place monster within range
       const path = gridSystem.getCurrentPath()
       for (let i = 0; i < path.length; i++) {
         monster.progress = i / (path.length - 1)
@@ -607,7 +607,7 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
       const rawDamage = buildingSystem.getDamageAtLevel('cannon', 1) // 12
       const expectedDamage = damageSystem.calculate(rawDamage, 10) // max(12-10, ceil(12*0.1)) = max(2, 2) = 2
 
-      // 创建子弹
+      // Create bullet
       const startX = building.position[0] * GRID_SIZE + GRID_SIZE / 2
       const startY = building.position[1] * GRID_SIZE + GRID_SIZE / 2
 
@@ -620,7 +620,7 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
         startY,
       })
 
-      // 模拟直到命中
+      // Simulate until hit
       for (let frame = 0; frame < 100; frame++) {
         bulletSystem.update([monster], mapBounds, recorder, frame)
         if (bulletSystem.getBullets().length === 0) break
@@ -632,8 +632,8 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
     })
   })
 
-  describe('怪物死亡判定', () => {
-    it('生命值归零时怪物应死亡', () => {
+  describe('Monster death check', () => {
+    it('Monster should die when health reaches zero', () => {
       const buildingDeps = createBuildingDeps(buildingSystem)
       const monsterDeps = createMonsterDeps(gridSystem, pathSystem)
 
@@ -644,11 +644,11 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
         level: 1,
       }, buildingDeps) as IBuilding & IBuildingRuntime
 
-      // 创建低血量怪物，确保一击必杀
+      // Create low-health monster, ensuring one-hit kill
       const monster = createMonster({
         id: 'monster-weak',
         type: 0 as MonsterTypeId,
-        life: 10, // 低于激光枪伤害 25
+        life: 10, // below laser gun damage of 25
         speed: 3,
         shield: 0,
         money: 5,
@@ -656,7 +656,7 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
         damage: 1,
       }, monsterDeps)
 
-      // 将怪物放在射程内
+      // Place monster within range
       const path = gridSystem.getCurrentPath()
       for (let i = 0; i < path.length; i++) {
         monster.progress = i / (path.length - 1)
@@ -676,11 +676,11 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
       }
     })
 
-    it('多次攻击应累计伤害直到击杀', () => {
+    it('Multiple attacks should accumulate damage until kill', () => {
       const buildingDeps = createBuildingDeps(buildingSystem)
       const monsterDeps = createMonsterDeps(gridSystem, pathSystem)
 
-      // 使用 LMG（伤害 5）
+      // Use LMG (damage 5)
       const building = createBuilding({
         id: 'lmg-001',
         type: 'LMG',
@@ -691,7 +691,7 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
       const monster = createMonster({
         id: 'monster-001',
         type: 0 as MonsterTypeId,
-        life: 15, // 需要 3 次攻击（5 × 3 = 15）
+        life: 15, // requires 3 attacks (5 x 3 = 15)
         speed: 3,
         shield: 0,
         money: 5,
@@ -699,7 +699,7 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
         damage: 1,
       }, monsterDeps)
 
-      // 将怪物放在射程内
+      // Place monster within range
       const path = gridSystem.getCurrentPath()
       for (let i = 0; i < path.length; i++) {
         monster.progress = i / (path.length - 1)
@@ -712,23 +712,23 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
       const damage = buildingSystem.getDamageAtLevel('LMG', 1) // 5
       let attackCount = 0
 
-      // 获取怪物位置用于子弹起点（确保立即命中）
+      // Get monster position for bullet origin (ensuring immediate hit)
       const monsterGridPos = monster.getGridPosition()
       const monsterX = monsterGridPos[0] * GRID_SIZE + GRID_SIZE / 2
       const monsterY = monsterGridPos[1] * GRID_SIZE + GRID_SIZE / 2
 
-      // 模拟多次子弹攻击（子弹从怪物位置发射以确保命中）
+      // Simulate multiple bullet attacks (bullet fired from monster position to ensure hit)
       while (monster.isValid && attackCount < 10) {
         bulletSystem.createBullet({
           building,
           target: monster,
           damage,
           speed: MOCK_BUILDINGS.LMG.bullet_speed,
-          startX: monsterX, // 从怪物位置发射确保命中
+          startX: monsterX, // fire from monster position to ensure hit
           startY: monsterY,
         })
 
-        // 更新一帧让子弹命中
+        // Update one frame to let bullet hit
         bulletSystem.update([monster], mapBounds, recorder, attackCount)
 
         attackCount++
@@ -736,12 +736,12 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
 
       expect(monster.isDead()).toBe(true)
       expect(monster.isValid).toBe(false)
-      expect(attackCount).toBe(3) // 15 / 5 = 3 次
+      expect(attackCount).toBe(3) // 15 / 5 = 3 attacks
     })
   })
 
-  describe('攻击冷却机制', () => {
-    it('攻击后应进入冷却', () => {
+  describe('Attack cooldown mechanism', () => {
+    it('Should enter cooldown after attacking', () => {
       const buildingDeps = createBuildingDeps(buildingSystem)
       const monsterDeps = createMonsterDeps(gridSystem, pathSystem)
 
@@ -763,7 +763,7 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
         damage: 1,
       }, monsterDeps)
 
-      // 将怪物放在射程内
+      // Place monster within range
       const path = gridSystem.getCurrentPath()
       for (let i = 0; i < path.length; i++) {
         monster.progress = i / (path.length - 1)
@@ -779,13 +779,13 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
       if (target) {
         building.attack(target, recorder, 1)
 
-        // 攻击后应进入冷却
+        // Should enter cooldown after attacking
         expect(building.canAttack()).toBe(false)
         expect(building.cooldown).toBeGreaterThan(0)
       }
     })
 
-    it('冷却结束后应能再次攻击', () => {
+    it('Should be able to attack again after cooldown ends', () => {
       const buildingDeps = createBuildingDeps(buildingSystem)
       const monsterDeps = createMonsterDeps(gridSystem, pathSystem)
 
@@ -807,7 +807,7 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
         damage: 1,
       }, monsterDeps)
 
-      // 将怪物放在射程内
+      // Place monster within range
       const path = gridSystem.getCurrentPath()
       for (let i = 0; i < path.length; i++) {
         monster.progress = i / (path.length - 1)
@@ -823,7 +823,7 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
 
         const cooldownFrames = building.cooldown
 
-        // 模拟冷却时间
+        // Simulate cooldown time
         for (let i = 0; i < cooldownFrames; i++) {
           building.updateCooldown()
         }
@@ -834,9 +834,9 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
     })
   })
 
-  describe('完整攻击循环', () => {
-    it('建筑应能持续攻击直到击杀怪物', () => {
-      // 使用更大的地图，让激光枪能找到在射程内的目标
+  describe('Complete attack cycle', () => {
+    it('Building should continuously attack until the monster is killed', () => {
+      // Use a larger map so the laser gun can find targets within range
       const largeMapConfig: MapConfig = {
         width: 16,
         height: 16,
@@ -848,7 +848,7 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
       const largeMonsterDeps = createMonsterDeps(largeGridSystem, pathSystem)
       const buildingDeps = createBuildingDeps(buildingSystem)
 
-      // 激光枪 level=1 射程为 6，放在 [8, 4] 可以打到 [8, 8] 路径点（距离 4）
+      // Laser gun level=1 range is 6, placed at [8, 4] can hit [8, 8] path point (distance 4)
       const building = createBuilding({
         id: 'laser-001',
         type: 'laser_gun',
@@ -859,7 +859,7 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
       const monster = createMonster({
         id: 'monster-001',
         type: 0 as MonsterTypeId,
-        life: 100, // 激光枪伤害 25，需要 4 次攻击
+        life: 100, // laser gun damage 25, requires 4 attacks
         speed: 3,
         shield: 0,
         money: 5,
@@ -867,8 +867,8 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
         damage: 1,
       }, largeMonsterDeps)
 
-      // 将怪物放在射程内（固定位置）
-      // 路径从 [0,8] 到 [15,8]，找到在激光枪射程内的位置
+      // Place monster within range (fixed position)
+      // Path from [0,8] to [15,8], find a position within laser gun range
       const path = largeGridSystem.getCurrentPath()
       let foundInRange = false
       for (let i = 0; i < path.length; i++) {
@@ -887,10 +887,10 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
       let attackCount = 0
 
       while (monster.isValid && frame < maxFrames) {
-        // 更新冷却
+        // Update cooldown
         building.updateCooldown()
 
-        // 尝试攻击
+        // Attempt to attack
         if (building.canAttack()) {
           const target = building.findTarget([monster])
           if (target) {
@@ -904,7 +904,7 @@ describe('M2: Building → Bullet → Monster 完整攻击流程', () => {
 
       expect(monster.isDead()).toBe(true)
       expect(monster.isValid).toBe(false)
-      expect(attackCount).toBe(4) // 100 / 25 = 4 次
+      expect(attackCount).toBe(4) // 100 / 25 = 4 attacks
     })
   })
 })

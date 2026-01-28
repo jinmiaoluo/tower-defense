@@ -8,10 +8,10 @@ export class Preloader extends Scene {
   init() {
     const { width, height } = this.scale
 
-    // 进度条背景
+    // Progress bar background
     this.add.rectangle(width / 2, height / 2, 468, 32).setStrokeStyle(1, 0xffffff)
 
-    // 进度条
+    // Progress bar
     const bar = this.add.rectangle(width / 2 - 230, height / 2, 4, 28, 0xffffff)
 
     this.load.on('progress', (progress: number) => {
@@ -20,9 +20,9 @@ export class Preloader extends Scene {
   }
 
   preload() {
-    // 加载游戏资源
+    // Load game assets
     this.load.setPath('assets')
-    // TODO: 加载塔防游戏资源
+    // TODO: Load tower defense game assets
   }
 
   create() {

@@ -1,5 +1,5 @@
 /**
- * i18n 多语言模块测试
+ * i18n module tests
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
@@ -18,23 +18,23 @@ describe('i18n', () => {
       i18n = createI18n('zh')
     })
 
-    it('应创建 i18n 实例', () => {
+    it('should create an i18n instance', () => {
       expect(i18n).toBeDefined()
       expect(typeof i18n.t).toBe('function')
       expect(typeof i18n.setLocale).toBe('function')
       expect(typeof i18n.getLocale).toBe('function')
     })
 
-    it('默认语言应为指定语言', () => {
+    it('should have the specified default locale', () => {
       expect(i18n.getLocale()).toBe('zh')
     })
 
-    it('可以切换语言', () => {
+    it('should switch locale', () => {
       i18n.setLocale('en')
       expect(i18n.getLocale()).toBe('en')
     })
 
-    it('翻译基础文本', () => {
+    it('should translate basic text', () => {
       const zhI18n = createI18n('zh')
       const enI18n = createI18n('en')
 
@@ -42,7 +42,7 @@ describe('i18n', () => {
       expect(enI18n.t('panel_money_title')).toBe('Money: ')
     })
 
-    it('翻译带参数的文本', () => {
+    it('should translate text with parameters', () => {
       const zhI18n = createI18n('zh')
       const enI18n = createI18n('en')
 
@@ -50,17 +50,17 @@ describe('i18n', () => {
       expect(enI18n.t('wave_info', [5])).toBe('Wave 5')
     })
 
-    it('翻译带多个参数的文本', () => {
+    it('should translate text with multiple parameters', () => {
       const zhI18n = createI18n('zh')
 
       expect(zhI18n.t('not_enough_money', [300])).toBe('金钱不足，需要 $300！')
     })
 
-    it('未知 key 应返回 key 本身', () => {
+    it('should return the key itself for unknown keys', () => {
       expect(i18n.t('unknown_key')).toBe('unknown_key')
     })
 
-    it('切换语言后翻译应更新', () => {
+    it('should update translations after switching locale', () => {
       expect(i18n.t('panel_score_title')).toBe('积分: ')
 
       i18n.setLocale('en')
@@ -78,7 +78,7 @@ describe('i18n', () => {
       })
     })
 
-    it('中文浏览器应返回 zh', () => {
+    it('should return zh for Chinese browsers', () => {
       Object.defineProperty(global, 'navigator', {
         value: { language: 'zh-CN' },
         writable: true,
@@ -86,7 +86,7 @@ describe('i18n', () => {
       expect(detectBrowserLocale()).toBe('zh')
     })
 
-    it('繁体中文浏览器应返回 zh', () => {
+    it('should return zh for Traditional Chinese browsers', () => {
       Object.defineProperty(global, 'navigator', {
         value: { language: 'zh-TW' },
         writable: true,
@@ -94,7 +94,7 @@ describe('i18n', () => {
       expect(detectBrowserLocale()).toBe('zh')
     })
 
-    it('英文浏览器应返回 en', () => {
+    it('should return en for English browsers', () => {
       Object.defineProperty(global, 'navigator', {
         value: { language: 'en-US' },
         writable: true,
@@ -102,7 +102,7 @@ describe('i18n', () => {
       expect(detectBrowserLocale()).toBe('en')
     })
 
-    it('其他语言浏览器应默认返回 en', () => {
+    it('should default to en for other language browsers', () => {
       Object.defineProperty(global, 'navigator', {
         value: { language: 'ja-JP' },
         writable: true,
@@ -110,7 +110,7 @@ describe('i18n', () => {
       expect(detectBrowserLocale()).toBe('en')
     })
 
-    it('无 navigator 时应返回 en', () => {
+    it('should return en when navigator is unavailable', () => {
       Object.defineProperty(global, 'navigator', {
         value: undefined,
         writable: true,
@@ -119,8 +119,8 @@ describe('i18n', () => {
     })
   })
 
-  describe('建筑名称翻译', () => {
-    it('应正确翻译所有建筑名称（中文）', () => {
+  describe('building name translations', () => {
+    it('should correctly translate all building names (Chinese)', () => {
       const i18n = createI18n('zh')
 
       expect(i18n.t('building_name_wall')).toBe('路障')
@@ -130,7 +130,7 @@ describe('i18n', () => {
       expect(i18n.t('building_name_laser_gun')).toBe('激光炮')
     })
 
-    it('应正确翻译所有建筑名称（英文）', () => {
+    it('should correctly translate all building names (English)', () => {
       const i18n = createI18n('en')
 
       expect(i18n.t('building_name_wall')).toBe('Roadblock')
@@ -141,8 +141,8 @@ describe('i18n', () => {
     })
   })
 
-  describe('游戏 UI 翻译', () => {
-    it('应正确翻译按钮文本（中文）', () => {
+  describe('game UI translations', () => {
+    it('should correctly translate button text (Chinese)', () => {
       const i18n = createI18n('zh')
 
       expect(i18n.t('button_pause_text')).toBe('暂停')
@@ -153,7 +153,7 @@ describe('i18n', () => {
       expect(i18n.t('button_sell_text')).toBe('出售')
     })
 
-    it('应正确翻译按钮文本（英文）', () => {
+    it('should correctly translate button text (English)', () => {
       const i18n = createI18n('en')
 
       expect(i18n.t('button_pause_text')).toBe('Pause')
@@ -165,8 +165,8 @@ describe('i18n', () => {
     })
   })
 
-  describe('排行榜翻译', () => {
-    it('应正确翻译排行榜相关文本（中文）', () => {
+  describe('leaderboard translations', () => {
+    it('should correctly translate leaderboard text (Chinese)', () => {
       const i18n = createI18n('zh')
 
       expect(i18n.t('leaderboard')).toBe('排行榜')
@@ -181,7 +181,7 @@ describe('i18n', () => {
       expect(i18n.t('leaderboard_empty')).toBe('暂无记录，成为第一个上榜者吧！')
     })
 
-    it('应正确翻译排行榜相关文本（英文）', () => {
+    it('should correctly translate leaderboard text (English)', () => {
       const i18n = createI18n('en')
 
       expect(i18n.t('leaderboard')).toBe('Leaderboard')
@@ -198,15 +198,15 @@ describe('i18n', () => {
   })
 
   describe('getDateLocale', () => {
-    it('中文语言应返回 zh-CN', () => {
+    it('should return zh-CN for Chinese locale', () => {
       expect(getDateLocale('zh')).toBe('zh-CN')
     })
 
-    it('英文语言应返回 en-US', () => {
+    it('should return en-US for English locale', () => {
       expect(getDateLocale('en')).toBe('en-US')
     })
 
-    it('Date.toLocaleDateString 应使用正确的日期格式', () => {
+    it('should use correct date format with Date.toLocaleDateString', () => {
       const date = new Date('2024-06-15T12:00:00Z')
 
       const zhFormatted = date.toLocaleDateString(getDateLocale('zh'), {
@@ -220,12 +220,12 @@ describe('i18n', () => {
         day: 'numeric',
       })
 
-      // 中文格式应包含年月日
+      // Chinese format should contain year, month, and day
       expect(zhFormatted).toMatch(/2024/)
       expect(zhFormatted).toMatch(/6/)
       expect(zhFormatted).toMatch(/15/)
 
-      // 英文格式应包含 Jun 和 15
+      // English format should contain Jun and 15
       expect(enFormatted).toMatch(/Jun/)
       expect(enFormatted).toMatch(/15/)
       expect(enFormatted).toMatch(/2024/)

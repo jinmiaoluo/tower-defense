@@ -1,12 +1,12 @@
 /**
- * 建筑渲染器测试
+ * Building renderer tests
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderBuilding, createBuildingRenderer } from './BuildingRenderer'
 import type { RenderContext, BuildingRenderData } from './types'
 
-/** 创建 Mock 渲染上下文 */
+/** Create mock render context */
 function createMockContext(): RenderContext & { calls: string[] } {
   const calls: string[] = []
 
@@ -39,7 +39,7 @@ describe('BuildingRenderer', () => {
   })
 
   describe('renderBuilding', () => {
-    it('渲染墙应绘制方块', () => {
+    it('should draw blocks when rendering a wall', () => {
       const data: BuildingRenderData = {
         id: 'wall-1',
         type: 'wall',
@@ -53,12 +53,12 @@ describe('BuildingRenderer', () => {
 
       renderBuilding(ctx, data)
 
-      // 简单风格使用 fillRect 绘制方块
+      // Simple style uses fillRect to draw blocks
       const fillRectCalls = (ctx.fillRect as ReturnType<typeof vi.fn>).mock.calls
       expect(fillRectCalls.length).toBeGreaterThanOrEqual(2)
     })
 
-    it('渲染炮台应绘制圆形底座和炮管', () => {
+    it('should draw circular base and barrel when rendering a cannon', () => {
       const data: BuildingRenderData = {
         id: 'cannon-1',
         type: 'cannon',
@@ -73,14 +73,14 @@ describe('BuildingRenderer', () => {
 
       renderBuilding(ctx, data)
 
-      // 简单风格使用 fillCircle 绘制圆形底座
+      // Simple style uses fillCircle to draw circular base
       const fillCircleCalls = (ctx.fillCircle as ReturnType<typeof vi.fn>).mock.calls
       expect(fillCircleCalls.length).toBeGreaterThanOrEqual(3)
-      // 使用 lineBetween 绘制炮管
+      // Uses lineBetween to draw barrel
       expect(ctx.lineBetween).toHaveBeenCalled()
     })
 
-    it('渲染 LMG 应绘制圆形底座和枪管', () => {
+    it('should draw circular base and barrel when rendering LMG', () => {
       const data: BuildingRenderData = {
         id: 'lmg-1',
         type: 'LMG',
@@ -95,12 +95,12 @@ describe('BuildingRenderer', () => {
 
       renderBuilding(ctx, data)
 
-      // 简单风格使用 fillCircle 绘制
+      // Simple style uses fillCircle to draw
       const fillCircleCalls = (ctx.fillCircle as ReturnType<typeof vi.fn>).mock.calls
       expect(fillCircleCalls.length).toBeGreaterThanOrEqual(3)
     })
 
-    it('渲染 HMG 应绘制大圆形底座和粗枪管', () => {
+    it('should draw large circular base and thick barrel when rendering HMG', () => {
       const data: BuildingRenderData = {
         id: 'hmg-1',
         type: 'HMG',
@@ -115,12 +115,12 @@ describe('BuildingRenderer', () => {
 
       renderBuilding(ctx, data)
 
-      // HMG 有多层圆形
+      // HMG has multiple circle layers
       const fillCircleCalls = (ctx.fillCircle as ReturnType<typeof vi.fn>).mock.calls
       expect(fillCircleCalls.length).toBeGreaterThanOrEqual(4)
     })
 
-    it('渲染激光枪应绘制三角形水晶', () => {
+    it('should draw triangle crystal when rendering laser gun', () => {
       const data: BuildingRenderData = {
         id: 'laser-1',
         type: 'laser_gun',
@@ -134,15 +134,15 @@ describe('BuildingRenderer', () => {
 
       renderBuilding(ctx, data)
 
-      // 激光枪使用三角形绘制水晶
+      // Laser gun uses triangles to draw crystal
       const fillTriangleCalls = (ctx.fillTriangle as ReturnType<typeof vi.fn>).mock.calls
       expect(fillTriangleCalls.length).toBeGreaterThanOrEqual(1)
-      // 也使用圆形绘制底座和能量点
+      // Also uses circles to draw base and energy point
       const fillCircleCalls = (ctx.fillCircle as ReturnType<typeof vi.fn>).mock.calls
       expect(fillCircleCalls.length).toBeGreaterThanOrEqual(2)
     })
 
-    it('选中建筑应绘制高亮边框', () => {
+    it('should draw highlight border when building is selected', () => {
       const data: BuildingRenderData = {
         id: 'cannon-1',
         type: 'cannon',
@@ -157,7 +157,7 @@ describe('BuildingRenderer', () => {
 
       renderBuilding(ctx, data)
 
-      // 检查是否使用了选中颜色（青色 0x00ffff）
+      // Check if the selection color (cyan 0x00ffff) was used
       const lineStyleCalls = (ctx.lineStyle as ReturnType<typeof vi.fn>).mock.calls
       const hasSelectedColor = lineStyleCalls.some((call) => call[1] === 0x00ffff)
       expect(hasSelectedColor).toBe(true)
@@ -165,7 +165,7 @@ describe('BuildingRenderer', () => {
   })
 
   describe('createBuildingRenderer', () => {
-    it('应创建批量渲染器', () => {
+    it('should create a building renderer', () => {
       const renderer = createBuildingRenderer(ctx)
 
       expect(renderer).toBeDefined()
@@ -173,7 +173,7 @@ describe('BuildingRenderer', () => {
       expect(typeof renderer.clear).toBe('function')
     })
 
-    it('批量渲染多个建筑', () => {
+    it('should render multiple buildings', () => {
       const renderer = createBuildingRenderer(ctx)
 
       const buildings: BuildingRenderData[] = [
@@ -205,7 +205,7 @@ describe('BuildingRenderer', () => {
         renderer.render(building)
       }
 
-      // 应该调用 clear 一次，然后为每个建筑调用渲染函数
+      // Should call clear once, then call render for each building
       expect(ctx.clear).toHaveBeenCalledTimes(1)
     })
   })

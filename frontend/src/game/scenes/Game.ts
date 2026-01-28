@@ -1,7 +1,7 @@
 /**
- * Game Scene - 游戏主场景
- * 整合 GameSceneLogic，负责渲染和用户交互
- * 逻辑层与渲染层分离，Game.ts 只负责渲染
+ * Game Scene - Main game scene
+ * Integrates GameSceneLogic, handles rendering and user interaction
+ * Logic layer and rendering layer are separated; Game.ts only handles rendering
  */
 
 import { Scene } from 'phaser'
@@ -31,13 +31,13 @@ import { DPR } from '../dpr'
 
 const { GRID_SIZE } = GAME_CONSTANTS
 
-// 渲染用的缩放格子尺寸（适配高 DPR 显示）
+// Scaled grid size for rendering (adapts to high DPR displays)
 const RENDER_GRID_SIZE = GRID_SIZE * DPR
 
-/** 波次间隔帧数 (60 FPS x 3 秒 = 180 帧) */
+/** Wave interval in frames (60 FPS x 3 seconds = 180 frames) */
 const WAVE_INTERVAL_FRAMES = 180
 
-/** 状态卡片颜色配置 */
+/** Stats card color configuration */
 const STATS_CARD_COLORS = {
   money: 0xf5a623,
   score: 0x9b59b6,
@@ -46,7 +46,7 @@ const STATS_CARD_COLORS = {
   monsters: 0xe67e22,
 } as const
 
-/** 单个状态卡片的数据结构 */
+/** Data structure for a single stats card */
 interface StatsCard {
   container: Phaser.GameObjects.Container
   background: Phaser.GameObjects.Graphics
@@ -55,7 +55,7 @@ interface StatsCard {
   valueText: Phaser.GameObjects.Text
 }
 
-/** 游戏 UI 状态 */
+/** Game UI state */
 interface UIState {
   isLoading: boolean
   waveIntervalCounter: number
@@ -69,22 +69,22 @@ interface UIState {
   mobilePreviewPosition: Position | null
 }
 
-/** 提示消息持续时间 (毫秒) */
+/** Tip message duration (milliseconds) */
 const TIP_DURATION = 2000
 
 export class Game extends Scene {
-  // 核心逻辑
+  // Core logic
   private logic!: GameSceneLogic
 
-  // UI 状态
+  // UI state
   private uiState!: UIState
 
-  // 会话状态
+  // Session state
   private sessionId: string = ''
   private gameConfig!: GameConfig
   private currentWaveConfig!: WaveConfig
 
-  // 渲染对象
+  // Render objects
   private mapGraphics!: Phaser.GameObjects.Graphics
   private buildingGraphics!: Phaser.GameObjects.Graphics
   private monsterGraphics!: Phaser.GameObjects.Graphics
@@ -92,7 +92,7 @@ export class Game extends Scene {
   private hoverGraphics!: Phaser.GameObjects.Graphics
   private buildingPanel!: Phaser.GameObjects.Container
 
-  // 状态卡片容器
+  // Stats card container
   private statsContainer!: Phaser.GameObjects.Container
   private statsCards!: {
     money: StatsCard
@@ -102,49 +102,49 @@ export class Game extends Scene {
     monsters: StatsCard
   }
 
-  // 渲染上下文适配器
+  // Render context adapters
   private buildingRenderCtx!: RenderContext
   private monsterRenderCtx!: RenderContext
   private bulletRenderCtx!: RenderContext
 
-  // 提示消息
+  // Tip message
   private tipContainer!: Phaser.GameObjects.Container
   private tipBackground!: Phaser.GameObjects.Graphics
   private tipText!: Phaser.GameObjects.Text
   private tipTimer: Phaser.Time.TimerEvent | null = null
 
-  // Tooltip（悬停提示）
+  // Tooltip (hover hint)
   private tooltipContainer!: Phaser.GameObjects.Container
   private tooltipBackground!: Phaser.GameObjects.Graphics
   private tooltipText!: Phaser.GameObjects.Text
   private tooltipSource: 'panel' | 'map' | null = null
 
-  // 地图偏移（居中显示）
+  // Map offset (for centering)
   private mapOffsetX = 0
   private mapOffsetY = 0
 
-  // 翻译函数
+  // Translation function
   private t = getTranslator()
 
-  // 当前主题颜色（从 localStorage 读取初始主题）
+  // Current theme colors (read initial theme from localStorage)
   private gameColors: GameColors = this.getInitialThemeColors()
 
-  // 移动设备标识
+  // Mobile device flag
   private isMobile: boolean = isMobileDevice()
 
-  // 建筑面板按钮文字（用于语言切换时更新）
+  // Building panel button texts (for updating on language switch)
   private buildingPanelTexts: Phaser.GameObjects.Text[] = []
 
-  // 建筑面板按钮（用于选中状态更新）
+  // Building panel buttons (for selected state updates)
   private buildingPanelButtons: Map<BuildingType, Phaser.GameObjects.Rectangle> = new Map()
 
-  // 页面可见性变化处理器（用于自动暂停/恢复）
+  // Page visibility change handlers (for auto pause/resume)
   private visibilityChangeHandler: (() => void) | null = null
   private pageHideHandler: (() => void) | null = null
   private pageShowHandler: ((event: PageTransitionEvent) => void) | null = null
   private wasAutoPaused: boolean = false
 
-  // 控制面板（暂停/重启/结束按钮）
+  // Control panel (pause/restart/end buttons)
   private controlPanel!: Phaser.GameObjects.Container
   private pauseButton!: Phaser.GameObjects.Rectangle
   private pauseButtonText!: Phaser.GameObjects.Text
@@ -153,7 +153,7 @@ export class Game extends Scene {
   private endGameButton!: Phaser.GameObjects.Rectangle
   private endGameButtonText!: Phaser.GameObjects.Text
 
-  // 建筑操作面板（升级/出售按钮，选中建筑时显示）
+  // Building action panel (upgrade/sell buttons, shown when a building is selected)
   private buildingActionPanel!: Phaser.GameObjects.Container
   private upgradeButton!: Phaser.GameObjects.Rectangle
   private upgradeButtonText!: Phaser.GameObjects.Text
@@ -164,69 +164,69 @@ export class Game extends Scene {
     super('Game')
   }
 
-  /** 获取初始主题颜色（根据系统主题或用户设置） */
+  /** Get initial theme colors (based on system theme or user setting) */
   private getInitialThemeColors(): GameColors {
     return getInitialGameColors()
   }
 
-  /** 获取当前主题颜色 */
+  /** Get current theme colors */
   private getColors(): GameColors {
     return this.gameColors
   }
 
   create() {
-    // 初始化 UI 状态
+    // Initialize UI state
     this.initUIState()
 
-    // 设置初始 canvas 背景色（根据保存的主题）
+    // Set initial canvas background color (based on saved theme)
     this.cameras.main.setBackgroundColor(this.gameColors.canvasBackground)
 
-    // 创建渲染对象
+    // Create render objects
     this.createRenderObjects()
 
-    // 创建 UI
+    // Create UI
     this.createUI()
 
-    // 设置输入事件
+    // Set up input events
     this.setupInput()
 
-    // 异步初始化游戏会话
+    // Async initialize game session
     gameApi.createSession().then((response) => {
       this.sessionId = response.sessionId
       this.gameConfig = response.config
       this.currentWaveConfig = response.firstWave
 
-      // 计算地图偏移（居中显示，考虑 UI 元素）
+      // Calculate map offset (center display, accounting for UI elements)
       const { width, height } = this.scale
       const mapWidth = this.gameConfig.map.width * RENDER_GRID_SIZE
       const mapHeight = this.gameConfig.map.height * RENDER_GRID_SIZE
-      // 预留顶部状态栏和底部按钮面板的空间
+      // Reserve space for top status bar and bottom button panel
       const topReserve = 50 * DPR
       const bottomReserve = 90 * DPR
       const availableHeight = height - topReserve - bottomReserve
       this.mapOffsetX = Math.floor((width - mapWidth) / 2)
       this.mapOffsetY = topReserve + Math.floor((availableHeight - mapHeight) / 2)
 
-      // 创建核心逻辑
+      // Create core logic
       this.logic = createGameSceneLogic(this.gameConfig)
 
-      // 等待玩家放置第一个武器后再开始第一波
-      // 与旧实现一致: wave == 0 && !has_weapon 时不开始
+      // Wait for the player to place the first weapon before starting wave 1
+      // Consistent with old implementation: wave == 0 && !has_weapon means no start
 
       this.uiState.isLoading = false
 
-      // 渲染静态元素
+      // Render static elements
       this.renderMap()
       this.createBuildingPanel()
       this.createControlPanel()
       this.createBuildingActionPanel()
 
-      // 通知 Vue 场景已就绪
+      // Notify Vue that the scene is ready
       EventBus.emit('current-scene-ready', this)
     })
   }
 
-  /** 初始化 UI 状态 */
+  /** Initialize UI state */
   private initUIState() {
     this.uiState = {
       isLoading: true,
@@ -242,7 +242,7 @@ export class Game extends Scene {
     }
   }
 
-  /** 创建渲染对象 */
+  /** Create render objects */
   private createRenderObjects() {
     this.mapGraphics = this.add.graphics()
     this.buildingGraphics = this.add.graphics()
@@ -250,13 +250,13 @@ export class Game extends Scene {
     this.bulletGraphics = this.add.graphics()
     this.hoverGraphics = this.add.graphics()
 
-    // 创建渲染上下文适配器
+    // Create render context adapters
     this.buildingRenderCtx = createPhaserAdapter(this.buildingGraphics)
     this.monsterRenderCtx = createPhaserAdapter(this.monsterGraphics)
     this.bulletRenderCtx = createPhaserAdapter(this.bulletGraphics)
   }
 
-  /** 设置输入事件 */
+  /** Set up input events */
   private setupInput() {
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
       if (this.uiState.isLoading) return
@@ -275,17 +275,17 @@ export class Game extends Scene {
       if (this.uiState.isLoading) return
       if (this.logic.getState().isGameOver) return
 
-      // 检查是否点击在交互 UI 元素上（建筑面板按钮等）
-      // hitTestPointer 返回指针位置下所有设置了 interactive 的游戏对象
+      // Check if click is on an interactive UI element (building panel buttons, etc.)
+      // hitTestPointer returns all interactive game objects under the pointer
       const hitObjects = this.input.hitTestPointer(pointer)
       if (hitObjects.length > 0) {
-        // 点击了某个交互对象（如建筑面板按钮），不处理地图点击
+        // Clicked an interactive object (e.g., building panel button), skip map click
         return
       }
 
       const gridPos = this.screenToGrid(pointer.x, pointer.y)
       if (!gridPos) {
-        // 点击地图外且不在 UI 上，取消选择
+        // Clicked outside map and not on UI, deselect
         this.uiState.selectedBuildingType = null
         this.uiState.selectedBuildingId = null
         this.updateBuildingActionPanel()
@@ -293,14 +293,14 @@ export class Game extends Scene {
         return
       }
 
-      // 先检查是否点击了已有建筑（优先级高于放置新建筑）
+      // First check if an existing building was clicked (higher priority than placing new)
       const buildings = this.logic.getBuildings()
       const clickedBuilding = buildings.find(
         (b) => b.position[0] === gridPos[0] && b.position[1] === gridPos[1],
       )
 
       if (clickedBuilding) {
-        // 点击已有建筑：选中该建筑，取消放置模式
+        // Clicked an existing building: select it, cancel placement mode
         this.uiState.selectedBuildingType = null
         this.uiState.selectedBuildingId = clickedBuilding.id
         this.uiState.mobilePreviewPosition = null
@@ -310,7 +310,7 @@ export class Game extends Scene {
         return
       }
 
-      // 如果选中了建筑类型且点击的是空地，尝试放置
+      // If a building type is selected and clicked on empty ground, try to place
       if (this.uiState.selectedBuildingType) {
         if (this.isMobile) {
           const preview = this.uiState.mobilePreviewPosition
@@ -326,12 +326,12 @@ export class Game extends Scene {
         return
       }
 
-      // 点击空地且未选中建筑类型：取消选中
+      // Clicked empty ground with no building type selected: deselect
       this.uiState.selectedBuildingId = null
       this.updateBuildingActionPanel()
     })
 
-    // 键盘快捷键
+    // Keyboard shortcuts
     this.input.keyboard?.on('keydown-ESC', () => {
       this.uiState.selectedBuildingType = null
       this.uiState.selectedBuildingId = null
@@ -345,28 +345,28 @@ export class Game extends Scene {
       }
     })
 
-    // 监听重新开始事件
+    // Listen for restart event
     EventBus.on('restart-game', () => {
       this.restart()
     })
 
-    // 监听主题变化（来自 Vue 层的 AppEventBus）
+    // Listen for theme change (from Vue layer via AppEventBus)
     AppEventBus.on('theme-changed', (theme: unknown) => {
       this.handleThemeChange(theme as Theme)
     })
 
-    // 监听语言变化（来自 Vue 层的 AppEventBus）
+    // Listen for locale change (from Vue layer via AppEventBus)
     AppEventBus.on('locale-changed', (_locale: unknown) => {
       this.handleLocaleChange()
     })
 
-    // 设置页面可见性处理器（自动暂停）
+    // Set up page visibility handlers (auto pause)
     this.setupVisibilityHandlers()
   }
 
-  /** 设置页面可见性处理器（自动暂停/恢复） */
+  /** Set up page visibility handlers (auto pause/resume) */
   private setupVisibilityHandlers() {
-    // 自动暂停逻辑（抽取公共方法避免重复）
+    // Auto pause logic (extracted to avoid duplication)
     const autoPause = () => {
       if (!this.logic || this.uiState.isLoading) return
       const state = this.logic.getState()
@@ -378,7 +378,7 @@ export class Game extends Scene {
       }
     }
 
-    // 自动恢复逻辑
+    // Auto resume logic
     const autoResume = () => {
       if (!this.logic || this.uiState.isLoading) return
       const state = this.logic.getState()
@@ -390,7 +390,7 @@ export class Game extends Scene {
       }
     }
 
-    // visibilitychange 事件：主要处理标签页切换
+    // visibilitychange event: primarily handles tab switching
     this.visibilityChangeHandler = () => {
       if (document.hidden) {
         autoPause()
@@ -399,14 +399,14 @@ export class Game extends Scene {
       }
     }
 
-    // pagehide 事件：补充处理移动设备上的页面隐藏场景
+    // pagehide event: supplementary handling for mobile page hiding
     this.pageHideHandler = () => {
       autoPause()
     }
 
-    // pageshow 事件：补充处理移动设备上的页面恢复场景
+    // pageshow event: supplementary handling for mobile page restoration
     this.pageShowHandler = (event: PageTransitionEvent) => {
-      // persisted 属性表示页面是从 bfcache（前进后退缓存）恢复的
+      // persisted property indicates the page was restored from bfcache (back-forward cache)
       if (event.persisted) {
         autoResume()
       }
@@ -416,7 +416,7 @@ export class Game extends Scene {
     window.addEventListener('pagehide', this.pageHideHandler)
     window.addEventListener('pageshow', this.pageShowHandler)
 
-    // 场景关闭时移除监听器
+    // Remove listeners when scene shuts down
     this.events.on('shutdown', () => {
       if (this.visibilityChangeHandler) {
         document.removeEventListener('visibilitychange', this.visibilityChangeHandler)
@@ -433,32 +433,32 @@ export class Game extends Scene {
     })
   }
 
-  /** 处理主题变化 */
+  /** Handle theme change */
   private handleThemeChange(theme: Theme) {
     this.gameColors = getTheme(theme).gameColors
-    // 更新 canvas 背景色
+    // Update canvas background color
     this.cameras.main.setBackgroundColor(this.gameColors.canvasBackground)
-    // 重新渲染需要主题颜色的元素
+    // Re-render elements that depend on theme colors
     if (!this.uiState.isLoading) {
       this.renderMap()
     }
   }
 
-  /** 处理语言变化 */
+  /** Handle locale change */
   private handleLocaleChange() {
-    // 更新翻译函数
+    // Update translation function
     this.t = getTranslator()
-    // 更新状态卡片标签
+    // Update stats card labels
     this.updateStatsCardLabels()
-    // 更新建筑面板文字
+    // Update building panel texts
     this.updateBuildingPanelTexts()
-    // 更新控制面板文字
+    // Update control panel texts
     this.updateControlPanelTexts()
-    // 更新 UI 文字
+    // Update UI texts
     this.updateUI()
   }
 
-  /** 更新建筑面板文字 */
+  /** Update building panel texts */
   private updateBuildingPanelTexts() {
     if (!this.gameConfig) return
 
@@ -472,14 +472,14 @@ export class Game extends Scene {
     })
   }
 
-  /** 更新控制面板文字 */
+  /** Update control panel texts */
   private updateControlPanelTexts() {
     if (!this.pauseButtonText || !this.restartButtonText || !this.endGameButtonText) return
 
     const state = this.logic?.getState()
     const isPaused = state?.isPaused ?? false
 
-    // 根据当前状态设置暂停按钮文字
+    // Set pause button text based on current state
     this.pauseButtonText.setText(
       isPaused ? this.t('button_continue_text') : this.t('button_pause_text'),
     )
@@ -487,7 +487,7 @@ export class Game extends Scene {
     this.endGameButtonText.setText(this.t('button_endgame_text'))
   }
 
-  /** 绘制虚线圆 */
+  /** Draw a dashed circle */
   private strokeDashedCircle(
     g: Phaser.GameObjects.Graphics,
     x: number,
@@ -514,7 +514,7 @@ export class Game extends Scene {
     }
   }
 
-  /** 屏幕坐标转格子坐标 */
+  /** Convert screen coordinates to grid coordinates */
   private screenToGrid(x: number, y: number): Position | null {
     const gx = Math.floor((x - this.mapOffsetX) / RENDER_GRID_SIZE)
     const gy = Math.floor((y - this.mapOffsetY) / RENDER_GRID_SIZE)
@@ -530,12 +530,12 @@ export class Game extends Scene {
     return null
   }
 
-  /** 检查地图元素的 tooltip（入口/出口/怪物） */
+  /** Check tooltip for map elements (entrance/exit/monster) */
   private checkMapElementTooltip(screenX: number, screenY: number, gridPos: Position) {
     const [gx, gy] = gridPos
     const { entrance, exit } = this.gameConfig.map
 
-    // 检查入口
+    // Check entrance
     if (gx === entrance[0] && gy === entrance[1]) {
       const centerX = this.mapOffsetX + gx * RENDER_GRID_SIZE + RENDER_GRID_SIZE / 2
       const centerY = this.mapOffsetY + gy * RENDER_GRID_SIZE
@@ -543,7 +543,7 @@ export class Game extends Scene {
       return
     }
 
-    // 检查出口
+    // Check exit
     if (gx === exit[0] && gy === exit[1]) {
       const centerX = this.mapOffsetX + gx * RENDER_GRID_SIZE + RENDER_GRID_SIZE / 2
       const centerY = this.mapOffsetY + gy * RENDER_GRID_SIZE
@@ -551,7 +551,7 @@ export class Game extends Scene {
       return
     }
 
-    // 检查怪物（包含血条区域）
+    // Check monsters (including health bar area)
     const monsters = this.logic.getMonsters()
     for (const monster of monsters) {
       if (!monster.isValid || monster.progress < 0) continue
@@ -561,13 +561,13 @@ export class Game extends Scene {
       const monsterY = this.mapOffsetY + pos.y * DPR
       const scaledRadius = monster.radius * DPR
 
-      // 检测怪物身体（圆形）
+      // Detect monster body (circle)
       const distance = Math.sqrt(
         Math.pow(screenX - monsterX, 2) + Math.pow(screenY - monsterY, 2),
       )
       const isOverBody = distance <= scaledRadius
 
-      // 检测血条区域（矩形：宽 22px，高约 20px，包含血条和可能的护盾条）
+      // Detect health bar area (rectangle: 22px wide, ~20px tall, includes health and possible shield bar)
       const healthBarWidth = 22 * DPR
       const healthBarHeight = 20 * DPR
       const healthBarY = monsterY - scaledRadius - 12 * DPR
@@ -591,11 +591,11 @@ export class Game extends Scene {
       }
     }
 
-    // 不在任何地图元素上时隐藏地图 tooltip（不影响建筑面板的 tooltip）
+    // Hide map tooltip when not over any map element (does not affect building panel tooltip)
     this.hideTooltip('map')
   }
 
-  /** 选择建筑类型 */
+  /** Select building type */
   selectBuildingType(type: BuildingType | null) {
     this.uiState.selectedBuildingType = type
     this.uiState.selectedBuildingId = null
@@ -605,39 +605,39 @@ export class Game extends Scene {
     EventBus.emit('building-type-selected', type)
   }
 
-  /** 更新建筑面板按钮选中状态 */
+  /** Update building panel button selected states */
   private updateBuildingPanelButtonStates() {
     const selectedType = this.uiState.selectedBuildingType
     const colors = this.getColors()
 
     this.buildingPanelButtons.forEach((button, type) => {
       if (type === selectedType) {
-        // 选中状态：金色边框
+        // Selected state: gold border
         button.setStrokeStyle(2, colors.rangeSelected)
       } else {
-        // 非选中状态：白色边框
+        // Unselected state: white border
         button.setStrokeStyle(2, 0xffffff)
       }
     })
   }
 
-  /** 尝试放置建筑 */
+  /** Try to place a building */
   private tryPlaceBuilding(position: Position) {
     if (!this.uiState.selectedBuildingType) return
-    // 波次提交期间不允许操作（尚未收到响应，新 recorder 未创建）
+    // Disallow operations during wave submission (response not yet received, new recorder not created)
     if (this.uiState.isSubmittingWave) return
     if (this.logic.getState().isGameOver) return
 
     const buildingType = this.uiState.selectedBuildingType
 
-    // 第一波开始前，放置任何建筑都需要先准备 recorder
-    // 确保所有 BUILD action（包括 wall）都记录到 wave 1 的 recorder 中
+    // Before wave 1 starts, placing any building requires preparing the recorder first
+    // Ensures all BUILD actions (including wall) are recorded in wave 1's recorder
     if (this.uiState.waitingForFirstWeapon && !this.uiState.firstWaveRecorderPrepared) {
       this.logic.prepareNextWaveRecorder(this.currentWaveConfig.waveNumber)
       this.uiState.firstWaveRecorderPrepared = true
     }
 
-    // 只有放置武器建筑时才开始波次（触发怪物生成）
+    // Only placing a weapon building triggers wave start (spawns monsters)
     if (this.uiState.waitingForFirstWeapon && isWeaponBuilding(buildingType)) {
       this.uiState.waitingForFirstWeapon = false
       this.uiState.currentWaveSubmitted = false
@@ -653,20 +653,20 @@ export class Game extends Scene {
         position,
       })
     } else {
-      // 显示提示消息
+      // Show tip message
       if (result.reason === 'insufficient_money') {
         const cost = this.gameConfig.buildings[this.uiState.selectedBuildingType].cost
         const tipX = this.mapOffsetX + position[0] * RENDER_GRID_SIZE + RENDER_GRID_SIZE / 2
         const tipY = this.mapOffsetY + position[1] * RENDER_GRID_SIZE - 20 * DPR
-        this.showTip(`金钱不足，需要 $${cost}!`, tipX, tipY)
+        this.showTip(`Not enough money, need $${cost}!`, tipX, tipY)
       }
       EventBus.emit('building-place-failed', result.reason)
     }
   }
 
-  /** 尝试升级建筑 */
+  /** Try to upgrade a building */
   tryUpgradeBuilding(buildingId: string) {
-    // 波次提交期间不允许操作（尚未收到响应，新 recorder 未创建）
+    // Disallow operations during wave submission (response not yet received, new recorder not created)
     if (this.uiState.isSubmittingWave) return
     if (this.logic.getState().isGameOver) return
 
@@ -675,20 +675,20 @@ export class Game extends Scene {
     if (result.success) {
       EventBus.emit('building-upgraded', this.logic.getBuilding(buildingId))
     } else {
-      // 显示提示消息
+      // Show tip message
       if (result.reason === 'insufficient_money' && building) {
         const cost = this.logic.getUpgradeCost(building.type, building.level)
         const tipX = this.mapOffsetX + building.position[0] * RENDER_GRID_SIZE + RENDER_GRID_SIZE / 2
         const tipY = this.mapOffsetY + building.position[1] * RENDER_GRID_SIZE - 20 * DPR
-        this.showTip(`金钱不足，需要 $${cost}!`, tipX, tipY)
+        this.showTip(`Not enough money, need $${cost}!`, tipX, tipY)
       }
       EventBus.emit('building-upgrade-failed', result.reason)
     }
   }
 
-  /** 尝试出售建筑 */
+  /** Try to sell a building */
   trySellBuilding(buildingId: string) {
-    // 波次提交期间不允许操作（尚未收到响应，新 recorder 未创建）
+    // Disallow operations during wave submission (response not yet received, new recorder not created)
     if (this.uiState.isSubmittingWave) return
     if (this.logic.getState().isGameOver) return
 
@@ -702,7 +702,7 @@ export class Game extends Scene {
     }
   }
 
-  /** 渲染地图 */
+  /** Render map */
   private renderMap() {
     const { width, height, entrance, exit, obstacles } = this.gameConfig.map
     const g = this.mapGraphics
@@ -710,7 +710,7 @@ export class Game extends Scene {
 
     g.clear()
 
-    // 绘制格子
+    // Draw grid cells
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const px = this.mapOffsetX + x * RENDER_GRID_SIZE
@@ -739,20 +739,20 @@ export class Game extends Scene {
       }
     }
 
-    // 入口标记
+    // Entrance marker
     const entranceX = this.mapOffsetX + entrance[0] * RENDER_GRID_SIZE + RENDER_GRID_SIZE / 2
     const entranceY = this.mapOffsetY + entrance[1] * RENDER_GRID_SIZE + RENDER_GRID_SIZE / 2
     g.lineStyle(2 * DPR, colors.entrance, 1)
     g.strokeCircle(entranceX, entranceY, RENDER_GRID_SIZE / 3)
 
-    // 出口标记
+    // Exit marker
     const exitX = this.mapOffsetX + exit[0] * RENDER_GRID_SIZE + RENDER_GRID_SIZE / 2
     const exitY = this.mapOffsetY + exit[1] * RENDER_GRID_SIZE + RENDER_GRID_SIZE / 2
     g.lineStyle(2 * DPR, colors.exit, 1)
     g.strokeCircle(exitX, exitY, RENDER_GRID_SIZE / 3)
   }
 
-  /** 渲染所有建筑 */
+  /** Render all buildings */
   private renderBuildings() {
     const buildings = this.logic.getBuildings()
 
@@ -766,7 +766,7 @@ export class Game extends Scene {
       const centerY = py + RENDER_GRID_SIZE / 2
       const isSelected = building.id === this.uiState.selectedBuildingId
 
-      // 获取建筑当前目标位置（由 Building 实体维护，包含最后目标位置）
+      // Get current target position from the Building entity (includes last target position)
       const targetPosition = building.getCurrentTargetPosition() ?? undefined
 
       const data: BuildingRenderData = {
@@ -783,22 +783,22 @@ export class Game extends Scene {
 
       renderBuilding(this.buildingRenderCtx, data)
 
-      // 激光射线渲染（与旧实现一致: td-obj-building.js:361-376）
-      // 只有当有实际目标时才渲染激光线
+      // Laser beam rendering (consistent with old implementation: td-obj-building.js:361-376)
+      // Only render laser line when there is an active target
       if (building.type === 'laser_gun' && building.hasActiveTarget() && targetPosition) {
         const targetX = this.mapOffsetX + targetPosition[0] * RENDER_GRID_SIZE + RENDER_GRID_SIZE / 2
         const targetY = this.mapOffsetY + targetPosition[1] * RENDER_GRID_SIZE + RENDER_GRID_SIZE / 2
 
-        // 外层激光线（蓝色半透明）
+        // Outer laser line (semi-transparent blue)
         this.buildingRenderCtx.lineStyle(3 * DPR, 0x3232c8, 0.5)
         this.buildingRenderCtx.lineBetween(centerX, centerY, targetX, targetY)
 
-        // 内层激光线（亮蓝色）
+        // Inner laser line (bright blue)
         this.buildingRenderCtx.lineStyle(1 * DPR, 0x9696ff, 0.5)
         this.buildingRenderCtx.lineBetween(centerX, centerY, targetX, targetY)
       }
 
-      // 选中效果（金色范围圆 + 格子高亮，与旧实现一致）
+      // Selection effect (gold range circle + grid highlight, consistent with old implementation)
       if (isSelected) {
         const selectionData: SelectionRenderData = {
           centerX,
@@ -817,7 +817,7 @@ export class Game extends Scene {
     }
   }
 
-  /** 渲染所有怪物 */
+  /** Render all monsters */
   private renderMonsters() {
     const monsters = this.logic.getMonsters()
 
@@ -845,7 +845,7 @@ export class Game extends Scene {
     }
   }
 
-  /** 渲染所有子弹 */
+  /** Render all bullets */
   private renderBullets() {
     const bullets = this.logic.getBullets()
 
@@ -869,7 +869,7 @@ export class Game extends Scene {
     }
   }
 
-  /** 渲染悬停指示 */
+  /** Render hover indicator */
   private renderHover() {
     const g = this.hoverGraphics
     const colors = this.getColors()
@@ -879,7 +879,7 @@ export class Game extends Scene {
       return
     }
 
-    // 移动端使用 mobilePreviewPosition，PC 端使用 hoverPosition
+    // Mobile uses mobilePreviewPosition, desktop uses hoverPosition
     const previewPos = this.isMobile
       ? this.uiState.mobilePreviewPosition
       : this.uiState.hoverPosition
@@ -895,14 +895,14 @@ export class Game extends Scene {
     const canPlace = this.logic.canPlaceBuilding(previewPos)
     const color = canPlace ? colors.hoverValid : colors.hoverInvalid
 
-    // 预览建筑
+    // Preview building
     g.fillStyle(color, 0.3)
     g.fillRect(px + 4 * DPR, py + 4 * DPR, RENDER_GRID_SIZE - 8 * DPR, RENDER_GRID_SIZE - 8 * DPR)
 
     g.lineStyle(2 * DPR, color, 0.8)
     g.strokeRect(px + 4 * DPR, py + 4 * DPR, RENDER_GRID_SIZE - 8 * DPR, RENDER_GRID_SIZE - 8 * DPR)
 
-    // 射程预览（虚线圆）
+    // Range preview (dashed circle)
     if (this.uiState.selectedBuildingType !== 'wall') {
       const buildingConfig = this.gameConfig.buildings[this.uiState.selectedBuildingType]
       const range = buildingConfig.range * RENDER_GRID_SIZE
@@ -913,21 +913,21 @@ export class Game extends Scene {
     }
   }
 
-  /** 创建 UI */
+  /** Create UI */
   private createUI() {
-    // 创建状态卡片
+    // Create stats cards
     this.createStatsCards()
 
-    // 创建提示容器
+    // Create tip container
     this.createTipContainer()
 
-    // 创建 Tooltip 容器
+    // Create tooltip container
     this.createTooltipContainer()
 
     this.updateUI()
   }
 
-  /** 创建状态卡片 */
+  /** Create stats cards */
   private createStatsCards() {
     const { width } = this.scale
 
@@ -961,7 +961,7 @@ export class Game extends Scene {
 
       const container = this.add.container(x, cardHeight / 2)
 
-      // 背景（半透明深色）
+      // Background (semi-transparent dark)
       const background = this.add.graphics()
       background.fillStyle(0x000000, 0.5)
       background.fillRoundedRect(
@@ -980,7 +980,7 @@ export class Game extends Scene {
         cornerRadius,
       )
 
-      // 顶部颜色条
+      // Top color bar
       const colorBar = this.add.graphics()
       colorBar.fillStyle(color, 1)
       colorBar.fillRoundedRect(
@@ -991,7 +991,7 @@ export class Game extends Scene {
         { tl: cornerRadius - 1, tr: cornerRadius - 1, bl: 0, br: 0 },
       )
 
-      // 标签文字（简短版本，不带冒号）
+      // Label text (short version, without colon)
       const label = this.t(config.labelKey).replace(/[:\s:]+$/, '')
       const labelText = this.add.text(0, -4 * DPR, label, {
         fontFamily: 'Arial',
@@ -1000,7 +1000,7 @@ export class Game extends Scene {
       })
       labelText.setOrigin(0.5, 0.5)
 
-      // 数值文字
+      // Value text
       const valueText = this.add.text(0, 10 * DPR, '0', {
         fontFamily: 'Arial',
         fontSize: `${12 * DPR}px`,
@@ -1022,7 +1022,7 @@ export class Game extends Scene {
     })
   }
 
-  /** 创建提示容器 */
+  /** Create tip container */
   private createTipContainer() {
     const { width, height } = this.scale
 
@@ -1041,7 +1041,7 @@ export class Game extends Scene {
     this.tipContainer.add([this.tipBackground, this.tipText])
   }
 
-  /** 创建 Tooltip 容器 */
+  /** Create tooltip container */
   private createTooltipContainer() {
     this.tooltipContainer = this.add.container(0, 0)
     this.tooltipContainer.setVisible(false)
@@ -1061,7 +1061,7 @@ export class Game extends Scene {
     this.tooltipContainer.add([this.tooltipBackground, this.tooltipText])
   }
 
-  /** 显示 Tooltip */
+  /** Show tooltip */
   private showTooltip(message: string, x: number, y: number, source: 'panel' | 'map' = 'map') {
     this.tooltipSource = source
     this.tooltipText.setText(message)
@@ -1070,7 +1070,7 @@ export class Game extends Scene {
     const bgWidth = this.tooltipText.width + padding * 2
     const bgHeight = this.tooltipText.height + padding * 2
 
-    // 将文本上移 padding 像素，使其在背景中垂直居中
+    // Move text up by padding pixels to vertically center it within the background
     this.tooltipText.setPosition(0, -padding)
 
     this.tooltipBackground.clear()
@@ -1083,7 +1083,7 @@ export class Game extends Scene {
     this.tooltipContainer.setVisible(true)
   }
 
-  /** 隐藏 Tooltip（仅隐藏指定来源的 tooltip，不指定则强制隐藏） */
+  /** Hide tooltip (only hides tooltip from specified source; force hides if no source specified) */
   private hideTooltip(source?: 'panel' | 'map') {
     if (source && this.tooltipSource !== source) {
       return
@@ -1092,45 +1092,45 @@ export class Game extends Scene {
     this.tooltipSource = null
   }
 
-  /** 显示提示消息 */
+  /** Show tip message */
   private showTip(message: string, x?: number, y?: number) {
     const { width, height } = this.scale
 
-    // 设置文本
+    // Set text
     this.tipText.setText(message)
 
-    // 计算背景尺寸
+    // Calculate background dimensions
     const padding = 10 * DPR
     const bgWidth = this.tipText.width + padding * 2
     const bgHeight = this.tipText.height + padding * 2
 
-    // 绘制黄色背景（与旧实现一致）
+    // Draw yellow background (consistent with old implementation)
     this.tipBackground.clear()
     this.tipBackground.fillStyle(0xffff00, 0.8)
     this.tipBackground.lineStyle(2 * DPR, 0xdede00, 1)
     this.tipBackground.fillRoundedRect(-bgWidth / 2, -bgHeight / 2, bgWidth, bgHeight, 4 * DPR)
     this.tipBackground.strokeRoundedRect(-bgWidth / 2, -bgHeight / 2, bgWidth, bgHeight, 4 * DPR)
 
-    // 设置位置
+    // Set position
     const posX = x ?? width / 2
     const posY = y ?? height / 2
     this.tipContainer.setPosition(posX, posY)
 
-    // 显示
+    // Show
     this.tipContainer.setVisible(true)
 
-    // 清除之前的定时器
+    // Clear previous timer
     if (this.tipTimer) {
       this.tipTimer.destroy()
     }
 
-    // 自动隐藏
+    // Auto hide
     this.tipTimer = this.time.delayedCall(TIP_DURATION, () => {
       this.tipContainer.setVisible(false)
     })
   }
 
-  /** 创建建筑面板 */
+  /** Create building panel */
   private createBuildingPanel() {
     const { width, height } = this.scale
 
@@ -1144,7 +1144,7 @@ export class Game extends Scene {
     const gapX = 8 * DPR
     const gapY = 6 * DPR
 
-    // 计算每行能放多少个按钮
+    // Calculate how many buttons fit per row
     const availableWidth = width - 20 * DPR
     const buttonsPerRow = Math.max(2, Math.floor(availableWidth / (buttonWidth + gapX)))
     const rows = Math.ceil(buildingTypes.length / buttonsPerRow)
@@ -1154,7 +1154,7 @@ export class Game extends Scene {
       const col = index % buttonsPerRow
       const buttonsInThisRow = Math.min(buttonsPerRow, buildingTypes.length - row * buttonsPerRow)
 
-      // 计算该行的起始 X 位置（居中）
+      // Calculate starting X position for this row (centered)
       const rowWidth = buttonsInThisRow * buttonWidth + (buttonsInThisRow - 1) * gapX
       const rowStartX = -rowWidth / 2
 
@@ -1163,18 +1163,18 @@ export class Game extends Scene {
 
       const config = this.gameConfig.buildings[type]
 
-      // 按钮背景
+      // Button background
       const buttonColor = BUILDING_COLORS[type].primary
       const button = this.add.rectangle(x, y, buttonWidth, buttonHeight, buttonColor, 0.8)
       button.setStrokeStyle(2 * DPR, 0xffffff)
       button.setInteractive({ useHandCursor: true })
 
-      // 存储按钮引用
+      // Store button reference
       this.buildingPanelButtons.set(type, button)
 
       button.on('pointerover', () => {
         button.setFillStyle(buttonColor, 1)
-        // 显示建筑介绍 tooltip
+        // Show building info tooltip
         const buildingName = this.t(`building_name_${type}`)
         let tooltipText: string
         if (type === 'wall') {
@@ -1196,7 +1196,7 @@ export class Game extends Scene {
       })
 
       button.on('pointerout', () => {
-        // 如果当前按钮是选中状态，保持选中边框
+        // If current button is selected, keep selected border
         const isSelected = this.uiState.selectedBuildingType === type
         button.setFillStyle(buttonColor, 0.8)
         if (isSelected) {
@@ -1210,7 +1210,7 @@ export class Game extends Scene {
         this.hideTooltip()
       })
 
-      // 按钮文字（使用 i18n 翻译）
+      // Button text (using i18n translation)
       const buildingName = this.t(`building_name_${type}`)
       const text = this.add.text(x, y, `${buildingName}\n$${config.cost}`, {
         fontFamily: 'Arial',
@@ -1225,18 +1225,18 @@ export class Game extends Scene {
     })
   }
 
-  /** 创建控制面板（暂停/重启/结束按钮） */
+  /** Create control panel (pause/restart/end buttons) */
   private createControlPanel() {
     const { width, height } = this.scale
 
-    // 控制面板位于建筑面板下方
+    // Control panel is below the building panel
     this.controlPanel = this.add.container(width / 2, height - 10 * DPR)
 
     const buttonWidth = 70 * DPR
     const buttonHeight = 20 * DPR
     const gap = 10 * DPR
 
-    // 重启按钮（左侧，初始隐藏，仅在暂停时显示）
+    // Restart button (left side, initially hidden, only shown when paused)
     const restartX = -(buttonWidth + gap)
     this.restartButton = this.add.rectangle(restartX, 0, buttonWidth, buttonHeight, 0xff6644, 0.8)
     this.restartButton.setStrokeStyle(1 * DPR, 0xffffff)
@@ -1263,7 +1263,7 @@ export class Game extends Scene {
       this.restart()
     })
 
-    // 暂停按钮（中间）
+    // Pause button (center)
     const pauseX = 0
     this.pauseButton = this.add.rectangle(pauseX, 0, buttonWidth, buttonHeight, 0x4488ff, 0.8)
     this.pauseButton.setStrokeStyle(1 * DPR, 0xffffff)
@@ -1288,7 +1288,7 @@ export class Game extends Scene {
       this.handlePauseClick()
     })
 
-    // 结束按钮（右侧，初始隐藏，仅在暂停时显示）
+    // End game button (right side, initially hidden, only shown when paused)
     const endGameX = buttonWidth + gap
     this.endGameButton = this.add.rectangle(endGameX, 0, buttonWidth, buttonHeight, 0x888888, 0.8)
     this.endGameButton.setStrokeStyle(1 * DPR, 0xffffff)
@@ -1325,7 +1325,7 @@ export class Game extends Scene {
     ])
   }
 
-  /** 创建建筑操作面板（选中建筑时显示升级/出售按钮） */
+  /** Create building action panel (upgrade/sell buttons shown when a building is selected) */
   private createBuildingActionPanel() {
     this.buildingActionPanel = this.add.container(0, 0)
     this.buildingActionPanel.setVisible(false)
@@ -1335,7 +1335,7 @@ export class Game extends Scene {
     const buttonHeight = 22 * DPR
     const gap = 6 * DPR
 
-    // 升级按钮
+    // Upgrade button
     this.upgradeButton = this.add.rectangle(0, 0, buttonWidth, buttonHeight, 0x44aa44, 0.9)
     this.upgradeButton.setStrokeStyle(1 * DPR, 0xffffff)
     this.upgradeButton.setInteractive({ useHandCursor: true })
@@ -1364,7 +1364,7 @@ export class Game extends Scene {
       }
     })
 
-    // 出售按钮
+    // Sell button
     const sellX = buttonWidth + gap
     this.sellButton = this.add.rectangle(sellX, 0, buttonWidth, buttonHeight, 0xcc4444, 0.9)
     this.sellButton.setStrokeStyle(1 * DPR, 0xffffff)
@@ -1401,7 +1401,7 @@ export class Game extends Scene {
     ])
   }
 
-  /** 显示建筑操作的 Tooltip */
+  /** Show building action tooltip */
   private showBuildingActionTooltip(action: 'upgrade' | 'sell') {
     if (!this.uiState.selectedBuildingId) return
 
@@ -1426,7 +1426,7 @@ export class Game extends Scene {
     this.showTooltip(tooltipText, panelPos.tx + buttonX, panelPos.ty - 20 * DPR, 'panel')
   }
 
-  /** 获取出售收入（调用 BuildingSystem） */
+  /** Get sell income (calls BuildingSystem) */
   private getSellIncome(type: string, level: number): number {
     const buildingConfig = this.gameConfig.buildings[type as BuildingType]
     const totalCost = this.getTotalCost(type as BuildingType, level)
@@ -1434,7 +1434,7 @@ export class Game extends Scene {
     return Math.max(income, 1)
   }
 
-  /** 获取建筑累计花费 */
+  /** Get cumulative building cost */
   private getTotalCost(type: BuildingType, level: number): number {
     const buildingConfig = this.gameConfig.buildings[type]
     let total = buildingConfig.cost
@@ -1444,9 +1444,9 @@ export class Game extends Scene {
     return total
   }
 
-  /** 更新建筑操作面板的显示状态和位置 */
+  /** Update building action panel display state and position */
   private updateBuildingActionPanel() {
-    // 面板尚未创建时跳过
+    // Skip if panel has not been created yet
     if (!this.buildingActionPanel) return
 
     if (!this.uiState.selectedBuildingId) {
@@ -1460,14 +1460,14 @@ export class Game extends Scene {
       return
     }
 
-    // 计算面板位置（建筑格子上方）
+    // Calculate panel position (above the building cell)
     const [bx, by] = building.position
     const panelX = this.mapOffsetX + bx * RENDER_GRID_SIZE + RENDER_GRID_SIZE / 2 - 40 * DPR
     const panelY = this.mapOffsetY + by * RENDER_GRID_SIZE - 30 * DPR
 
     this.buildingActionPanel.setPosition(panelX, panelY)
 
-    // 更新按钮文字
+    // Update button text
     const upgradeCost = this.logic.getUpgradeCost(building.type, building.level)
     this.upgradeButtonText.setText(`${this.t('button_upgrade_text')} $${upgradeCost}`)
 
@@ -1477,21 +1477,21 @@ export class Game extends Scene {
     this.buildingActionPanel.setVisible(true)
   }
 
-  /** 处理暂停按钮点击 */
+  /** Handle pause button click */
   private handlePauseClick() {
     const state = this.logic.getState()
 
-    // 游戏已结束时，点击继续按钮会重启游戏
+    // When game is over, clicking continue button restarts the game
     if (state.isGameOver) {
       this.restart()
       return
     }
 
-    // 用户手动操作时清除自动暂停标志
+    // Clear auto-pause flag on manual operation
     this.wasAutoPaused = false
 
     if (state.isPaused) {
-      // 当前是暂停状态，点击继续游戏
+      // Currently paused, click to resume
       this.logic.togglePause()
       this.pauseButtonText.setText(this.t('button_pause_text'))
       this.restartButton.setVisible(false)
@@ -1499,7 +1499,7 @@ export class Game extends Scene {
       this.endGameButton.setVisible(false)
       this.endGameButtonText.setVisible(false)
     } else {
-      // 当前是运行状态，点击暂停游戏
+      // Currently running, click to pause
       this.logic.togglePause()
       this.pauseButtonText.setText(this.t('button_continue_text'))
       this.restartButton.setVisible(true)
@@ -1511,23 +1511,23 @@ export class Game extends Scene {
     EventBus.emit('game-paused', this.logic.getState().isPaused)
   }
 
-  /** 处理结束游戏按钮点击 */
+  /** Handle end game button click */
   private handleEndGameClick() {
-    // 波次提交期间不允许结束（避免竞态条件）
+    // Disallow ending during wave submission (to avoid race conditions)
     if (this.uiState.isSubmittingWave) {
       console.warn('Cannot end game: wave submission in progress')
       return
     }
 
-    // 判断是否为"波次已提交后的提前结束"
-    // 这种情况下 lastWave 已通过 /wave 提交，不需要再发送
-    // 其他情况（波次进行中、波次完成未提交）都需要发送 lastWave
+    // Determine if this is an "early end after wave submitted"
+    // In this case lastWave was already submitted via /wave, no need to resend
+    // Otherwise (wave in progress, or wave completed but not submitted) lastWave needs to be sent
     const isEarlyEnd = this.uiState.currentWaveSubmitted && this.uiState.waveIntervalCounter > 0
 
     this.gameOver(isEarlyEnd)
   }
 
-  /** 更新 UI 显示 */
+  /** Update UI display */
   private updateUI() {
     if (this.uiState.isLoading || !this.statsCards) {
       return
@@ -1538,7 +1538,7 @@ export class Game extends Scene {
     const monsters = this.logic.getMonsters()
     const aliveMonsters = monsters.filter((m) => m.isValid).length
 
-    // 更新各卡片数值
+    // Update card values
     this.statsCards.money.valueText.setText(`$${state.money}`)
     this.statsCards.score.valueText.setText(String(state.score))
     this.statsCards.life.valueText.setText(String(state.life))
@@ -1546,7 +1546,7 @@ export class Game extends Scene {
     this.statsCards.monsters.valueText.setText(String(aliveMonsters))
   }
 
-  /** 更新状态卡片标签文字（语言切换时） */
+  /** Update stats card label texts (on language switch) */
   private updateStatsCardLabels() {
     if (!this.statsCards) return
 
@@ -1567,12 +1567,12 @@ export class Game extends Scene {
     })
   }
 
-  /** 检查波次是否结束并处理 */
+  /** Check if wave is complete and handle accordingly */
   private checkWaveComplete() {
     if (this.uiState.isSubmittingWave) return
 
-    // 暂停时不处理波次完成和间隔计数
-    // 与旧实现一致: td.js step() 方法在 is_paused 时直接 return
+    // Do not process wave completion or interval counting while paused
+    // Consistent with old implementation: td.js step() returns early when is_paused
     const state = this.logic.getState()
     if (state.isPaused) return
 
@@ -1586,14 +1586,14 @@ export class Game extends Scene {
       this.uiState.waveIntervalCounter--
 
       if (this.uiState.waveIntervalCounter === 0) {
-        // 新波次开始，重置提交标记
+        // New wave starts, reset submission flag
         this.uiState.currentWaveSubmitted = false
         this.logic.startWave(this.currentWaveConfig)
       }
     }
   }
 
-  /** 提交波次结果到服务端 */
+  /** Submit wave result to server */
   private submitWaveResult() {
     const state = this.logic.getState()
     const waveRecorder = this.logic.getWaveRecorder()
@@ -1613,7 +1613,7 @@ export class Game extends Scene {
     ).then((response) => {
       if (!response.valid) {
         console.error('Wave validation failed:', response.error)
-        // 处理 Mock 模式下的 SESSION_NOT_FOUND
+        // Handle SESSION_NOT_FOUND in mock mode
         if (response.error?.code === 'SESSION_NOT_FOUND') {
           this.handleSessionNotFound()
           return
@@ -1622,27 +1622,27 @@ export class Game extends Scene {
         return
       }
 
-      // 检查游戏是否结束
-      // 波次已通过 /wave 提交，调用 gameOver(true) 避免重复提交 lastWave
+      // Check if game is over
+      // Wave was already submitted via /wave, call gameOver(true) to avoid duplicate lastWave submission
       if (state.life <= 0 || !response.nextWave) {
         this.gameOver(true)
         return
       }
 
-      // 保存下一波配置
+      // Save next wave config
       this.currentWaveConfig = response.nextWave
 
-      // 立即为下一波准备 recorder，使间隔期间的操作记录到正确的波次
+      // Immediately prepare recorder for next wave so actions during interval are recorded correctly
       this.logic.prepareNextWaveRecorder(response.nextWave.waveNumber)
 
-      // 标记当前波次已提交
+      // Mark current wave as submitted
       this.uiState.currentWaveSubmitted = true
 
-      // 开始波次间隔倒计时
+      // Start wave interval countdown
       this.uiState.waveIntervalCounter = WAVE_INTERVAL_FRAMES
       this.uiState.isSubmittingWave = false
     }).catch((error) => {
-      // 处理真实 API 模式下的错误
+      // Handle errors in real API mode
       console.error('Submit wave error:', error)
       this.uiState.isSubmittingWave = false
 
@@ -1651,45 +1651,45 @@ export class Game extends Scene {
         return
       }
 
-      // 其他网络错误，显示提示
+      // Other network errors, show tip
       this.showTip(this.t('error_network'))
     })
   }
 
-  /** 处理会话不存在错误 */
+  /** Handle session not found error */
   private handleSessionNotFound() {
-    // 显示提示告知用户会话已失效
+    // Show tip informing user that the session has expired
     const { width, height } = this.scale
     this.showTip(this.t('error_session_expired'), width / 2, height / 2)
 
-    // 延迟后自动重启游戏
+    // Auto restart after delay
     this.time.delayedCall(2000, () => {
       this.restart()
     })
   }
 
   /**
-   * 游戏结束
-   * @param isEarlyEnd 是否为提前结束（波次已通过 /wave 提交，不需要再发送 lastWave）
+   * Game over
+   * @param isEarlyEnd Whether this is an early end (wave already submitted via /wave, no need to send lastWave)
    */
   private gameOver(isEarlyEnd: boolean = false) {
-    // 设置游戏结束状态，停止游戏逻辑更新
+    // Set game over state, stop game logic updates
     this.logic.setGameOver()
 
     const state = this.logic.getState()
     const buildings = this.logic.getBuildings()
 
-    // 计算已完成波次数
-    // - isEarlyEnd = true: 当前波次已通过 /wave 提交，state.wave 即为已完成波次
-    // - isEarlyEnd = false: 当前波次进行中或刚完成未提交，已完成波次为 state.wave - 1
+    // Calculate completed waves count
+    // - isEarlyEnd = true: current wave already submitted via /wave, state.wave is the completed count
+    // - isEarlyEnd = false: current wave in progress or just completed without submission, completed = state.wave - 1
     const wavesCompleted = isEarlyEnd ? state.wave : Math.max(0, state.wave - 1)
 
-    // 最终得分 = 累计命中得分（无额外奖励）
+    // Final score = cumulative hit score (no bonus)
     const finalScore = state.score
 
-    // 发送游戏结束事件到 Vue 层
+    // Send game over event to Vue layer
     if (isEarlyEnd) {
-      // 提前结束：lastWave 已通过 /wave 提交，不需要再发送
+      // Early end: lastWave already submitted via /wave, no need to resend
       EventBus.emit('game-over', {
         score: finalScore,
         wavesCompleted,
@@ -1697,10 +1697,10 @@ export class Game extends Scene {
         isEarlyEnd: true,
       })
     } else {
-      // 正常结束：需要发送 lastWave 数据
+      // Normal end: need to send lastWave data
       const waveRecorder = this.logic.getWaveRecorder()
 
-      // 记录场上剩余的怪物（提前结束时需要，用于服务端验证）
+      // Record remaining monsters on the field (needed for early end, used for server validation)
       const monsters = this.logic.getMonsters()
       for (const monster of monsters) {
         if (monster.isValid) {
@@ -1733,13 +1733,13 @@ export class Game extends Scene {
       })
     }
 
-    // 禁用继续按钮（游戏结束后不允许继续）
+    // Disable continue button (not allowed after game over)
     this.pauseButton.disableInteractive()
     this.pauseButton.setFillStyle(0x666666, 0.5)
     this.pauseButtonText.setAlpha(0.5)
   }
 
-  /** 游戏主循环 */
+  /** Game main loop */
   update() {
     if (this.uiState.isLoading) return
 
@@ -1747,21 +1747,21 @@ export class Game extends Scene {
 
     if (state.isGameOver) return
 
-    // 更新逻辑
+    // Update logic
     this.logic.update()
 
-    // 渲染
+    // Render
     this.renderBuildings()
     this.renderMonsters()
     this.renderBullets()
     this.renderHover()
     this.updateUI()
 
-    // 检查波次完成
+    // Check wave completion
     this.checkWaveComplete()
   }
 
-  /** 暂停/恢复游戏 */
+  /** Pause/resume game */
   togglePause() {
     if (this.logic) {
       this.logic.togglePause()
@@ -1769,7 +1769,7 @@ export class Game extends Scene {
     }
   }
 
-  /** 获取游戏状态 */
+  /** Get game state */
   getGameState() {
     if (this.logic) {
       return this.logic.getState()
@@ -1777,9 +1777,9 @@ export class Game extends Scene {
     return null
   }
 
-  /** 重新开始游戏 */
+  /** Restart game */
   async restart() {
-    // 设置加载状态
+    // Set loading state
     this.uiState.isLoading = true
     this.uiState.waveIntervalCounter = 0
     this.uiState.isSubmittingWave = false
@@ -1788,10 +1788,10 @@ export class Game extends Scene {
     this.uiState.hoverPosition = null
     this.uiState.mobilePreviewPosition = null
 
-    // 重置自动暂停标志
+    // Reset auto-pause flag
     this.wasAutoPaused = false
 
-    // 重置控制面板状态
+    // Reset control panel state
     this.pauseButtonText.setText(this.t('button_pause_text'))
     this.pauseButtonText.setAlpha(1)
     this.pauseButton.setInteractive({ useHandCursor: true })
@@ -1801,40 +1801,40 @@ export class Game extends Scene {
     this.endGameButton.setVisible(false)
     this.endGameButtonText.setVisible(false)
 
-    // 隐藏建筑操作面板
+    // Hide building action panel
     this.updateBuildingActionPanel()
 
-    // 重置建筑面板按钮选中状态
+    // Reset building panel button selected states
     this.updateBuildingPanelButtonStates()
 
-    // 清除渲染
+    // Clear rendering
     this.buildingGraphics.clear()
     this.monsterGraphics.clear()
     this.bulletGraphics.clear()
     this.hoverGraphics.clear()
 
     try {
-      // 请求新的游戏会话
+      // Request new game session
       const response = await gameApi.createSession()
 
       this.sessionId = response.sessionId
       this.gameConfig = response.config
       this.currentWaveConfig = response.firstWave
 
-      // 重置核心逻辑
+      // Reset core logic
       this.logic.reset()
 
-      // 等待玩家放置第一个武器后再开始第一波
+      // Wait for the player to place the first weapon before starting wave 1
       this.uiState.waitingForFirstWeapon = true
       this.uiState.firstWaveRecorderPrepared = false
       this.uiState.currentWaveSubmitted = false
 
       this.uiState.isLoading = false
 
-      // 重新渲染静态元素
+      // Re-render static elements
       this.renderMap()
 
-      // 通知重新开始完成
+      // Notify restart completed
       EventBus.emit('game-restarted')
     } catch (error) {
       console.error('Failed to restart game:', error)

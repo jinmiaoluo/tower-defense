@@ -1,6 +1,6 @@
 /**
- * 建筑选中渲染器测试
- * TDD: 先编写测试，再实现功能
+ * Building selection renderer tests
+ * TDD: write tests first, then implement functionality
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -11,7 +11,7 @@ import {
 } from './SelectionRenderer'
 import type { RenderContext } from './types'
 
-/** 创建 Mock 渲染上下文 */
+/** Create mock render context */
 function createMockContext(): RenderContext & {
   calls: Array<{ method: string; args: unknown[] }>
 } {
@@ -43,7 +43,7 @@ function createMockContext(): RenderContext & {
   }
 }
 
-/** 默认选中颜色（金色，与旧实现一致） */
+/** Default selection colors (golden, consistent with legacy implementation) */
 const defaultColors: SelectionColors = {
   rangeSelected: 0xbb8d20,
   gridHighlight: 0xbb8d20,
@@ -57,7 +57,7 @@ describe('SelectionRenderer', () => {
   })
 
   describe('renderBuildingSelection', () => {
-    it('选中武器建筑时应渲染金色攻击范围圆（带填充和描边）', () => {
+    it('should render golden attack range circle (with fill and stroke) when weapon building is selected', () => {
       const data: SelectionRenderData = {
         centerX: 100,
         centerY: 100,
@@ -69,32 +69,32 @@ describe('SelectionRenderer', () => {
 
       renderBuildingSelection(ctx, data, defaultColors)
 
-      // 验证使用了金色填充
+      // Verify golden fill was used
       const fillStyleCalls = ctx.calls.filter((c) => c.method === 'fillStyle')
       const hasFillWithGoldenColor = fillStyleCalls.some(
         (c) => c.args[0] === 0xbb8d20
       )
       expect(hasFillWithGoldenColor).toBe(true)
 
-      // 验证渲染了填充圆
+      // Verify fill circle was rendered
       const fillCircleCalls = ctx.calls.filter((c) => c.method === 'fillCircle')
       expect(fillCircleCalls.length).toBeGreaterThan(0)
 
-      // 验证使用了金色描边
+      // Verify golden stroke was used
       const lineStyleCalls = ctx.calls.filter((c) => c.method === 'lineStyle')
       const hasStrokeWithGoldenColor = lineStyleCalls.some(
         (c) => c.args[1] === 0xbb8d20
       )
       expect(hasStrokeWithGoldenColor).toBe(true)
 
-      // 验证渲染了描边圆
+      // Verify stroke circle was rendered
       const strokeCircleCalls = ctx.calls.filter(
         (c) => c.method === 'strokeCircle'
       )
       expect(strokeCircleCalls.length).toBeGreaterThan(0)
     })
 
-    it('攻击范围圆的填充透明度应为 0.15（与旧实现一致）', () => {
+    it('should have fill alpha of 0.15 for attack range circle (consistent with legacy)', () => {
       const data: SelectionRenderData = {
         centerX: 100,
         centerY: 100,
@@ -106,13 +106,13 @@ describe('SelectionRenderer', () => {
 
       renderBuildingSelection(ctx, data, defaultColors)
 
-      // 验证范围圆填充透明度为 0.15（查找紧跟 fillCircle 的 fillStyle）
+      // Verify range circle fill alpha is 0.15 (find fillStyle preceding fillCircle)
       const fillCircleIndex = ctx.calls.findIndex(
         (c) => c.method === 'fillCircle'
       )
       expect(fillCircleIndex).toBeGreaterThan(0)
 
-      // fillCircle 前面的 fillStyle 应该是范围圆的填充设置
+      // The fillStyle before fillCircle should be the range circle fill setting
       const rangeFillStyle = ctx.calls
         .slice(0, fillCircleIndex)
         .reverse()
@@ -123,7 +123,7 @@ describe('SelectionRenderer', () => {
       expect(rangeFillStyle?.args[1]).toBe(0.15)
     })
 
-    it('应渲染格子高亮效果', () => {
+    it('should render grid highlight effect', () => {
       const data: SelectionRenderData = {
         centerX: 100,
         centerY: 100,
@@ -135,12 +135,12 @@ describe('SelectionRenderer', () => {
 
       renderBuildingSelection(ctx, data, defaultColors)
 
-      // 验证渲染了格子高亮矩形
+      // Verify grid highlight rect was rendered
       const fillRectCalls = ctx.calls.filter((c) => c.method === 'fillRect')
       expect(fillRectCalls.length).toBeGreaterThan(0)
     })
 
-    it('非武器建筑（墙）不应渲染攻击范围圆', () => {
+    it('should not render attack range circle for non-weapon building (wall)', () => {
       const data: SelectionRenderData = {
         centerX: 100,
         centerY: 100,
@@ -152,7 +152,7 @@ describe('SelectionRenderer', () => {
 
       renderBuildingSelection(ctx, data, defaultColors)
 
-      // 验证没有渲染攻击范围圆
+      // Verify no attack range circle was rendered
       const fillCircleCalls = ctx.calls.filter((c) => c.method === 'fillCircle')
       expect(fillCircleCalls.length).toBe(0)
 
@@ -162,7 +162,7 @@ describe('SelectionRenderer', () => {
       expect(strokeCircleCalls.length).toBe(0)
     })
 
-    it('非武器建筑（墙）仍应渲染格子高亮', () => {
+    it('should still render grid highlight for non-weapon building (wall)', () => {
       const data: SelectionRenderData = {
         centerX: 100,
         centerY: 100,
@@ -174,12 +174,12 @@ describe('SelectionRenderer', () => {
 
       renderBuildingSelection(ctx, data, defaultColors)
 
-      // 验证仍然渲染了格子高亮
+      // Verify grid highlight was still rendered
       const fillRectCalls = ctx.calls.filter((c) => c.method === 'fillRect')
       expect(fillRectCalls.length).toBeGreaterThan(0)
     })
 
-    it('攻击范围圆半径应正确计算（range * gridSize）', () => {
+    it('should correctly calculate attack range circle radius (range * gridSize)', () => {
       const data: SelectionRenderData = {
         centerX: 100,
         centerY: 100,
@@ -191,13 +191,13 @@ describe('SelectionRenderer', () => {
 
       renderBuildingSelection(ctx, data, defaultColors)
 
-      // 验证圆的半径为 range * gridSize = 4 * 32 = 128
+      // Verify circle radius is range * gridSize = 4 * 32 = 128
       const fillCircleCall = ctx.calls.find((c) => c.method === 'fillCircle')
       expect(fillCircleCall).toBeDefined()
       expect(fillCircleCall?.args[2]).toBe(128)
     })
 
-    it('格子高亮应正确定位在建筑位置', () => {
+    it('should correctly position grid highlight at building location', () => {
       const data: SelectionRenderData = {
         centerX: 116,
         centerY: 116,
@@ -209,11 +209,11 @@ describe('SelectionRenderer', () => {
 
       renderBuildingSelection(ctx, data, defaultColors)
 
-      // 验证格子高亮矩形的位置
+      // Verify grid highlight rect position
       const fillRectCalls = ctx.calls.filter((c) => c.method === 'fillRect')
       expect(fillRectCalls.length).toBeGreaterThan(0)
 
-      // 格子左上角应该是 centerX - gridSize/2, centerY - gridSize/2
+      // Grid top-left should be centerX - gridSize/2, centerY - gridSize/2
       const expectedX = 116 - 16
       const expectedY = 116 - 16
       const highlightCall = fillRectCalls[0]

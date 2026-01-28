@@ -30,10 +30,10 @@ const showLeaderboard = ref(false)
 const showGuide = ref(StartGuide.shouldShowGuide())
 const gameOverData = ref<GameOverData | null>(null)
 
-// 屏幕唤醒锁管理器（仅移动设备）
+// Screen wake lock manager (mobile only)
 const wakeLockManager = isMobileDevice() ? new WakeLockManager() : null
 
-// 存储最后一波的数据，用于提交
+// Store last wave data for submission
 const lastWaveData = ref<{
   waveNumber: number
   actions: Action[]
@@ -43,7 +43,7 @@ const lastWaveData = ref<{
 } | null>(null)
 
 const currentScene = (_scene: Scene) => {
-  // 场景就绪时获取屏幕唤醒锁
+  // Acquire screen wake lock when scene is ready
   wakeLockManager?.acquire()
 }
 
@@ -51,7 +51,7 @@ async function handleSubmitScore(nickname: string) {
   if (!gameOverData.value) return
 
   try {
-    // 根据是否提前结束决定是否包含 lastWave 数据
+    // Include lastWave data only if not an early end
     const endRequest = gameOverData.value.isEarlyEnd
       ? {
           sessionId: gameOverData.value.sessionId,
@@ -76,7 +76,7 @@ async function handleSubmitScore(nickname: string) {
     if (response.verified && response.ranking) {
       gameOverModalRef.value?.setRankingResult(response.ranking)
     } else {
-      // Mock 模式下的 SESSION_NOT_FOUND 处理
+      // Handle SESSION_NOT_FOUND in mock mode
       if (response.error?.code === 'SESSION_NOT_FOUND') {
         gameOverModalRef.value?.setError('Session expired. Please restart the game.')
       } else {
@@ -84,16 +84,16 @@ async function handleSubmitScore(nickname: string) {
       }
     }
   } catch (error) {
-    // 真实 API 模式下的错误处理
+    // Error handling for real API mode
     if (error instanceof ApiError) {
       if (error.code === 'SESSION_NOT_FOUND') {
         gameOverModalRef.value?.setError('Session expired. Please restart the game.')
       } else {
-        // 显示服务端返回的具体错误消息
+        // Show specific error message from the server
         gameOverModalRef.value?.setError(error.message)
       }
     } else {
-      // 网络错误或其他未知错误
+      // Network error or other unknown errors
       gameOverModalRef.value?.setError('Network error')
     }
   }
@@ -132,12 +132,12 @@ function handleRestart() {
   lastWaveData.value = null
   gameOverModalRef.value?.resetState()
 
-  // 通过 EventBus 通知 Game 场景重新开始
+  // Notify Game scene to restart via EventBus
   EventBus.emit('restart-game')
 }
 
 onMounted(() => {
-  // 监听游戏结束事件
+  // Listen to game-over event
   EventBus.on('game-over', (data: {
     score: number
     wavesCompleted: number
@@ -155,8 +155,8 @@ onMounted(() => {
       isEarlyEnd: data.isEarlyEnd,
     }
 
-    // 只有非提前结束时才设置 lastWaveData
-    // 注意: waveNumber 是当前波次号 (wavesCompleted + 1)，用于 API 提交
+    // Only set lastWaveData when not an early end
+    // Note: waveNumber is the current wave number (wavesCompleted + 1) for API submission
     if (!data.isEarlyEnd && data.lastWaveActions && data.lastWaveResult && data.buildings) {
       lastWaveData.value = {
         waveNumber: data.wavesCompleted + 1,
@@ -169,19 +169,19 @@ onMounted(() => {
       lastWaveData.value = null
     }
 
-    // 游戏结束时释放屏幕唤醒锁
+    // Release screen wake lock when game ends
     wakeLockManager?.release()
 
     showGameOver.value = true
   })
 
-  // 监听显示排行榜事件（从游戏界面按钮触发）
+  // Listen to show-leaderboard event (triggered from game UI button)
   EventBus.on('show-leaderboard', () => {
     showLeaderboard.value = true
     leaderboardRef.value?.refresh()
   })
 
-  // 监听游戏重启完成事件，重新获取屏幕唤醒锁
+  // Listen to game-restarted event and reacquire screen wake lock
   EventBus.on('game-restarted', () => {
     wakeLockManager?.acquire()
   })
@@ -191,7 +191,7 @@ onUnmounted(() => {
   EventBus.off('game-over')
   EventBus.off('show-leaderboard')
   EventBus.off('game-restarted')
-  // 组件卸载时释放屏幕唤醒锁
+  // Release screen wake lock when component unmounts
   wakeLockManager?.release()
 })
 </script>

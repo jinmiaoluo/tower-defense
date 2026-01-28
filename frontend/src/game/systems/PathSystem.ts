@@ -1,7 +1,7 @@
 /**
- * PathSystem - 路径计算系统
- * 负责怪物路径计算，基于 BFS 寻路算法
- * 参考旧实现：html5-tower-defense/src/js/td-walk.js
+ * PathSystem - Path calculation system
+ * Handles monster path calculation based on BFS pathfinding algorithm
+ * Reference: html5-tower-defense/src/js/td-walk.js
  */
 
 import type { MapConfig, Position } from '@/types'
@@ -9,41 +9,41 @@ import { GAME_CONSTANTS } from '@/types'
 
 const { GRID_SIZE } = GAME_CONSTANTS
 
-/** PathSystem 接口定义 */
+/** PathSystem interface definition */
 export interface PathSystem {
   /**
-   * 生成从入口到出口的路径
-   * @param mapConfig 地图配置
-   * @returns 路径点数组，如果路径被阻塞返回空数组
+   * Generate path from entrance to exit
+   * @param mapConfig Map configuration
+   * @returns Array of path points, or empty array if path is blocked
    */
   generatePath(mapConfig: MapConfig): Position[]
 
   /**
-   * 从指定位置生成到出口的路径
-   * 用于怪物独立寻路
-   * @param startPosition 起始位置
-   * @param mapConfig 地图配置（包含当前障碍物）
-   * @returns 路径点数组，如果路径被阻塞返回空数组
+   * Generate path from a specified position to the exit
+   * Used for independent monster pathfinding
+   * @param startPosition Starting position
+   * @param mapConfig Map configuration (including current obstacles)
+   * @returns Array of path points, or empty array if path is blocked
    */
   generatePathFrom(startPosition: Position, mapConfig: MapConfig): Position[]
 
   /**
-   * 根据进度获取路径上的像素位置
-   * @param path 路径点数组
-   * @param progress 进度 (0-1)
-   * @returns 像素坐标 { x, y }
+   * Get pixel position on the path at a given progress
+   * @param path Array of path points
+   * @param progress Progress value (0-1)
+   * @returns Pixel coordinates { x, y }
    */
   getPositionAtProgress(path: Position[], progress: number): { x: number; y: number }
 }
 
-/** 未探索标记 */
+/** Unexplored marker */
 const UNEXPLORED = -2
-/** 不可通过标记 */
+/** Impassable marker */
 const BLOCKED = -1
 
 /**
- * BFS 寻路器
- * 基于旧实现的 TD.FindWay 类重写
+ * BFS pathfinder
+ * Rewritten based on the old implementation's TD.FindWay class
  */
 class PathFinder {
   private readonly width: number
@@ -67,15 +67,15 @@ class PathFinder {
     this.endX = mapConfig.exit[0]
     this.endY = mapConfig.exit[1]
 
-    // 初始化网格为未探索状态
+    // Initialize grid as unexplored
     const len = this.width * this.height
     this.grid = new Array(len).fill(UNEXPLORED)
 
-    // 创建障碍物集合用于快速查找
+    // Create obstacle set for fast lookup
     this.obstacleSet = new Set(mapConfig.obstacles.map((p) => `${p[0]},${p[1]}`))
   }
 
-  /** 获取网格值 */
+  /** Get grid value */
   private getVal(x: number, y: number): number {
     if (x < 0 || x >= this.width || y < 0 || y >= this.height) {
       return BLOCKED
@@ -83,14 +83,14 @@ class PathFinder {
     return this.grid[y * this.width + x]
   }
 
-  /** 设置网格值 */
+  /** Set grid value */
   private setVal(x: number, y: number, value: number): void {
     if (x >= 0 && x < this.width && y >= 0 && y < this.height) {
       this.grid[y * this.width + x] = value
     }
   }
 
-  /** 检查格子是否可通过 */
+  /** Check if a cell is passable */
   private isPassable(x: number, y: number): boolean {
     if (x < 0 || x >= this.width || y < 0 || y >= this.height) {
       return false
@@ -98,17 +98,17 @@ class PathFinder {
     return !this.obstacleSet.has(`${x},${y}`)
   }
 
-  /** 获取相邻格子（上下左右） */
+  /** Get adjacent cells (up, down, left, right) */
   private getNeighbors(x: number, y: number): Position[] {
     const neighbors: Position[] = []
-    if (y > 0) neighbors.push([x, y - 1]) // 上
-    if (x < this.width - 1) neighbors.push([x + 1, y]) // 右
-    if (y < this.height - 1) neighbors.push([x, y + 1]) // 下
-    if (x > 0) neighbors.push([x - 1, y]) // 左
+    if (y > 0) neighbors.push([x, y - 1]) // up
+    if (x < this.width - 1) neighbors.push([x + 1, y]) // right
+    if (y < this.height - 1) neighbors.push([x, y + 1]) // down
+    if (x > 0) neighbors.push([x - 1, y]) // left
     return neighbors
   }
 
-  /** 执行一轮 BFS 扩展 */
+  /** Execute one round of BFS expansion */
   private expandWave(): boolean {
     const nextWave: Position[] = []
     this.distance++
@@ -117,14 +117,14 @@ class PathFinder {
       const neighbors = this.getNeighbors(cx, cy)
 
       for (const [nx, ny] of neighbors) {
-        // 跳过已探索的格子
+        // Skip already explored cells
         if (this.getVal(nx, ny) !== UNEXPLORED) continue
 
         if (this.isPassable(nx, ny)) {
           this.setVal(nx, ny, this.distance)
           nextWave.push([nx, ny])
 
-          // 检查是否到达终点
+          // Check if destination reached
           if (nx === this.endX && ny === this.endY) {
             this.currentWave = []
             return false
@@ -144,20 +144,20 @@ class PathFinder {
     return true
   }
 
-  /** 从终点回溯找到路径 */
+  /** Trace path backwards from destination */
   private tracePath(): Position[] {
     const path: Position[] = []
     let x = this.endX
     let y = this.endY
 
-    // 从终点回溯到起点
+    // Trace back from destination to start
     while (x !== this.startX || y !== this.startY) {
       path.unshift([x, y])
 
       const neighbors = this.getNeighbors(x, y)
       let minVal = Infinity
 
-      // 第一遍：找到最小距离值
+      // First pass: find minimum distance value
       for (const [nx, ny] of neighbors) {
         const val = this.getVal(nx, ny)
         if (val >= 0 && val < minVal) {
@@ -165,7 +165,7 @@ class PathFinder {
         }
       }
 
-      // 第二遍：收集所有具有最小距离值的邻格
+      // Second pass: collect all neighbors with minimum distance value
       const closestNeighbors: Position[] = []
       for (const [nx, ny] of neighbors) {
         const val = this.getVal(nx, ny)
@@ -174,7 +174,7 @@ class PathFinder {
         }
       }
 
-      // 随机选择一个（与旧实现一致）
+      // Randomly select one (consistent with old implementation)
       if (closestNeighbors.length === 0) break
       const randomIndex =
         closestNeighbors.length > 1 ? Math.floor(Math.random() * closestNeighbors.length) : 0
@@ -182,30 +182,30 @@ class PathFinder {
       ;[x, y] = nextPos
     }
 
-    // 添加起点
+    // Add start point
     path.unshift([this.startX, this.startY])
     return path
   }
 
-  /** 执行寻路 */
+  /** Execute pathfinding */
   findPath(): Position[] {
-    // 特殊情况：起点和终点相同
+    // Special case: start and end are the same
     if (this.startX === this.endX && this.startY === this.endY) {
       return [[this.startX, this.startY]]
     }
 
-    // 检查起点是否可通过
+    // Check if start is passable
     if (!this.isPassable(this.startX, this.startY)) {
       return []
     }
 
-    // 初始化起点
+    // Initialize start point
     this.setVal(this.startX, this.startY, 0)
     this.currentWave = [[this.startX, this.startY]]
 
-    // BFS 扩展直到到达终点或被阻塞
+    // BFS expansion until destination reached or blocked
     while (this.expandWave()) {
-      // 继续扩展
+      // Continue expanding
     }
 
     if (this.isBlocked) {
@@ -217,7 +217,7 @@ class PathFinder {
 }
 
 /**
- * 将格子坐标转换为像素坐标（格子中心）
+ * Convert grid coordinates to pixel coordinates (cell center)
  */
 function gridToPixel(gridX: number, gridY: number): { x: number; y: number } {
   return {
@@ -227,7 +227,7 @@ function gridToPixel(gridX: number, gridY: number): { x: number; y: number } {
 }
 
 /**
- * 创建 PathSystem 实例
+ * Create a PathSystem instance
  */
 export function createPathSystem(): PathSystem {
   return {
@@ -237,7 +237,7 @@ export function createPathSystem(): PathSystem {
     },
 
     generatePathFrom(startPosition: Position, mapConfig: MapConfig): Position[] {
-      // 创建临时配置，将起点设为指定位置
+      // Create temporary config, setting start to specified position
       const tempConfig: MapConfig = {
         ...mapConfig,
         entrance: startPosition,
@@ -247,34 +247,34 @@ export function createPathSystem(): PathSystem {
     },
 
     getPositionAtProgress(path: Position[], progress: number): { x: number; y: number } {
-      // 空路径返回原点
+      // Empty path returns origin
       if (path.length === 0) {
         return { x: 0, y: 0 }
       }
 
-      // 单点路径直接返回该点
+      // Single-point path returns that point directly
       if (path.length === 1) {
         return gridToPixel(path[0][0], path[0][1])
       }
 
-      // clamp progress 到 [0, 1]
+      // Clamp progress to [0, 1]
       const clampedProgress = Math.max(0, Math.min(1, progress))
 
-      // 计算总段数和当前位置
+      // Calculate total segments and current position
       const totalSegments = path.length - 1
       const exactPosition = clampedProgress * totalSegments
       const segmentIndex = Math.min(Math.floor(exactPosition), totalSegments - 1)
       const segmentProgress = exactPosition - segmentIndex
 
-      // 获取当前段的起点和终点
+      // Get start and end of current segment
       const [startGridX, startGridY] = path[segmentIndex]
       const [endGridX, endGridY] = path[segmentIndex + 1]
 
-      // 转换为像素坐标
+      // Convert to pixel coordinates
       const startPixel = gridToPixel(startGridX, startGridY)
       const endPixel = gridToPixel(endGridX, endGridY)
 
-      // 线性插值
+      // Linear interpolation
       return {
         x: startPixel.x + (endPixel.x - startPixel.x) * segmentProgress,
         y: startPixel.y + (endPixel.y - startPixel.y) * segmentProgress,

@@ -1,5 +1,5 @@
 /**
- * StartGuide 组件测试
+ * StartGuide component tests
  * @vitest-environment happy-dom
  */
 
@@ -29,8 +29,8 @@ describe('StartGuide', () => {
     vi.unstubAllGlobals()
   })
 
-  describe('显示控制', () => {
-    it('当 visible 为 true 时应显示指引', () => {
+  describe('visibility control', () => {
+    it('should show the guide when visible is true', () => {
       const wrapper = mount(StartGuide, {
         props: { visible: true },
       })
@@ -38,7 +38,7 @@ describe('StartGuide', () => {
       expect(wrapper.find('.modal-overlay').exists()).toBe(true)
     })
 
-    it('当 visible 为 false 时不应显示指引', () => {
+    it('should not show the guide when visible is false', () => {
       const wrapper = mount(StartGuide, {
         props: { visible: false },
       })
@@ -47,8 +47,8 @@ describe('StartGuide', () => {
     })
   })
 
-  describe('关闭行为', () => {
-    it('点击关闭按钮应触发 close 事件', async () => {
+  describe('close behavior', () => {
+    it('should emit close event when close button is clicked', async () => {
       const wrapper = mount(StartGuide, {
         props: { visible: true },
       })
@@ -58,7 +58,7 @@ describe('StartGuide', () => {
       expect(wrapper.emitted('close')).toHaveLength(1)
     })
 
-    it('显示时应自动聚焦到关闭按钮', async () => {
+    it('should auto-focus the close button when shown', async () => {
       const wrapper = mount(StartGuide, {
         props: { visible: true },
         attachTo: document.body,
@@ -70,7 +70,7 @@ describe('StartGuide', () => {
       wrapper.unmount()
     })
 
-    it('从隐藏变为显示时应自动聚焦到关闭按钮', async () => {
+    it('should auto-focus the close button when transitioning from hidden to shown', async () => {
       const wrapper = mount(StartGuide, {
         props: { visible: false },
         attachTo: document.body,
@@ -86,7 +86,7 @@ describe('StartGuide', () => {
       wrapper.unmount()
     })
 
-    it('关闭时应移除焦点避免焦点转移到其他元素', async () => {
+    it('should remove focus on close to prevent focus shifting to other elements', async () => {
       const wrapper = mount(StartGuide, {
         props: { visible: true },
         attachTo: document.body,
@@ -103,7 +103,7 @@ describe('StartGuide', () => {
       wrapper.unmount()
     })
 
-    it('按下 Enter 键应触发 close 事件', async () => {
+    it('should emit close event when Enter key is pressed', async () => {
       const wrapper = mount(StartGuide, {
         props: { visible: true },
         attachTo: document.body,
@@ -116,7 +116,7 @@ describe('StartGuide', () => {
       wrapper.unmount()
     })
 
-    it('visible 为 false 时按下 Enter 键不应触发 close 事件', async () => {
+    it('should not emit close event when Enter is pressed while visible is false', async () => {
       const wrapper = mount(StartGuide, {
         props: { visible: false },
         attachTo: document.body,
@@ -129,43 +129,43 @@ describe('StartGuide', () => {
       wrapper.unmount()
     })
 
-    it('visible 从 true 变为 false 后按下 Enter 键不应触发 close 事件', async () => {
+    it('should not emit close event on Enter after visible changes from true to false', async () => {
       const wrapper = mount(StartGuide, {
         props: { visible: true },
         attachTo: document.body,
       })
 
-      // 先验证 visible=true 时可以响应
+      // Verify Enter triggers close when visible=true
       let event = new KeyboardEvent('keydown', { key: 'Enter' })
       document.dispatchEvent(event)
       expect(wrapper.emitted('close')).toHaveLength(1)
 
-      // 切换为 visible=false
+      // Switch to visible=false
       await wrapper.setProps({ visible: false })
 
-      // 再次按 Enter 不应触发新的 close 事件
+      // Press Enter again; should not trigger a new close event
       event = new KeyboardEvent('keydown', { key: 'Enter' })
       document.dispatchEvent(event)
-      expect(wrapper.emitted('close')).toHaveLength(1) // 仍然是 1，没有新增
+      expect(wrapper.emitted('close')).toHaveLength(1) // Still 1, no new emission
 
       wrapper.unmount()
     })
 
-    it('visible 从 false 变为 true 后按下 Enter 键应触发 close 事件', async () => {
+    it('should emit close event on Enter after visible changes from false to true', async () => {
       const wrapper = mount(StartGuide, {
         props: { visible: false },
         attachTo: document.body,
       })
 
-      // visible=false 时按 Enter 不应响应
+      // Enter should not respond when visible=false
       let event = new KeyboardEvent('keydown', { key: 'Enter' })
       document.dispatchEvent(event)
       expect(wrapper.emitted('close')).toBeUndefined()
 
-      // 切换为 visible=true（模拟用户点击 HelpButton 重新打开）
+      // Switch to visible=true (simulating user clicking HelpButton to reopen)
       await wrapper.setProps({ visible: true })
 
-      // 再次按 Enter 应触发 close 事件
+      // Press Enter again; should trigger close event
       event = new KeyboardEvent('keydown', { key: 'Enter' })
       document.dispatchEvent(event)
       expect(wrapper.emitted('close')).toHaveLength(1)
@@ -173,7 +173,7 @@ describe('StartGuide', () => {
       wrapper.unmount()
     })
 
-    it('点击背景遮罩应触发 close 事件', async () => {
+    it('should emit close event when clicking the backdrop overlay', async () => {
       const wrapper = mount(StartGuide, {
         props: { visible: true },
       })
@@ -183,7 +183,7 @@ describe('StartGuide', () => {
       expect(wrapper.emitted('close')).toHaveLength(1)
     })
 
-    it('点击内容区域不应触发 close 事件', async () => {
+    it('should not emit close event when clicking the content area', async () => {
       const wrapper = mount(StartGuide, {
         props: { visible: true },
       })
@@ -194,8 +194,8 @@ describe('StartGuide', () => {
     })
   })
 
-  describe('自动记住关闭状态', () => {
-    it('关闭时应自动保存到 localStorage', async () => {
+  describe('auto-remember dismissed state', () => {
+    it('should save to localStorage on close', async () => {
       const wrapper = mount(StartGuide, {
         props: { visible: true },
       })
@@ -205,7 +205,7 @@ describe('StartGuide', () => {
       expect(localStorage.setItem).toHaveBeenCalledWith(STORAGE_KEY, 'true')
     })
 
-    it('点击遮罩关闭时也应保存到 localStorage', async () => {
+    it('should save to localStorage when closing via overlay click', async () => {
       const wrapper = mount(StartGuide, {
         props: { visible: true },
       })
@@ -215,7 +215,7 @@ describe('StartGuide', () => {
       expect(localStorage.setItem).toHaveBeenCalledWith(STORAGE_KEY, 'true')
     })
 
-    it('localStorage.setItem 抛出异常时不应崩溃', async () => {
+    it('should not crash when localStorage.setItem throws', async () => {
       vi.stubGlobal('localStorage', {
         getItem: vi.fn(() => null),
         setItem: vi.fn(() => {
@@ -233,7 +233,7 @@ describe('StartGuide', () => {
       expect(wrapper.emitted('close')).toHaveLength(1)
     })
 
-    it('不应显示 checkbox 选项', () => {
+    it('should not show a checkbox option', () => {
       const wrapper = mount(StartGuide, {
         props: { visible: true },
       })
@@ -242,19 +242,19 @@ describe('StartGuide', () => {
     })
   })
 
-  describe('shouldShowGuide 静态方法', () => {
-    it('首次访问应返回 true', () => {
+  describe('shouldShowGuide static method', () => {
+    it('should return true on first visit', () => {
       const { shouldShowGuide } = StartGuide
       expect(shouldShowGuide()).toBe(true)
     })
 
-    it('已dismiss过应返回 false', () => {
+    it('should return false after being dismissed', () => {
       localStorageMock[STORAGE_KEY] = 'true'
       const { shouldShowGuide } = StartGuide
       expect(shouldShowGuide()).toBe(false)
     })
 
-    it('localStorage 返回异常值时应返回 true', () => {
+    it('should return true when localStorage returns unexpected values', () => {
       localStorageMock[STORAGE_KEY] = 'false'
       expect(StartGuide.shouldShowGuide()).toBe(true)
 
@@ -265,7 +265,7 @@ describe('StartGuide', () => {
       expect(StartGuide.shouldShowGuide()).toBe(true)
     })
 
-    it('localStorage.getItem 抛出异常时应返回 true', () => {
+    it('should return true when localStorage.getItem throws', () => {
       vi.stubGlobal('localStorage', {
         getItem: vi.fn(() => {
           throw new Error('localStorage disabled')
@@ -277,8 +277,8 @@ describe('StartGuide', () => {
     })
   })
 
-  describe('内容显示', () => {
-    it('应显示游戏目标说明', () => {
+  describe('content display', () => {
+    it('should display the game objective description', () => {
       const wrapper = mount(StartGuide, {
         props: { visible: true },
       })
@@ -288,7 +288,7 @@ describe('StartGuide', () => {
       expect(content).toContain('monsters')
     })
 
-    it('应显示建造操作说明', () => {
+    it('should display the build instructions', () => {
       const wrapper = mount(StartGuide, {
         props: { visible: true },
       })
@@ -297,7 +297,7 @@ describe('StartGuide', () => {
       expect(content).toContain('Build Towers')
     })
 
-    it('应显示升级/出售说明', () => {
+    it('should display the upgrade/sell instructions', () => {
       const wrapper = mount(StartGuide, {
         props: { visible: true },
       })
@@ -307,7 +307,7 @@ describe('StartGuide', () => {
       expect(content).toContain('Sell')
     })
 
-    it('关闭按钮应显示通用确认文案而非开始游戏', () => {
+    it('should show a generic confirmation label on the close button, not a start-game label', () => {
       const wrapper = mount(StartGuide, {
         props: { visible: true },
       })

@@ -1,49 +1,49 @@
 /**
- * EconomySystem - 经济系统
- * 负责游戏过程中的波次生命恢复奖励计算
+ * EconomySystem - Economy system
+ * Handles wave life recovery reward calculation during gameplay
  *
- * 参考旧实现：html5-tower-defense/src/js/td-data-stage-1.js 第 62-73 行
+ * Reference: html5-tower-defense/src/js/td-data-stage-1.js lines 62-73
  */
 
 import type { GameConfig } from '@/types'
 import { GAME_CONSTANTS } from '@/types'
 
-/** EconomySystem 接口定义 */
+/** EconomySystem interface definition */
 export interface EconomySystem {
   /**
-   * 计算波次生命恢复奖励（游戏过程中的资源恢复）
+   * Calculate wave life recovery reward (resource recovery during gameplay)
    *
-   * 规则：
-   * - 每 10 波：+10 生命
-   * - 每 5 波（非 10 的倍数）：+5 生命
-   * - 其他波次：0
+   * Rules:
+   * - Every 10 waves: +10 life
+   * - Every 5 waves (not a multiple of 10): +5 life
+   * - Other waves: 0
    *
-   * @param waveNumber 当前波次号
+   * @param waveNumber Current wave number
    */
   getLifeReward(waveNumber: number): number
 
   /**
-   * 应用生命奖励，考虑生命值上限
-   * @param currentLife 当前生命值
-   * @param reward 奖励值
-   * @returns 应用奖励后的生命值（不超过 MAX_LIFE）
+   * Apply life reward, considering life cap
+   * @param currentLife Current life value
+   * @param reward Reward value
+   * @returns Life value after applying reward (capped at MAX_LIFE)
    */
   applyLifeReward(currentLife: number, reward: number): number
 }
 
 /**
- * 创建 EconomySystem 实例
- * 注意: canAfford 和 getBuildCost 已移至 BuildingSystem，避免功能重复
+ * Create an EconomySystem instance
+ * Note: canAfford and getBuildCost have been moved to BuildingSystem to avoid duplication
  */
 export function createEconomySystem(_config: GameConfig): EconomySystem {
   /**
-   * 计算波次生命奖励
-   * 来源：旧实现 td-data-stage-1.js 第 62-73 行
+   * Calculate wave life reward
+   * Source: old implementation td-data-stage-1.js lines 62-73
    *
-   * 规则：
-   * - 每 10 波：返回 10
-   * - 每 5 波（非 10 的倍数）：返回 5
-   * - 其他：返回 0
+   * Rules:
+   * - Every 10 waves: return 10
+   * - Every 5 waves (not a multiple of 10): return 5
+   * - Others: return 0
    */
   function getLifeReward(waveNumber: number): number {
     if (waveNumber % 10 === 0) {
@@ -56,10 +56,10 @@ export function createEconomySystem(_config: GameConfig): EconomySystem {
   }
 
   /**
-   * 应用生命奖励
-   * 来源：旧实现 td-data-stage-1.js 第 68-72 行
+   * Apply life reward
+   * Source: old implementation td-data-stage-1.js lines 68-72
    *
-   * 生命值有上限 100，奖励后不超过此上限
+   * Life has a cap of 100; reward cannot exceed this cap
    */
   function applyLifeReward(currentLife: number, reward: number): number {
     const newLife = currentLife + reward

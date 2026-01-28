@@ -1,5 +1,5 @@
 /**
- * 渲染模块导出
+ * Render module exports
  */
 
 export * from './types'

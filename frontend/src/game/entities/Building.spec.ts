@@ -1,5 +1,5 @@
 /**
- * Building 实体测试
+ * Building entity tests
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
@@ -9,13 +9,13 @@ import type { IWaveRecorder } from '@/types/recorder'
 import type { BuildingType, Position } from '@/types'
 
 // ============================================================================
-// Mock 数据和工厂函数
+// Mock data and factory functions
 // ============================================================================
 
 function createMockDependencies(overrides?: Partial<BuildingDependencies>): BuildingDependencies {
   return {
     getDamageAtLevel: vi.fn((type: BuildingType, level: number) => {
-      // 模拟基础伤害计算
+      // Simulate base damage calculation
       const baseDamage: Record<BuildingType, number> = {
         wall: 0,
         cannon: 12,
@@ -50,7 +50,7 @@ function createMockDependencies(overrides?: Partial<BuildingDependencies>): Buil
       return speeds[type]
     }),
     isInRange: vi.fn((building, targetPos) => {
-      // 简单距离计算
+      // Simple distance calculation
       const dx = building.position[0] - targetPos[0]
       const dy = building.position[1] - targetPos[1]
       const distance = Math.sqrt(dx * dx + dy * dy)
@@ -124,7 +124,7 @@ function createMockRecorder(): IWaveRecorder {
 }
 
 // ============================================================================
-// 测试用例
+// Test cases
 // ============================================================================
 
 describe('Building', () => {
@@ -142,11 +142,11 @@ describe('Building', () => {
   })
 
   // --------------------------------------------------------------------------
-  // 创建和初始化
+  // Creation and initialization
   // --------------------------------------------------------------------------
 
-  describe('创建和初始化', () => {
-    it('应该正确创建 Building 实例', () => {
+  describe('creation and initialization', () => {
+    it('should correctly create a Building instance', () => {
       const building = createBuilding(defaultParams, deps)
 
       expect(building.id).toBe('building-1')
@@ -158,14 +158,14 @@ describe('Building', () => {
       expect(building.kills).toBe(0)
     })
 
-    it('默认等级应该为 1', () => {
+    it('should default level to 1', () => {
       const params = { ...defaultParams, level: undefined }
       const building = createBuilding(params, deps)
 
       expect(building.level).toBe(1)
     })
 
-    it('应该支持不同建筑类型', () => {
+    it('should support different building types', () => {
       const types: BuildingType[] = ['wall', 'cannon', 'LMG', 'HMG', 'laser_gun']
 
       for (const type of types) {
@@ -176,25 +176,25 @@ describe('Building', () => {
   })
 
   // --------------------------------------------------------------------------
-  // 攻击能力检查
+  // Attack ability check
   // --------------------------------------------------------------------------
 
   describe('canAttack', () => {
-    it('冷却结束时应该可以攻击', () => {
+    it('should be able to attack when cooldown is finished', () => {
       const building = createBuilding(defaultParams, deps)
       building.cooldown = 0
 
       expect(building.canAttack()).toBe(true)
     })
 
-    it('冷却中时不能攻击', () => {
+    it('should not be able to attack while on cooldown', () => {
       const building = createBuilding(defaultParams, deps)
       building.cooldown = 10
 
       expect(building.canAttack()).toBe(false)
     })
 
-    it('wall 类型永远不能攻击', () => {
+    it('wall type should never be able to attack', () => {
       const building = createBuilding({ ...defaultParams, type: 'wall' }, deps)
       building.cooldown = 0
 
@@ -203,11 +203,11 @@ describe('Building', () => {
   })
 
   // --------------------------------------------------------------------------
-  // 目标搜索
+  // Target search
   // --------------------------------------------------------------------------
 
   describe('findTarget', () => {
-    it('应该找到射程内的怪物', () => {
+    it('should find a monster within range', () => {
       const building = createBuilding(defaultParams, deps)
       const monster = createMockMonster({ id: 'monster-1' })
       ;(monster.getGridPosition as ReturnType<typeof vi.fn>).mockReturnValue([6, 6])
@@ -217,7 +217,7 @@ describe('Building', () => {
       expect(target).toBe(monster)
     })
 
-    it('应该忽略无效的怪物', () => {
+    it('should ignore invalid monsters', () => {
       const building = createBuilding(defaultParams, deps)
       const invalidMonster = createMockMonster({ isValid: false })
       const validMonster = createMockMonster({ id: 'monster-2' })
@@ -228,7 +228,7 @@ describe('Building', () => {
       expect(target).toBe(validMonster)
     })
 
-    it('没有怪物时应该返回 null', () => {
+    it('should return null when there are no monsters', () => {
       const building = createBuilding(defaultParams, deps)
 
       const target = building.findTarget([])
@@ -236,7 +236,7 @@ describe('Building', () => {
       expect(target).toBeNull()
     })
 
-    it('wall 类型应该始终返回 null', () => {
+    it('wall type should always return null', () => {
       const building = createBuilding({ ...defaultParams, type: 'wall' }, deps)
       const monster = createMockMonster()
 
@@ -245,8 +245,8 @@ describe('Building', () => {
       expect(target).toBeNull()
     })
 
-    it('应该忽略射程外的怪物', () => {
-      // 配置 isInRange 返回 false
+    it('should ignore monsters out of range', () => {
+      // Configure isInRange to return false
       deps.isInRange = vi.fn(() => false)
 
       const building = createBuilding(defaultParams, deps)
@@ -258,7 +258,7 @@ describe('Building', () => {
       expect(target).toBeNull()
     })
 
-    it('应该优先选择路径进度最高的怪物', () => {
+    it('should prioritize the monster with the highest path progress', () => {
       const building = createBuilding(defaultParams, deps)
 
       const monster1 = createMockMonster({ id: 'monster-1', progress: 0.3 })
@@ -276,21 +276,21 @@ describe('Building', () => {
   })
 
   // --------------------------------------------------------------------------
-  // 攻击行为
+  // Attack behavior
   // --------------------------------------------------------------------------
 
   describe('attack', () => {
-    it('攻击后应该设置冷却时间', () => {
+    it('should set cooldown after attacking', () => {
       const building = createBuilding(defaultParams, deps)
       const monster = createMockMonster()
       const recorder = createMockRecorder()
 
       building.attack(monster, recorder, 100)
 
-      expect(building.cooldown).toBe(30) // cannon 的攻击间隔
+      expect(building.cooldown).toBe(30) // cannon attack interval
     })
 
-    it('应该记录攻击事件（非激光枪）', () => {
+    it('should not record attack event for non-laser weapons', () => {
       const building = createBuilding(defaultParams, deps)
       const monster = createMockMonster()
       ;(monster.getGridPosition as ReturnType<typeof vi.fn>).mockReturnValue([6, 6])
@@ -298,11 +298,11 @@ describe('Building', () => {
 
       building.attack(monster, recorder, 100)
 
-      // 非激光枪不应该直接记录攻击，由 BulletSystem 记录
+      // Non-laser weapons should not record attack directly; BulletSystem handles it
       expect(recorder.recordAttack).not.toHaveBeenCalled()
     })
 
-    it('laser_gun 应该立即命中并记录', () => {
+    it('laser_gun should hit immediately and record', () => {
       const building = createBuilding({ ...defaultParams, type: 'laser_gun' }, deps)
       const monster = createMockMonster()
       ;(monster.getGridPosition as ReturnType<typeof vi.fn>).mockReturnValue([6, 6])
@@ -310,13 +310,13 @@ describe('Building', () => {
 
       building.attack(monster, recorder, 100)
 
-      // laser_gun 直接造成伤害
+      // laser_gun deals damage directly
       expect(monster.takeDamage).toHaveBeenCalled()
-      // laser_gun 应该记录攻击事件
+      // laser_gun should record the attack event
       expect(recorder.recordAttack).toHaveBeenCalled()
     })
 
-    it('laser_gun 攻击后应该更新统计', () => {
+    it('laser_gun should update stats after attacking', () => {
       const building = createBuilding({ ...defaultParams, type: 'laser_gun' }, deps)
       const monster = createMockMonster()
       ;(monster.takeDamage as ReturnType<typeof vi.fn>).mockReturnValue(25)
@@ -328,7 +328,7 @@ describe('Building', () => {
       expect(building.damageDealt).toBe(25)
     })
 
-    it('laser_gun 击杀应该增加 kills', () => {
+    it('laser_gun kill should increment kills', () => {
       const building = createBuilding({ ...defaultParams, type: 'laser_gun' }, deps)
       const monster = createMockMonster()
       ;(monster.takeDamage as ReturnType<typeof vi.fn>).mockReturnValue(100)
@@ -343,11 +343,11 @@ describe('Building', () => {
   })
 
   // --------------------------------------------------------------------------
-  // 属性获取
+  // Property getters
   // --------------------------------------------------------------------------
 
-  describe('属性获取', () => {
-    it('getDamage 应该返回当前等级的伤害', () => {
+  describe('property getters', () => {
+    it('getDamage should return damage for the current level', () => {
       const building = createBuilding(defaultParams, deps)
 
       const damage = building.getDamage()
@@ -356,7 +356,7 @@ describe('Building', () => {
       expect(damage).toBe(12)
     })
 
-    it('getRange 应该返回当前等级的射程', () => {
+    it('getRange should return range for the current level', () => {
       const building = createBuilding(defaultParams, deps)
 
       const range = building.getRange()
@@ -365,7 +365,7 @@ describe('Building', () => {
       expect(range).toBe(8)
     })
 
-    it('getAttackSpeed 应该返回攻击间隔帧数', () => {
+    it('getAttackSpeed should return attack interval in frames', () => {
       const building = createBuilding(defaultParams, deps)
 
       const speed = building.getAttackSpeed()
@@ -374,7 +374,7 @@ describe('Building', () => {
       expect(speed).toBe(30)
     })
 
-    it('升级后属性应该正确更新', () => {
+    it('properties should update correctly after upgrade', () => {
       const building = createBuilding({ ...defaultParams, level: 3 }, deps)
 
       const damage = building.getDamage()
@@ -388,11 +388,11 @@ describe('Building', () => {
   })
 
   // --------------------------------------------------------------------------
-  // 波次统计重置
+  // Wave stats reset
   // --------------------------------------------------------------------------
 
   describe('resetWaveStats', () => {
-    it('应该重置波次统计数据', () => {
+    it('should reset wave statistics', () => {
       const building = createBuilding(defaultParams, deps)
       building.damageDealt = 500
       building.kills = 10
@@ -403,7 +403,7 @@ describe('Building', () => {
       expect(building.kills).toBe(0)
     })
 
-    it('不应该重置其他状态', () => {
+    it('should not reset other state', () => {
       const building = createBuilding(defaultParams, deps)
       building.level = 5
       building.cooldown = 10
@@ -416,11 +416,11 @@ describe('Building', () => {
   })
 
   // --------------------------------------------------------------------------
-  // 冷却更新
+  // Cooldown update
   // --------------------------------------------------------------------------
 
   describe('updateCooldown', () => {
-    it('每帧应该减少冷却', () => {
+    it('should decrease cooldown each frame', () => {
       const building = createBuilding(defaultParams, deps)
       building.cooldown = 10
 
@@ -429,7 +429,7 @@ describe('Building', () => {
       expect(building.cooldown).toBe(9)
     })
 
-    it('冷却不应该变成负数', () => {
+    it('cooldown should not go below zero', () => {
       const building = createBuilding(defaultParams, deps)
       building.cooldown = 0
 
@@ -440,11 +440,11 @@ describe('Building', () => {
   })
 
   // --------------------------------------------------------------------------
-  // 子弹创建参数
+  // Bullet creation parameters
   // --------------------------------------------------------------------------
 
   describe('getBulletParams', () => {
-    it('应该返回正确的子弹创建参数', () => {
+    it('should return correct bullet creation parameters', () => {
       const building = createBuilding(defaultParams, deps)
       const monster = createMockMonster()
       ;(monster.getGridPosition as ReturnType<typeof vi.fn>).mockReturnValue([6, 6])
@@ -459,7 +459,7 @@ describe('Building', () => {
       expect(params!.originalTargetPosition).toEqual([6, 6])
     })
 
-    it('laser_gun 应该返回 null（不使用子弹）', () => {
+    it('laser_gun should return null (does not use bullets)', () => {
       const building = createBuilding({ ...defaultParams, type: 'laser_gun' }, deps)
       const monster = createMockMonster()
 
@@ -470,11 +470,11 @@ describe('Building', () => {
   })
 
   // --------------------------------------------------------------------------
-  // 升级
+  // Upgrade
   // --------------------------------------------------------------------------
 
   describe('upgrade', () => {
-    it('应该增加等级', () => {
+    it('should increment level', () => {
       const building = createBuilding(defaultParams, deps)
 
       building.upgrade()
@@ -482,7 +482,7 @@ describe('Building', () => {
       expect(building.level).toBe(2)
     })
 
-    it('升级后伤害应该增加', () => {
+    it('damage should increase after upgrade', () => {
       const building = createBuilding(defaultParams, deps)
 
       building.upgrade()

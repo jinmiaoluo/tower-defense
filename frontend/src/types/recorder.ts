@@ -1,6 +1,6 @@
 /**
- * 波次记录类型定义
- * 用于 WaveRecorder 系统记录游戏数据
+ * Wave recorder type definitions
+ * Used by the WaveRecorder system to record game data
  */
 
 import type { BuildingType, MonsterTypeId, Position } from './config'
@@ -13,7 +13,7 @@ import type {
   WaveResult,
 } from './api'
 
-// 重新导出常用类型
+// Re-export common types
 export type {
   Action,
   ActionType,
@@ -24,10 +24,10 @@ export type {
 }
 
 // ============================================================================
-// 内部记录类型（用于累计统计）
+// Internal record types (for cumulative statistics)
 // ============================================================================
 
-/** 波次记录内部状态 */
+/** Wave record internal state */
 export interface WaveRecordState {
   waveNumber: number
   startFrame: number
@@ -36,7 +36,7 @@ export interface WaveRecordState {
   result: MutableWaveResult
 }
 
-/** 可变的波次结果（内部使用） */
+/** Mutable wave result (for internal use) */
 export interface MutableWaveResult {
   killed: number
   killedByType: Map<MonsterTypeId, number>
@@ -51,10 +51,10 @@ export interface MutableWaveResult {
 }
 
 // ============================================================================
-// 建造操作数据
+// Build action data
 // ============================================================================
 
-/** 建造操作数据 */
+/** Build action data */
 export interface BuildActionData {
   buildingId: string
   buildingType: BuildingType
@@ -62,115 +62,115 @@ export interface BuildActionData {
   frame: number
 }
 
-/** 升级操作数据 */
+/** Upgrade action data */
 export interface UpgradeActionData {
   buildingId: string
   level: number
   frame: number
 }
 
-/** 出售操作数据 */
+/** Sell action data */
 export interface SellActionData {
   buildingId: string
   frame: number
 }
 
 // ============================================================================
-// 攻击记录数据
+// Attack record data
 // ============================================================================
 
-/** 攻击记录数据 */
+/** Attack record data */
 export interface AttackRecordData {
   buildingId: string
-  /** 发射时瞄准的怪物 ID（用于验证建筑有合法目标） */
+  /** Monster ID targeted at the time of firing (used to verify the building had a valid target) */
   originalTargetId: string
-  /** 发射时目标的格子坐标（用于射程验证） */
+  /** Grid coordinates of the target at the time of firing (used for range verification) */
   originalTargetPosition: Position
-  /** 实际命中的怪物 ID，可能与 originalTargetId 不同（"误伤"） */
+  /** Monster ID actually hit, may differ from originalTargetId ("friendly fire") */
   monsterId: string
-  /** 命中时怪物的格子坐标，用于路径验证 */
+  /** Grid coordinates of the monster when hit (used for path verification) */
   monsterPosition: Position
   damage: number
   frame: number
 }
 
 // ============================================================================
-// 击杀/穿过记录
+// Kill/pass records
 // ============================================================================
 
-/** 怪物击杀数据 */
+/** Monster kill data */
 export interface KillRecordData {
   monsterType: MonsterTypeId
   monsterLife: number
   money: number
 }
 
-/** 怪物穿过终点数据 */
+/** Monster passed through exit data */
 export interface PassedRecordData {
-  /** 怪物到达终点造成的伤害（扣除玩家生命值） */
+  /** Damage dealt when the monster reaches the exit (deducted from player life) */
   damage: number
 }
 
 // ============================================================================
-// WaveRecorder 接口
+// WaveRecorder interface
 // ============================================================================
 
-/** WaveRecorder 接口定义 */
+/** WaveRecorder interface definition */
 export interface IWaveRecorder {
-  /** 记录建造操作 */
+  /** Record a build action */
   recordBuild(data: BuildActionData): void
 
-  /** 记录升级操作 */
+  /** Record an upgrade action */
   recordUpgrade(data: UpgradeActionData): void
 
-  /** 记录出售操作 */
+  /** Record a sell action */
   recordSell(data: SellActionData): void
 
   /**
-   * 记录攻击事件
-   * 同时累加得分: scoreGained += floor(√damage)
+   * Record an attack event
+   * Also accumulates score: scoreGained += floor(sqrt(damage))
    */
   recordAttack(data: AttackRecordData): void
 
-  /** 记录怪物被击杀（用于统计击杀数和金钱奖励，不计算得分） */
+  /** Record a monster kill (for kill count and money reward statistics, does not compute score) */
   recordKill(data: KillRecordData): void
 
-  /** 记录怪物穿过终点 */
+  /** Record a monster passing through the exit */
   recordPassed(data: PassedRecordData): void
 
-  /** 记录在场剩余怪物（提前结束时使用） */
+  /** Record a remaining monster on the field (used when ending early) */
   recordRemainingMonster(monsterId: string): void
 
-  /** 记录怪物生成（每生成一只怪物调用一次） */
+  /** Record a monster spawn (called once per monster spawned) */
   recordSpawn(): void
 
-  /** 获取在场剩余怪物 ID 列表 */
+  /** Get the list of remaining monster IDs on the field */
   getRemainingMonsterIds(): string[]
 
-  /** 设置波次持续帧数 */
+  /** Set the wave duration in frames */
   setDuration(frames: number): void
 
-  /** 获取所有操作 */
+  /** Get all actions */
   getActions(): Action[]
 
-  /** 获取所有攻击事件 */
+  /** Get all attack events */
   getAttacks(): AttackEvent[]
 
-  /** 获取波次结果 */
+  /** Get the wave result */
   getResult(): WaveResult
 
-  /** 导出为 WaveRequest 格式 */
+  /** Export as WaveRequest format */
   toWaveRequest(sessionId: string, buildings: BuildingSnapshot[]): WaveRequest
 
-  /** 重置记录器（开始新波次） */
+  /** Reset the recorder (start a new wave) */
   reset(waveNumber: number, startFrame: number): void
 }
 
 // ============================================================================
-// 辅助函数类型
+// Helper function types
 // ============================================================================
 
-/** 将 Map 转换为 Record */
+/** Convert a Map to a Record */
 export function mapToRecord<K extends number, V>(
   map: Map<K, V>,
 ): Record<K, V> {
@@ -181,7 +181,7 @@ export function mapToRecord<K extends number, V>(
   return record
 }
 
-/** 创建空的可变波次结果 */
+/** Create an empty mutable wave result */
 export function createEmptyMutableResult(): MutableWaveResult {
   return {
     killed: 0,
@@ -197,7 +197,7 @@ export function createEmptyMutableResult(): MutableWaveResult {
   }
 }
 
-/** 将可变结果转换为不可变结果 */
+/** Convert a mutable result to an immutable result */
 export function toImmutableResult(
   mutable: MutableWaveResult,
   waveDurationFrames: number,
@@ -215,7 +215,7 @@ export function toImmutableResult(
     waveDurationFrames,
   }
 
-  // 只有当有剩余怪物时才添加这些字段
+  // Only add these fields when there are remaining monsters
   if (mutable.remainingMonsterIds.length > 0) {
     result.remaining = mutable.remainingMonsterIds.length
     result.remainingMonsterIds = [...mutable.remainingMonsterIds]

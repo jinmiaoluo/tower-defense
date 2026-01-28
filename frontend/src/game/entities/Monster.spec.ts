@@ -1,6 +1,6 @@
 /**
- * Monster 实体测试
- * 基于 TDD 方式编写，测试先于实现
+ * Monster entity tests
+ * Written in TDD style, tests before implementation
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
@@ -9,10 +9,10 @@ import type { MonsterCreateParams, Path } from '@/types/entities'
 import type { MonsterTypeId, Position } from '@/types'
 
 // ============================================================================
-// 测试 fixtures
+// Test fixtures
 // ============================================================================
 
-/** 创建测试用的怪物参数 */
+/** Create test monster parameters */
 function createTestMonsterParams(overrides: Partial<MonsterCreateParams> = {}): MonsterCreateParams {
   return {
     id: 'test-monster-001',
@@ -27,7 +27,7 @@ function createTestMonsterParams(overrides: Partial<MonsterCreateParams> = {}): 
   }
 }
 
-/** 创建测试用的路径 */
+/** Create a test path */
 function createTestPath(): Path {
   return [
     [0, 0],
@@ -38,7 +38,7 @@ function createTestPath(): Path {
   ] as Position[]
 }
 
-/** 创建测试用的依赖 */
+/** Create test dependencies */
 function createTestDependencies(): MonsterDependencies {
   return {
     generatePathFrom: () => createTestPath(),
@@ -66,7 +66,7 @@ function createTestDependencies(): MonsterDependencies {
 }
 
 // ============================================================================
-// 测试用例
+// Test cases
 // ============================================================================
 
 describe('Monster', () => {
@@ -76,8 +76,8 @@ describe('Monster', () => {
     dependencies = createTestDependencies()
   })
 
-  describe('创建', () => {
-    it('应正确初始化所有属性', () => {
+  describe('creation', () => {
+    it('should correctly initialize all properties', () => {
       const params = createTestMonsterParams()
       const monster = createMonster(params, dependencies)
 
@@ -94,14 +94,14 @@ describe('Monster', () => {
       expect(monster.isValid).toBe(true)
     })
 
-    it('应正确初始化有护盾的怪物', () => {
+    it('should correctly initialize a monster with shield', () => {
       const params = createTestMonsterParams({ shield: 20 })
       const monster = createMonster(params, dependencies)
 
       expect(monster.shield).toBe(20)
     })
 
-    it('应正确初始化高级怪物', () => {
+    it('should correctly initialize an advanced monster', () => {
       const params = createTestMonsterParams({
         type: 8 as MonsterTypeId,
         life: 300,
@@ -121,25 +121,25 @@ describe('Monster', () => {
   })
 
   describe('radius', () => {
-    it('应根据 damage 计算 radius: floor(damage * 1.2)', () => {
+    it('should calculate radius based on damage: floor(damage * 1.2)', () => {
       // damage = 5, radius = floor(5 * 1.2) = 6
       const monster = createMonster(createTestMonsterParams({ damage: 5 }), dependencies)
       expect(monster.radius).toBe(6)
     })
 
-    it('radius 最小值应为 4', () => {
-      // damage = 1, floor(1 * 1.2) = 1, 但最小值为 4
+    it('radius minimum should be 4', () => {
+      // damage = 1, floor(1 * 1.2) = 1, but minimum is 4
       const monster = createMonster(createTestMonsterParams({ damage: 1 }), dependencies)
       expect(monster.radius).toBe(4)
     })
 
-    it('radius 最大值应为 12', () => {
-      // damage = 20, floor(20 * 1.2) = 24, 但最大值为 12
+    it('radius maximum should be 12', () => {
+      // damage = 20, floor(20 * 1.2) = 24, but maximum is 12
       const monster = createMonster(createTestMonsterParams({ damage: 20 }), dependencies)
       expect(monster.radius).toBe(12)
     })
 
-    it('高伤害怪物应有更大的 radius', () => {
+    it('high damage monsters should have larger radius', () => {
       const lowDamageMonster = createMonster(createTestMonsterParams({ damage: 3 }), dependencies)
       const highDamageMonster = createMonster(createTestMonsterParams({ damage: 10 }), dependencies)
 
@@ -152,7 +152,7 @@ describe('Monster', () => {
   })
 
   describe('takeDamage', () => {
-    it('无护盾时应造成全额伤害', () => {
+    it('should deal full damage without shield', () => {
       const monster = createMonster(createTestMonsterParams({ life: 100, shield: 0 }), dependencies)
 
       const actualDamage = monster.takeDamage(30)
@@ -161,7 +161,7 @@ describe('Monster', () => {
       expect(monster.currentLife).toBe(70)
     })
 
-    it('有护盾时应减少伤害', () => {
+    it('should reduce damage with shield', () => {
       const monster = createMonster(createTestMonsterParams({ life: 100, shield: 10 }), dependencies)
 
       const actualDamage = monster.takeDamage(30)
@@ -170,43 +170,43 @@ describe('Monster', () => {
       expect(monster.currentLife).toBe(80)
     })
 
-    it('护盾应保证最低 10% 伤害', () => {
+    it('shield should guarantee minimum 10% damage', () => {
       const monster = createMonster(createTestMonsterParams({ life: 100, shield: 50 }), dependencies)
 
       const actualDamage = monster.takeDamage(30)
 
-      // 30 - 50 = -20，但最低伤害 = ceil(30 * 0.1) = 3
+      // 30 - 50 = -20, but minimum damage = ceil(30 * 0.1) = 3
       expect(actualDamage).toBe(3)
       expect(monster.currentLife).toBe(97)
     })
 
-    it('高伤害武器应对护盾怪造成更多伤害', () => {
+    it('high damage weapons should deal more damage to shielded monsters', () => {
       const monster1 = createMonster(createTestMonsterParams({ life: 100, shield: 20 }), dependencies)
       const monster2 = createMonster(createTestMonsterParams({ life: 100, shield: 20 }), dependencies)
 
-      // 低伤害武器
+      // Low damage weapon
       const damage1 = monster1.takeDamage(10) // max(10 - 20, 1) = 1
-      // 高伤害武器
+      // High damage weapon
       const damage2 = monster2.takeDamage(50) // max(50 - 20, 5) = 30
 
       expect(damage1).toBe(1) // ceil(10 * 0.1) = 1
       expect(damage2).toBe(30) // 50 - 20 = 30
     })
 
-    it('shield 是静态值，不会随受击递减', () => {
+    it('shield is a static value and does not decrease on hit', () => {
       const monster = createMonster(createTestMonsterParams({ shield: 10 }), dependencies)
 
       expect(monster.shield).toBe(10)
 
       monster.takeDamage(5)
-      // 与旧实现一致，shield 不变
+      // Consistent with the old implementation, shield remains unchanged
       expect(monster.shield).toBe(10)
 
       monster.takeDamage(5)
       expect(monster.shield).toBe(10)
     })
 
-    it('生命值不应低于 0', () => {
+    it('life should not go below 0', () => {
       const monster = createMonster(createTestMonsterParams({ life: 10, shield: 0 }), dependencies)
 
       monster.takeDamage(100)
@@ -214,7 +214,7 @@ describe('Monster', () => {
       expect(monster.currentLife).toBe(0)
     })
 
-    it('死亡后不应再受到伤害', () => {
+    it('should not take damage after death', () => {
       const monster = createMonster(createTestMonsterParams({ life: 10, shield: 0 }), dependencies)
 
       monster.takeDamage(10)
@@ -228,13 +228,13 @@ describe('Monster', () => {
   })
 
   describe('isDead', () => {
-    it('生命值 > 0 时应返回 false', () => {
+    it('should return false when life > 0', () => {
       const monster = createMonster(createTestMonsterParams({ life: 50 }), dependencies)
 
       expect(monster.isDead()).toBe(false)
     })
 
-    it('生命值 = 0 时应返回 true', () => {
+    it('should return true when life = 0', () => {
       const monster = createMonster(createTestMonsterParams({ life: 10 }), dependencies)
 
       monster.takeDamage(10)
@@ -242,7 +242,7 @@ describe('Monster', () => {
       expect(monster.isDead()).toBe(true)
     })
 
-    it('生命值 < 0 时应返回 true', () => {
+    it('should return true when life < 0', () => {
       const monster = createMonster(createTestMonsterParams({ life: 10 }), dependencies)
 
       monster.takeDamage(100)
@@ -252,7 +252,7 @@ describe('Monster', () => {
   })
 
   describe('reachedExit', () => {
-    it('progress < 1 时应返回 false', () => {
+    it('should return false when progress < 1', () => {
       const monster = createMonster(createTestMonsterParams(), dependencies)
 
       monster.progress = 0.5
@@ -260,7 +260,7 @@ describe('Monster', () => {
       expect(monster.reachedExit()).toBe(false)
     })
 
-    it('progress = 1 时应返回 true', () => {
+    it('should return true when progress = 1', () => {
       const monster = createMonster(createTestMonsterParams(), dependencies)
 
       monster.progress = 1
@@ -268,7 +268,7 @@ describe('Monster', () => {
       expect(monster.reachedExit()).toBe(true)
     })
 
-    it('progress > 1 时应返回 true', () => {
+    it('should return true when progress > 1', () => {
       const monster = createMonster(createTestMonsterParams(), dependencies)
 
       monster.progress = 1.1
@@ -278,7 +278,7 @@ describe('Monster', () => {
   })
 
   describe('getGridPosition', () => {
-    it('初始时应返回入口格子', () => {
+    it('should return the entrance cell initially', () => {
       const monster = createMonster(createTestMonsterParams(), dependencies)
 
       const pos = monster.getGridPosition()
@@ -286,11 +286,11 @@ describe('Monster', () => {
       expect(pos).toEqual([0, 0])
     })
 
-    it('到达终点时应返回出口格子', () => {
-      // 使用高速怪物快速到达终点
+    it('should return the exit cell when reached the end', () => {
+      // Use a high-speed monster to reach the end quickly
       const monster = createMonster(createTestMonsterParams({ speed: 1000 }), dependencies)
 
-      // 多次更新直到到达终点
+      // Update multiple times until reaching the end
       for (let i = 0; i < 100; i++) {
         if (!monster.isValid) break
         monster.update()
@@ -300,45 +300,45 @@ describe('Monster', () => {
       expect(pos).toEqual([4, 0])
     })
 
-    it('移动过程中应返回对应的格子', () => {
-      // 使用高速移动，减少 10% 重新寻路的影响
+    it('should return the corresponding cell during movement', () => {
+      // Use high speed to reduce the impact of 10% re-pathing
       // speed=320, GLOBAL_SPEED=0.1, OLD_FPS/FPS=0.4
-      // 每帧移动 = 320 * 0.1 * 0.4 = 12.8 像素
-      // 每格需要 32 / 12.8 = 2.5 帧
+      // Per-frame movement = 320 * 0.1 * 0.4 = 12.8 pixels
+      // Each cell takes 32 / 12.8 = 2.5 frames
       const monster = createMonster(createTestMonsterParams({ speed: 320 }), dependencies)
 
-      // 模拟移动若干帧后检查位置
-      // 由于 10% 重新寻路机制，怪物移动可能不稳定
-      // 使用足够多的帧来确保移动了至少 1 格
+      // Simulate moving several frames then check position
+      // Due to the 10% re-pathing mechanism, monster movement may be unstable
+      // Use enough frames to ensure at least 1 cell of movement
       for (let i = 0; i < 20; i++) {
         monster.update()
         if (!monster.isValid) break
       }
 
-      // 高速怪物在 20 帧后应该移动了至少 1 格
+      // High-speed monster should have moved at least 1 cell after 20 frames
       const pos = monster.getGridPosition()
-      expect(pos[1]).toBe(0) // y 坐标应该是 0
-      // 由于路径随机性和重新寻路，只验证怪物确实在移动
+      expect(pos[1]).toBe(0) // y coordinate should be 0
+      // Due to path randomness and re-pathing, only verify that the monster is indeed moving
       expect(monster.progress).toBeGreaterThan(0)
     })
   })
 
   describe('getPixelPosition', () => {
-    it('初始时应返回入口格子中心', () => {
+    it('should return the entrance cell center initially', () => {
       const monster = createMonster(createTestMonsterParams(), dependencies)
 
       const pos = monster.getPixelPosition()
 
-      // 格子 (0, 0) 中心 = (16, 16)
+      // Cell (0, 0) center = (16, 16)
       expect(pos.x).toBe(16)
       expect(pos.y).toBe(16)
     })
 
-    it('到达终点时应返回出口格子中心', () => {
-      // 使用高速怪物快速到达终点
+    it('should return the exit cell center when reached the end', () => {
+      // Use a high-speed monster to reach the end quickly
       const monster = createMonster(createTestMonsterParams({ speed: 1000 }), dependencies)
 
-      // 多次更新直到到达终点
+      // Update multiple times until reaching the end
       for (let i = 0; i < 100; i++) {
         if (!monster.isValid) break
         monster.update()
@@ -346,45 +346,45 @@ describe('Monster', () => {
 
       const pos = monster.getPixelPosition()
 
-      // 格子 (4, 0) 中心 = (4 * 32 + 16, 16) = (144, 16)
+      // Cell (4, 0) center = (4 * 32 + 16, 16) = (144, 16)
       expect(pos.x).toBe(144)
       expect(pos.y).toBe(16)
     })
 
-    it('移动过程中应返回正确的插值位置', () => {
-      // 使用可预测的速度移动
+    it('should return a correct interpolated position during movement', () => {
+      // Use a predictable speed for movement
       // speed=32, GLOBAL_SPEED=0.1, OLD_FPS/FPS=0.4
-      // 每帧移动 = 32 * 0.1 * 0.4 = 1.28 像素
+      // Per-frame movement = 32 * 0.1 * 0.4 = 1.28 pixels
       const monster = createMonster(createTestMonsterParams({ speed: 32 }), dependencies)
 
-      // 模拟移动一帧后检查位置
+      // Simulate moving one frame then check position
       monster.update()
       const pos = monster.getPixelPosition()
 
-      // 应该向右移动了 1.28 像素
-      expect(pos.x).toBeGreaterThan(16) // 起始位置是 16
-      expect(pos.x).toBeLessThan(48) // 还没到第二个格子中心 (48)
+      // Should have moved 1.28 pixels to the right
+      expect(pos.x).toBeGreaterThan(16) // Starting position is 16
+      expect(pos.x).toBeLessThan(48) // Has not reached the second cell center (48)
       expect(pos.y).toBe(16)
     })
   })
 
   describe('update', () => {
-    it('每帧应根据 speed 更新 progress', () => {
+    it('should update progress based on speed each frame', () => {
       const monster = createMonster(createTestMonsterParams({ speed: 3 }), dependencies)
 
-      // 速度 3 表示每帧移动 3 格，路径 5 个点共 4 段
-      // progress 增量 = speed / (路径段数 * 32)
+      // Speed 3 means moving 3 cells per frame, path has 5 points and 4 segments
+      // progress increment = speed / (segments * 32)
       const initialProgress = monster.progress
       monster.update()
 
       expect(monster.progress).toBeGreaterThan(initialProgress)
     })
 
-    it('到达终点时应标记为无效', () => {
-      // 使用高速怪物确保能在有限帧数内到达终点
+    it('should be marked invalid when reaching the end', () => {
+      // Use a high-speed monster to ensure reaching the end within limited frames
       const monster = createMonster(createTestMonsterParams({ speed: 1000 }), dependencies)
 
-      // 多次更新直到到达终点
+      // Update multiple times until reaching the end
       for (let i = 0; i < 200; i++) {
         monster.update()
         if (!monster.isValid) break
@@ -394,10 +394,10 @@ describe('Monster', () => {
       expect(monster.isValid).toBe(false)
     })
 
-    it('已无效的怪物不应更新', () => {
+    it('invalid monster should not be updated', () => {
       const monster = createMonster(createTestMonsterParams(), dependencies)
 
-      // 标记为无效
+      // Mark as invalid
       monster.isValid = false
       const initialProgress = monster.progress
 
@@ -407,8 +407,8 @@ describe('Monster', () => {
     })
   })
 
-  describe('边界情况', () => {
-    it('空路径时不应崩溃', () => {
+  describe('edge cases', () => {
+    it('should not crash with an empty path', () => {
       const emptyDeps: MonsterDependencies = {
         generatePathFrom: () => [],
         getPositionAtProgress: () => ({ x: 0, y: 0 }),
@@ -422,7 +422,7 @@ describe('Monster', () => {
       expect(() => monster.update()).not.toThrow()
     })
 
-    it('单点路径应正确处理', () => {
+    it('should handle a single-point path correctly', () => {
       const singlePointDeps: MonsterDependencies = {
         generatePathFrom: () => [[5, 5]] as Position[],
         getPositionAtProgress: () => ({ x: 5 * 32 + 16, y: 5 * 32 + 16 }),
@@ -436,29 +436,29 @@ describe('Monster', () => {
     })
   })
 
-  describe('移动连续性（防止跳跃）', () => {
+  describe('movement continuity (preventing jumps)', () => {
     afterEach(() => {
       vi.restoreAllMocks()
     })
 
-    it('重新寻路时像素位置应保持连续（参考旧实现）', () => {
-      // 模拟重新寻路时路径方向改变的情况
-      // 旧实现通过追踪像素位置 (cx, cy) 保持连续性
-      // 新实现应该有相同的行为
+    it('pixel position should remain continuous during re-pathing (reference: old implementation)', () => {
+      // Simulate a scenario where path direction changes during re-pathing
+      // The old implementation maintains continuity by tracking pixel position (cx, cy)
+      // The new implementation should have the same behavior
 
       let pathCallCount = 0
       const repathDeps: MonsterDependencies = {
         generatePathFrom: (startPos) => {
           pathCallCount++
           if (pathCallCount === 1) {
-            // 初始路径：向右移动（足够长以确保有时间触发重新寻路）
+            // Initial path: move right (long enough to ensure time for re-pathing trigger)
             return [
               [0, 0], [1, 0], [2, 0], [3, 0], [4, 0],
               [5, 0], [6, 0], [7, 0], [8, 0], [9, 0],
               [10, 0], [11, 0], [12, 0], [13, 0], [14, 0], [15, 0],
             ] as Position[]
           } else {
-            // 重新寻路：从当前格子向下移动（方向改变）
+            // Re-path: move downward from current cell (direction change)
             const [sx, sy] = startPos
             return [
               [sx, sy],
@@ -475,34 +475,34 @@ describe('Monster', () => {
         getEntrance: () => [0, 0] as Position,
       }
 
-      // 使用较高速度，确保能穿越足够多格子触发重新寻路
+      // Use higher speed to ensure crossing enough cells to trigger re-pathing
       // speed=128, GLOBAL_SPEED=0.1, OLD_FPS/FPS=0.4
-      // 每帧移动 = 128 * 0.1 * 0.4 = 5.12 像素
-      // 穿越一个格子 (32 像素) 约需 6-7 帧
+      // Per-frame movement = 128 * 0.1 * 0.4 = 5.12 pixels
+      // Crossing one cell (32 pixels) takes approximately 6-7 frames
       const monster = createMonster(createTestMonsterParams({ speed: 128 }), repathDeps)
 
-      // 移动若干帧，让怪物进入路径中段
+      // Move several frames to get the monster into the middle of the path
       for (let i = 0; i < 10; i++) {
         monster.update()
       }
 
-      // Mock Math.random() 来确定性地触发 10% 重新寻路
-      // 返回 0.05 < 0.1 会触发重新寻路
+      // Mock Math.random() to deterministically trigger 10% re-pathing
+      // Returning 0.05 < 0.1 will trigger re-pathing
       let randomCallCount = 0
       vi.spyOn(Math, 'random').mockImplementation(() => {
         randomCallCount++
-        // 第一次到达格子中心时触发重新寻路（返回 0.05 < 0.1）
+        // Trigger re-pathing on first arrival at a cell center (return 0.05 < 0.1)
         if (randomCallCount === 1) {
           return 0.05
         }
-        // 之后返回 0.5 不触发重新寻路
+        // Afterwards return 0.5 to not trigger re-pathing
         return 0.5
       })
 
       const initialPathCallCount = pathCallCount
       let repathOccurred = false
 
-      // 继续移动直到触发重新寻路或到达终点
+      // Continue moving until re-pathing occurs or the end is reached
       for (let i = 0; i < 100 && !repathOccurred && monster.isValid; i++) {
         const posBeforeUpdate = monster.getPixelPosition()
         monster.update()
@@ -511,14 +511,14 @@ describe('Monster', () => {
         if (pathCallCount > initialPathCallCount) {
           repathOccurred = true
 
-          // 关键断言：重新寻路后像素位置变化应该很小
-          // 每帧最大移动距离约 5.12 像素，不应该有大幅跳跃
+          // Key assertion: pixel position change after re-pathing should be small
+          // Max per-frame movement is about 5.12 pixels; there should be no large jumps
           const dx = Math.abs(posAfterUpdate.x - posBeforeUpdate.x)
           const dy = Math.abs(posAfterUpdate.y - posBeforeUpdate.y)
           const distance = Math.sqrt(dx * dx + dy * dy)
 
-          // 单帧移动距离不应超过几个像素
-          // 如果有跳跃，距离会远超这个值
+          // Single-frame movement distance should not exceed a few pixels
+          // If there is a jump, the distance will be far above this value
           const maxExpectedMove = 10
           expect(distance).toBeLessThan(maxExpectedMove)
         }
@@ -527,11 +527,11 @@ describe('Monster', () => {
       expect(repathOccurred).toBe(true)
     })
 
-    it('每帧移动应该是平滑的（无大幅跳跃）', () => {
+    it('per-frame movement should be smooth (no large jumps)', () => {
       const monster = createMonster(createTestMonsterParams({ speed: 64 }), dependencies)
 
       let lastPos = monster.getPixelPosition()
-      const jumpThreshold = 20 // 单帧跳跃超过这个距离视为异常
+      const jumpThreshold = 20 // Single-frame jump exceeding this distance is considered abnormal
 
       for (let i = 0; i < 100 && monster.isValid; i++) {
         monster.update()
@@ -541,23 +541,23 @@ describe('Monster', () => {
         const dy = Math.abs(currentPos.y - lastPos.y)
         const distance = Math.sqrt(dx * dx + dy * dy)
 
-        // 单帧移动不应有大幅跳跃
+        // Single-frame movement should not have large jumps
         expect(distance).toBeLessThan(jumpThreshold)
 
         lastPos = currentPos
       }
     })
 
-    it('10% 重新寻路应只在到达格子中心时触发（参考旧实现）', () => {
-      // 旧实现: 10% 重新寻路只在怪物到达格子中心后选择下一个目标时触发
-      // 而不是每帧都有 10% 概率触发
-      // 这保证了怪物在两个格子之间移动时方向稳定
+    it('10% re-pathing should only trigger when reaching a cell center (reference: old implementation)', () => {
+      // Old implementation: 10% re-pathing only triggers when the monster reaches a cell center
+      // and selects the next target, not every frame with a 10% chance
+      // This ensures stable direction when moving between two cells
 
       let pathCallCount = 0
       const trackingDeps: MonsterDependencies = {
         generatePathFrom: () => {
           pathCallCount++
-          // 返回一条长路径
+          // Return a long path
           return [
             [0, 0], [1, 0], [2, 0], [3, 0], [4, 0],
             [5, 0], [6, 0], [7, 0], [8, 0], [9, 0],
@@ -568,33 +568,33 @@ describe('Monster', () => {
         getEntrance: () => [0, 0] as Position,
       }
 
-      // 使用慢速怪物，确保每个格子需要多帧才能通过
+      // Use a slow monster to ensure each cell requires multiple frames to traverse
       // speed=16, GLOBAL_SPEED=0.1, OLD_FPS/FPS=0.4
-      // 每帧移动 = 16 * 0.1 * 0.4 = 0.64 像素
-      // 每格需要 32 / 0.64 = 50 帧
+      // Per-frame movement = 16 * 0.1 * 0.4 = 0.64 pixels
+      // Each cell takes 32 / 0.64 = 50 frames
       const monster = createMonster(createTestMonsterParams({ speed: 16 }), trackingDeps)
       const initialPathCallCount = pathCallCount
 
-      // 运行 30 帧，怪物应该还在第一个格子内
-      // 如果每帧都有 10% 概率重新寻路，预期会有约 3 次重新寻路
-      // 如果只在格子边界重新寻路，应该没有额外的寻路调用
+      // Run 30 frames; the monster should still be within the first cell
+      // If every frame has a 10% re-pathing chance, expect about 3 re-pathings
+      // If re-pathing only occurs at cell boundaries, there should be no additional path calls
       for (let i = 0; i < 30; i++) {
         monster.update()
       }
 
-      // 在格子内移动时不应该触发额外的寻路
-      // 允许最多 1 次额外寻路（由于路径阻塞检查）
+      // No additional path calls should be triggered while moving within a cell
+      // Allow at most 1 additional path call (due to passability checks)
       const additionalPathCalls = pathCallCount - initialPathCallCount
       expect(additionalPathCalls).toBeLessThanOrEqual(1)
     })
 
-    it('怪物移动方向应保持稳定（无左右晃动）', () => {
-      // 测试怪物在两个格子之间移动时方向不会频繁改变
+    it('monster movement direction should remain stable (no oscillation)', () => {
+      // Test that the monster direction does not change frequently while moving between two cells
       let pathCallCount = 0
       const stableDeps: MonsterDependencies = {
         generatePathFrom: () => {
           pathCallCount++
-          // 返回一条直线路径（向右移动）
+          // Return a straight-line path (moving right)
           return [
             [0, 0], [1, 0], [2, 0], [3, 0], [4, 0],
             [5, 0], [6, 0], [7, 0], [8, 0], [9, 0],
@@ -607,7 +607,7 @@ describe('Monster', () => {
 
       const monster = createMonster(createTestMonsterParams({ speed: 32 }), stableDeps)
 
-      // 记录方向变化次数
+      // Track direction changes
       let directionChanges = 0
       let lastDirection = { dx: 0, dy: 0 }
       let lastPos = monster.getPixelPosition()
@@ -619,7 +619,7 @@ describe('Monster', () => {
         const dx = currentPos.x - lastPos.x
         const dy = currentPos.y - lastPos.y
 
-        // 检查方向是否改变（忽略静止状态）
+        // Check if direction changed (ignore stationary state)
         if (dx !== 0 || dy !== 0) {
           const currentDirection = {
             dx: dx > 0 ? 1 : dx < 0 ? -1 : 0,
@@ -639,8 +639,8 @@ describe('Monster', () => {
         lastPos = currentPos
       }
 
-      // 在直线路径上，方向变化应该很少（最多在格子边界处）
-      // 如果频繁重新寻路导致晃动，方向变化次数会很高
+      // On a straight-line path, direction changes should be rare (at most at cell boundaries)
+      // If frequent re-pathing causes oscillation, the direction change count will be high
       expect(directionChanges).toBeLessThan(5)
     })
   })

@@ -1,12 +1,12 @@
 /**
- * 怪物渲染器测试
+ * Monster renderer tests
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderMonster, createMonsterRenderer } from './MonsterRenderer'
 import type { RenderContext, MonsterRenderData } from './types'
 
-/** 创建 Mock 渲染上下文 */
+/** Create mock render context */
 function createMockContext(): RenderContext & { calls: string[] } {
   const calls: string[] = []
 
@@ -39,7 +39,7 @@ describe('MonsterRenderer', () => {
   })
 
   describe('renderMonster', () => {
-    it('渲染怪物应绘制圆形身体', () => {
+    it('should draw circular body when rendering a monster', () => {
       const data: MonsterRenderData = {
         id: 'monster-1',
         x: 100,
@@ -53,12 +53,12 @@ describe('MonsterRenderer', () => {
 
       renderMonster(ctx, data)
 
-      // 简单风格使用 fillCircle 绘制怪物身体（外圈+主体+高光+眼睛+瞳孔）
+      // Simple style uses fillCircle to draw monster body (outer ring + body + highlight + eyes + pupils)
       const fillCircleCalls = (ctx.fillCircle as ReturnType<typeof vi.fn>).mock.calls
       expect(fillCircleCalls.length).toBeGreaterThanOrEqual(7)
     })
 
-    it('渲染怪物应绘制血条背景和血量', () => {
+    it('should draw health bar background and fill when rendering a monster', () => {
       const data: MonsterRenderData = {
         id: 'monster-1',
         x: 100,
@@ -72,12 +72,12 @@ describe('MonsterRenderer', () => {
 
       renderMonster(ctx, data)
 
-      // 血条需要绘制背景矩形和血量矩形
+      // Health bar requires drawing background rect and health rect
       const fillRectCalls = (ctx.fillRect as ReturnType<typeof vi.fn>).mock.calls
       expect(fillRectCalls.length).toBeGreaterThanOrEqual(2)
     })
 
-    it('血量为 50% 时血条宽度应为一半', () => {
+    it('should have half width health bar at 50% health', () => {
       const data: MonsterRenderData = {
         id: 'monster-1',
         x: 100,
@@ -92,12 +92,12 @@ describe('MonsterRenderer', () => {
       renderMonster(ctx, data)
 
       const fillRectCalls = (ctx.fillRect as ReturnType<typeof vi.fn>).mock.calls
-      // 找到血条相关的调用（血条宽度为 20，在靠后的调用中）
+      // Find health bar related calls (bar width is 20, in later calls)
       const healthBarCalls = fillRectCalls.filter((call) => call[2] <= 22 && call[2] >= 10)
       expect(healthBarCalls.length).toBeGreaterThan(0)
     })
 
-    it('满血时血条应为绿色', () => {
+    it('should show green health bar at full health', () => {
       const data: MonsterRenderData = {
         id: 'monster-1',
         x: 100,
@@ -112,12 +112,12 @@ describe('MonsterRenderer', () => {
       renderMonster(ctx, data)
 
       const fillStyleCalls = (ctx.fillStyle as ReturnType<typeof vi.fn>).mock.calls
-      // 应该有绿色血条的调用
+      // Should have a green health bar call
       const hasGreenHealthBar = fillStyleCalls.some((call) => call[0] === 0x00ff00)
       expect(hasGreenHealthBar).toBe(true)
     })
 
-    it('低血量时血条应为红色', () => {
+    it('should show red health bar at low health', () => {
       const data: MonsterRenderData = {
         id: 'monster-1',
         x: 100,
@@ -132,12 +132,12 @@ describe('MonsterRenderer', () => {
       renderMonster(ctx, data)
 
       const fillStyleCalls = (ctx.fillStyle as ReturnType<typeof vi.fn>).mock.calls
-      // 应该有红色血条的调用
+      // Should have a red health bar call
       const hasRedHealthBar = fillStyleCalls.some((call) => call[0] === 0xff0000)
       expect(hasRedHealthBar).toBe(true)
     })
 
-    it('有护盾时应绘制护盾条', () => {
+    it('should draw shield bar when shield is present', () => {
       const data: MonsterRenderData = {
         id: 'monster-1',
         x: 100,
@@ -152,12 +152,12 @@ describe('MonsterRenderer', () => {
       renderMonster(ctx, data)
 
       const fillStyleCalls = (ctx.fillStyle as ReturnType<typeof vi.fn>).mock.calls
-      // 护盾条应为蓝色
+      // Shield bar should be cyan
       const hasBlueShield = fillStyleCalls.some((call) => call[0] === 0x00ffff)
       expect(hasBlueShield).toBe(true)
     })
 
-    it('怪物颜色应用于身体填充', () => {
+    it('should apply monster color to body fill', () => {
       const data: MonsterRenderData = {
         id: 'monster-1',
         x: 100,
@@ -172,14 +172,14 @@ describe('MonsterRenderer', () => {
       renderMonster(ctx, data)
 
       const fillStyleCalls = (ctx.fillStyle as ReturnType<typeof vi.fn>).mock.calls
-      // 应该有怪物颜色的调用 (0xff6600)
+      // Should have a call with the monster color (0xff6600)
       const hasMonsterColor = fillStyleCalls.some((call) => call[0] === 0xff6600)
       expect(hasMonsterColor).toBe(true)
     })
   })
 
   describe('createMonsterRenderer', () => {
-    it('应创建怪物渲染器', () => {
+    it('should create a monster renderer', () => {
       const renderer = createMonsterRenderer(ctx)
 
       expect(renderer).toBeDefined()
@@ -187,7 +187,7 @@ describe('MonsterRenderer', () => {
       expect(typeof renderer.clear).toBe('function')
     })
 
-    it('批量渲染多个怪物', () => {
+    it('should render multiple monsters', () => {
       const renderer = createMonsterRenderer(ctx)
 
       const monsters: MonsterRenderData[] = [
@@ -219,7 +219,7 @@ describe('MonsterRenderer', () => {
       }
 
       expect(ctx.clear).toHaveBeenCalledTimes(1)
-      // 简单风格使用 fillCircle 渲染，每个怪物至少 7 次调用
+      // Simple style uses fillCircle to render, at least 7 calls per monster
       const fillCircleCalls = (ctx.fillCircle as ReturnType<typeof vi.fn>).mock.calls
       expect(fillCircleCalls.length).toBeGreaterThanOrEqual(14)
     })

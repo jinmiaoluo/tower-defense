@@ -1,6 +1,6 @@
 /**
- * API 层测试
- * 采用 TDD 方式，先定义期望行为
+ * API layer tests
+ * Uses TDD approach, defining expected behavior first
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
@@ -21,7 +21,7 @@ import type {
   MonsterDisplayConfig,
 } from '@/types'
 
-// Mock 网络请求
+// Mock network requests
 const mockFetch = vi.fn()
 vi.stubGlobal('fetch', mockFetch)
 
@@ -36,12 +36,12 @@ describe('GameApi', () => {
     vi.restoreAllMocks()
   })
 
-  describe('Mock 模式', () => {
+  describe('Mock mode', () => {
     beforeEach(() => {
       api = createGameApi({ useMock: true })
     })
 
-    it('createSession 应返回会话信息和配置', async () => {
+    it('createSession should return session info and config', async () => {
       const response = await api.createSession()
 
       expect(response.sessionId).toBeDefined()
@@ -56,7 +56,7 @@ describe('GameApi', () => {
       expect(response.firstWave.monsters.length).toBeGreaterThan(0)
     })
 
-    it('createSession 返回的怪物应有服务端生成的 UUID', async () => {
+    it('createSession monsters should have server-generated UUIDs', async () => {
       const response = await api.createSession()
 
       for (const monster of response.firstWave.monsters) {
@@ -69,8 +69,8 @@ describe('GameApi', () => {
       }
     })
 
-    it('submitWave 应验证并返回服务端状态', async () => {
-      // 先创建会话
+    it('submitWave should validate and return server state', async () => {
+      // Create session first
       const startResponse = await api.createSession()
 
       const waveRequest: WaveRequest = {
@@ -103,7 +103,7 @@ describe('GameApi', () => {
       expect(response.nextWave?.waveNumber).toBe(2)
     })
 
-    it('submitWave 对不存在的会话应返回错误', async () => {
+    it('submitWave should return error for non-existent session', async () => {
       const waveRequest: WaveRequest = {
         sessionId: 'non-existent-session',
         waveNumber: 1,
@@ -130,10 +130,10 @@ describe('GameApi', () => {
       expect(response.error?.code).toBe('SESSION_NOT_FOUND')
     })
 
-    it('submitWave 应计算生命奖励（每 5 波）', async () => {
+    it('submitWave should calculate life reward (every 5 waves)', async () => {
       const startResponse = await api.createSession()
 
-      // 模拟完成 5 波
+      // Simulate completing 5 waves
       for (let wave = 1; wave <= 5; wave++) {
         const waveRequest: WaveRequest = {
           sessionId: startResponse.sessionId,
@@ -162,7 +162,7 @@ describe('GameApi', () => {
       }
     })
 
-    it('endGame 应返回排名信息', async () => {
+    it('endGame should return ranking info', async () => {
       const startResponse = await api.createSession()
 
       const endRequest: GameEndRequest = {
@@ -196,14 +196,14 @@ describe('GameApi', () => {
       expect(typeof response.ranking?.isNewRecord).toBe('boolean')
     })
 
-    it('getLeaderboard 应返回排行榜列表', async () => {
+    it('getLeaderboard should return leaderboard list', async () => {
       const response = await api.getLeaderboard()
 
       expect(response.entries).toBeDefined()
       expect(Array.isArray(response.entries)).toBe(true)
       expect(response.entries.length).toBeGreaterThan(0)
 
-      // 验证排行榜条目结构
+      // Verify leaderboard entry structure
       const firstEntry = response.entries[0]
       expect(firstEntry.rank).toBe(1)
       expect(typeof firstEntry.nickname).toBe('string')
@@ -211,22 +211,22 @@ describe('GameApi', () => {
       expect(typeof firstEntry.wavesCompleted).toBe('number')
       expect(typeof firstEntry.createdAt).toBe('string')
 
-      // 验证排名顺序
+      // Verify ranking order
       for (let i = 0; i < response.entries.length - 1; i++) {
         expect(response.entries[i].score).toBeGreaterThanOrEqual(response.entries[i + 1].score)
       }
     })
 
-    it('getLeaderboard 应支持 limit 参数', async () => {
+    it('getLeaderboard should support limit parameter', async () => {
       const response = await api.getLeaderboard(5)
 
       expect(response.entries.length).toBeLessThanOrEqual(5)
     })
 
-    it('endGame 应支持提前结束（不带 lastWave，波次间隔期间结束）', async () => {
+    it('endGame should support early end (without lastWave, ending between waves)', async () => {
       const startResponse = await api.createSession()
 
-      // 先提交第 1 波
+      // Submit wave 1 first
       const waveRequest: WaveRequest = {
         sessionId: startResponse.sessionId,
         waveNumber: 1,
@@ -247,7 +247,7 @@ describe('GameApi', () => {
       }
       await api.submitWave(waveRequest)
 
-      // 提前结束：不带 lastWave（波次间隔期间结束，当前波次已通过 /wave 提交）
+      // Early end: without lastWave (ending between waves, current wave already submitted via /wave)
       const endRequest = {
         sessionId: startResponse.sessionId,
         nickname: 'EarlyEndPlayer',
@@ -260,10 +260,10 @@ describe('GameApi', () => {
       expect(response.ranking?.rank).toBeGreaterThan(0)
     })
 
-    it('endGame 应支持波次进行中结束（带 lastWave 和 remaining）', async () => {
+    it('endGame should support mid-wave end (with lastWave and remaining)', async () => {
       const startResponse = await api.createSession()
 
-      // 波次进行中结束：带 lastWave，包含 remaining（场上还有怪物）
+      // Mid-wave end: with lastWave, including remaining (monsters still on the field)
       const endRequest: GameEndRequest = {
         sessionId: startResponse.sessionId,
         nickname: 'MidWaveEndPlayer',
@@ -299,12 +299,12 @@ describe('GameApi', () => {
     })
   })
 
-  describe('真实 API 模式', () => {
+  describe('Real API mode', () => {
     beforeEach(() => {
       api = createGameApi({ useMock: false, baseUrl: '/api/game' })
     })
 
-    it('createSession 应调用正确的 API 端点', async () => {
+    it('createSession should call the correct API endpoint', async () => {
       const mockResponse: GameStartResponse = {
         sessionId: 'test-session-id',
         config: {
@@ -334,7 +334,7 @@ describe('GameApi', () => {
       expect(response.sessionId).toBe('test-session-id')
     })
 
-    it('submitWave 应调用正确的 API 端点', async () => {
+    it('submitWave should call the correct API endpoint', async () => {
       const mockResponse: WaveResponse = {
         valid: true,
         serverState: { money: 500, score: 100, life: 100, difficulty: 1 },
@@ -374,7 +374,7 @@ describe('GameApi', () => {
       })
     })
 
-    it('endGame 应调用正确的 API 端点', async () => {
+    it('endGame should call the correct API endpoint', async () => {
       const mockResponse: GameEndResponse = {
         verified: true,
         ranking: { rank: 1, total: 100, isNewRecord: true },
@@ -416,7 +416,7 @@ describe('GameApi', () => {
       })
     })
 
-    it('getLeaderboard 应调用正确的 API 端点', async () => {
+    it('getLeaderboard should call the correct API endpoint', async () => {
       const mockResponse: LeaderboardResponse = {
         entries: [],
       }
@@ -435,26 +435,26 @@ describe('GameApi', () => {
       })
     })
 
-    it('API 错误应正确处理', async () => {
+    it('API errors should be handled correctly', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 404,
         json: () => Promise.resolve({
-          error: { code: 'SESSION_NOT_FOUND', message: '会话不存在' },
+          error: { code: 'SESSION_NOT_FOUND', message: 'Session not found' },
         }),
       })
 
       await expect(api.createSession()).rejects.toThrow()
     })
 
-    it('SESSION_NOT_FOUND 错误应包含正确的错误代码', async () => {
+    it('SESSION_NOT_FOUND error should contain the correct error code', async () => {
       const { ApiError } = await import('./game')
 
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 404,
         json: () => Promise.resolve({
-          error: { code: 'SESSION_NOT_FOUND', message: '会话不存在' },
+          error: { code: 'SESSION_NOT_FOUND', message: 'Session not found' },
         }),
       })
 
@@ -468,14 +468,14 @@ describe('GameApi', () => {
       }
     })
 
-    it('VALIDATION_FAILED 错误应包含服务端返回的错误消息', async () => {
+    it('VALIDATION_FAILED error should contain server error message', async () => {
       const { ApiError } = await import('./game')
 
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 400,
         json: () => Promise.resolve({
-          error: { code: 'VALIDATION_FAILED', message: '金钱收益不匹配' },
+          error: { code: 'VALIDATION_FAILED', message: 'Money gain mismatch' },
         }),
       })
 
@@ -502,19 +502,19 @@ describe('GameApi', () => {
       } catch (error) {
         expect(error).toBeInstanceOf(ApiError)
         expect((error as InstanceType<typeof ApiError>).code).toBe('VALIDATION_FAILED')
-        expect((error as InstanceType<typeof ApiError>).message).toBe('金钱收益不匹配')
+        expect((error as InstanceType<typeof ApiError>).message).toBe('Money gain mismatch')
         expect((error as InstanceType<typeof ApiError>).status).toBe(400)
       }
     })
 
-    it('INVALID_REQUEST 错误应包含昵称验证失败的错误消息', async () => {
+    it('INVALID_REQUEST error should contain nickname validation error message', async () => {
       const { ApiError } = await import('./game')
 
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 400,
         json: () => Promise.resolve({
-          error: { code: 'INVALID_REQUEST', message: '昵称包含非法字符' },
+          error: { code: 'INVALID_REQUEST', message: 'Nickname contains invalid characters' },
         }),
       })
 
@@ -527,7 +527,7 @@ describe('GameApi', () => {
       } catch (error) {
         expect(error).toBeInstanceOf(ApiError)
         expect((error as InstanceType<typeof ApiError>).code).toBe('INVALID_REQUEST')
-        expect((error as InstanceType<typeof ApiError>).message).toBe('昵称包含非法字符')
+        expect((error as InstanceType<typeof ApiError>).message).toBe('Nickname contains invalid characters')
         expect((error as InstanceType<typeof ApiError>).status).toBe(400)
       }
     })

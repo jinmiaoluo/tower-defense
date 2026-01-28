@@ -1,7 +1,7 @@
 /**
- * WaveRecorder - 波次记录器
- * 负责记录每波次的所有操作、攻击事件和战斗结果
- * 用于提交给服务端进行验证
+ * WaveRecorder - Wave recorder
+ * Records all actions, attack events, and combat results for each wave
+ * Used for server-side verification
  */
 
 import type {
@@ -21,13 +21,13 @@ import type {
 } from '@/types'
 import { createEmptyMutableResult, toImmutableResult } from '@/types'
 
-/** WaveRecorder 类型别名 */
+/** WaveRecorder type alias */
 export type WaveRecorder = IWaveRecorder
 
 /**
- * 创建波次记录器
- * @param waveNumber 波次号
- * @param startFrame 起始帧号
+ * Create a wave recorder
+ * @param waveNumber Wave number
+ * @param startFrame Starting frame number
  */
 export function createWaveRecorder(waveNumber: number, startFrame: number): WaveRecorder {
   let currentWaveNumber = waveNumber
@@ -38,7 +38,7 @@ export function createWaveRecorder(waveNumber: number, startFrame: number): Wave
   let waveDurationFrames = 0
 
   /**
-   * 记录建造操作
+   * Record a build action
    */
   function recordBuild(data: BuildActionData): void {
     actions.push({
@@ -51,7 +51,7 @@ export function createWaveRecorder(waveNumber: number, startFrame: number): Wave
   }
 
   /**
-   * 记录升级操作
+   * Record an upgrade action
    */
   function recordUpgrade(data: UpgradeActionData): void {
     actions.push({
@@ -63,7 +63,7 @@ export function createWaveRecorder(waveNumber: number, startFrame: number): Wave
   }
 
   /**
-   * 记录出售操作
+   * Record a sell action
    */
   function recordSell(data: SellActionData): void {
     actions.push({
@@ -74,8 +74,8 @@ export function createWaveRecorder(waveNumber: number, startFrame: number): Wave
   }
 
   /**
-   * 记录攻击事件
-   * 同时累加伤害和得分
+   * Record an attack event
+   * Also accumulates damage and score
    */
   function recordAttack(data: AttackRecordData): void {
     attacks.push({
@@ -88,32 +88,32 @@ export function createWaveRecorder(waveNumber: number, startFrame: number): Wave
       damage: data.damage,
     })
 
-    // 累加总伤害
+    // Accumulate total damage
     result.totalDamageDealt += data.damage
 
-    // 累加得分: score = floor(sqrt(damage))
+    // Accumulate score: score = floor(sqrt(damage))
     result.scoreGained += Math.floor(Math.sqrt(data.damage))
   }
 
   /**
-   * 记录怪物被击杀
+   * Record a monster kill
    */
   function recordKill(data: KillRecordData): void {
     result.killed += 1
 
-    // 累加 killedByType
+    // Accumulate killedByType
     const currentCount = result.killedByType.get(data.monsterType) || 0
     result.killedByType.set(data.monsterType, currentCount + 1)
 
-    // 累加金钱
+    // Accumulate money
     result.moneyGained += data.money
 
-    // 累加击杀的总生命值
+    // Accumulate total life destroyed
     result.totalLifeDestroyed += data.monsterLife
   }
 
   /**
-   * 记录怪物穿过终点
+   * Record a monster passing through the exit
    */
   function recordPassed(data: PassedRecordData): void {
     result.passed += 1
@@ -121,57 +121,57 @@ export function createWaveRecorder(waveNumber: number, startFrame: number): Wave
   }
 
   /**
-   * 记录在场剩余怪物（提前结束时使用）
+   * Record remaining monsters on the field (used for early termination)
    */
   function recordRemainingMonster(monsterId: string): void {
     result.remainingMonsterIds.push(monsterId)
   }
 
   /**
-   * 记录怪物生成（每生成一只怪物调用一次）
+   * Record monster spawn (called once per monster spawned)
    */
   function recordSpawn(): void {
     result.spawned += 1
   }
 
   /**
-   * 获取在场剩余怪物 ID 列表
+   * Get list of remaining monster IDs on the field
    */
   function getRemainingMonsterIds(): string[] {
     return [...result.remainingMonsterIds]
   }
 
   /**
-   * 设置波次持续帧数
-   * @param currentFrame 当前绝对帧号，内部会计算相对于波次开始的持续时间
+   * Set wave duration in frames
+   * @param currentFrame Current absolute frame number; internally calculates duration relative to wave start
    */
   function setDuration(currentFrame: number): void {
     waveDurationFrames = currentFrame - currentStartFrame
   }
 
   /**
-   * 获取所有操作
+   * Get all actions
    */
   function getActions(): Action[] {
     return [...actions]
   }
 
   /**
-   * 获取所有攻击事件
+   * Get all attack events
    */
   function getAttacks(): AttackEvent[] {
     return [...attacks]
   }
 
   /**
-   * 获取波次结果
+   * Get wave result
    */
   function getResult(): WaveResult {
     return toImmutableResult(result, waveDurationFrames)
   }
 
   /**
-   * 导出为 WaveRequest 格式
+   * Export as WaveRequest format
    */
   function toWaveRequest(sessionId: string, buildings: BuildingSnapshot[]): WaveRequest {
     return {
@@ -185,7 +185,7 @@ export function createWaveRecorder(waveNumber: number, startFrame: number): Wave
   }
 
   /**
-   * 重置记录器
+   * Reset recorder
    */
   function reset(newWaveNumber: number, newStartFrame: number): void {
     currentWaveNumber = newWaveNumber

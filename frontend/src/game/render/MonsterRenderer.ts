@@ -1,11 +1,11 @@
 /**
- * 怪物渲染器 - 简单动画风格
+ * Monster renderer - simple animated style
  */
 
 import type { RenderContext, MonsterRenderData } from './types'
 import { DPR } from '../dpr'
 
-/** 血条配置（DPR 缩放） */
+/** Health bar configuration (DPR scaled) */
 const HEALTH_BAR = {
   width: 20 * DPR,
   height: 3 * DPR,
@@ -15,7 +15,7 @@ const HEALTH_BAR = {
 }
 
 /**
- * 根据血量百分比获取血条颜色
+ * Get health bar color based on health percentage
  */
 function getHealthBarColor(ratio: number): number {
   if (ratio > 0.6) {
@@ -28,7 +28,7 @@ function getHealthBarColor(ratio: number): number {
 }
 
 /**
- * 将 CSS 颜色字符串转换为数字
+ * Convert CSS color string to number
  */
 function parseColor(color: string): number {
   if (color.startsWith('#')) {
@@ -38,7 +38,7 @@ function parseColor(color: string): number {
 }
 
 /**
- * 计算较暗的颜色
+ * Calculate darker color
  */
 function darkenColor(color: number, factor: number = 0.6): number {
   const r = Math.floor(((color >> 16) & 0xff) * factor)
@@ -48,7 +48,7 @@ function darkenColor(color: number, factor: number = 0.6): number {
 }
 
 /**
- * 计算较亮的颜色
+ * Calculate lighter color
  */
 function lightenColor(color: number, factor: number = 1.4): number {
   const r = Math.min(255, Math.floor(((color >> 16) & 0xff) * factor))
@@ -57,13 +57,13 @@ function lightenColor(color: number, factor: number = 1.4): number {
   return (r << 16) | (g << 8) | b
 }
 
-/** 计算呼吸动画缩放 */
+/** Calculate breathing animation scale */
 function calcBreath(frame: number, speed: number = 0.1): number {
   return 1 + Math.sin(frame * speed) * 0.08
 }
 
 /**
- * 渲染单个怪物
+ * Render a single monster
  */
 export function renderMonster(ctx: RenderContext, data: MonsterRenderData): void {
   const { x, y, radius, color, currentLife, maxLife, shield, frame = 0 } = data
@@ -72,45 +72,45 @@ export function renderMonster(ctx: RenderContext, data: MonsterRenderData): void
   const dark = darkenColor(bodyColor)
   const light = lightenColor(bodyColor)
 
-  // 呼吸动画
+  // Breathing animation
   const scale = calcBreath(frame, 0.12)
   const animRadius = radius * scale
 
-  // 外圈（阴影）
+  // Outer ring (shadow)
   ctx.fillStyle(dark, 1)
   ctx.fillCircle(x, y, animRadius + 2 * DPR)
 
-  // 主体圆
+  // Main body circle
   ctx.fillStyle(bodyColor, 1)
   ctx.fillCircle(x, y, animRadius)
 
-  // 高光
+  // Highlight
   ctx.fillStyle(light, 0.6)
   ctx.fillCircle(x - animRadius * 0.3, y - animRadius * 0.3, animRadius * 0.4)
 
-  // 眼睛
+  // Eyes
   const eyeOffset = animRadius * 0.25
   const eyeRadius = Math.max(2 * DPR, animRadius * 0.2)
   ctx.fillStyle(0x000000, 1)
   ctx.fillCircle(x - eyeOffset, y - eyeOffset * 0.5, eyeRadius)
   ctx.fillCircle(x + eyeOffset, y - eyeOffset * 0.5, eyeRadius)
 
-  // 眼睛高光
+  // Eye highlights
   const pupilRadius = eyeRadius * 0.4
   ctx.fillStyle(0xffffff, 1)
   ctx.fillCircle(x - eyeOffset + pupilRadius, y - eyeOffset * 0.5 - pupilRadius, pupilRadius)
   ctx.fillCircle(x + eyeOffset + pupilRadius, y - eyeOffset * 0.5 - pupilRadius, pupilRadius)
 
-  // 边框
+  // Border
   ctx.lineStyle(1 * DPR, 0x000000, 0.5)
   ctx.strokeCircle(x, y, animRadius + 2 * DPR)
 
-  // 绘制血条
+  // Draw health bar
   renderHealthBar(ctx, x, y, radius, currentLife, maxLife, shield)
 }
 
 /**
- * 渲染血条
+ * Render health bar
  */
 function renderHealthBar(
   ctx: RenderContext,
@@ -124,11 +124,11 @@ function renderHealthBar(
   const barX = x - HEALTH_BAR.width / 2
   const barY = y - radius - HEALTH_BAR.offsetY
 
-  // 血条背景
+  // Health bar background
   ctx.fillStyle(HEALTH_BAR.backgroundColor, 1)
   ctx.fillRect(barX - 1, barY - 1, HEALTH_BAR.width + 2, HEALTH_BAR.height + 2)
 
-  // 血量条
+  // Health bar fill
   const healthRatio = Math.max(0, Math.min(1, currentLife / maxLife))
   const healthWidth = Math.floor(HEALTH_BAR.width * healthRatio)
   const healthColor = getHealthBarColor(healthRatio)
@@ -136,7 +136,7 @@ function renderHealthBar(
   ctx.fillStyle(healthColor, 1)
   ctx.fillRect(barX, barY, healthWidth, HEALTH_BAR.height)
 
-  // 护盾条
+  // Shield bar
   if (shield > 0) {
     const shieldRatio = Math.min(1, shield / maxLife)
     const shieldWidth = Math.floor(HEALTH_BAR.width * shieldRatio)
@@ -151,7 +151,7 @@ function renderHealthBar(
 }
 
 /**
- * 怪物渲染器接口
+ * Monster renderer interface
  */
 export interface MonsterRenderer {
   render(data: MonsterRenderData): void
@@ -159,7 +159,7 @@ export interface MonsterRenderer {
 }
 
 /**
- * 创建怪物渲染器
+ * Create a monster renderer
  */
 export function createMonsterRenderer(ctx: RenderContext): MonsterRenderer {
   return {

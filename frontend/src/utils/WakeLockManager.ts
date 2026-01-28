@@ -1,8 +1,9 @@
 /**
- * WakeLockManager - 防止移动设备屏幕自动锁定
+ * WakeLockManager - prevents mobile device screens from auto-locking.
  *
- * 使用 Screen Wake Lock API 防止设备屏幕变暗或锁定。
- * 当页面不可见时系统会自动释放锁，页面重新可见时会自动重新获取。
+ * Uses the Screen Wake Lock API to prevent the device screen from dimming or locking.
+ * The system automatically releases the lock when the page becomes hidden,
+ * and reacquires it when the page becomes visible again.
  */
 export class WakeLockManager {
   private wakeLockSentinel: WakeLockSentinel | null = null
@@ -10,15 +11,15 @@ export class WakeLockManager {
   private boundVisibilityChangeHandler: (() => void) | null = null
 
   /**
-   * 检查当前浏览器是否支持 Screen Wake Lock API
+   * Check whether the current browser supports the Screen Wake Lock API.
    */
   isSupported(): boolean {
     return 'wakeLock' in navigator
   }
 
   /**
-   * 获取屏幕唤醒锁
-   * @returns 是否成功获取锁
+   * Acquire the screen wake lock.
+   * @returns Whether the lock was successfully acquired
    */
   async acquire(): Promise<boolean> {
     if (!this.isSupported()) {
@@ -42,7 +43,7 @@ export class WakeLockManager {
   }
 
   /**
-   * 释放屏幕唤醒锁
+   * Release the screen wake lock.
    */
   async release(): Promise<void> {
     this.isManuallyReleased = true
@@ -52,22 +53,22 @@ export class WakeLockManager {
       try {
         await this.wakeLockSentinel.release()
       } catch {
-        // 忽略释放时的错误
+        // Ignore errors during release
       }
       this.wakeLockSentinel = null
     }
   }
 
   /**
-   * 检查锁是否处于活动状态
+   * Check whether the lock is currently active.
    */
   isActive(): boolean {
     return this.wakeLockSentinel !== null && !this.wakeLockSentinel.released
   }
 
   /**
-   * 设置页面可见性变化监听器
-   * 当页面从隐藏变为可见时，重新获取锁
+   * Set up the page visibility change listener.
+   * Reacquires the lock when the page transitions from hidden to visible.
    */
   private setupVisibilityChangeListener(): void {
     if (this.boundVisibilityChangeHandler) {
@@ -82,7 +83,7 @@ export class WakeLockManager {
   }
 
   /**
-   * 移除页面可见性变化监听器
+   * Remove the page visibility change listener.
    */
   private removeVisibilityChangeListener(): void {
     if (this.boundVisibilityChangeHandler) {
@@ -92,7 +93,7 @@ export class WakeLockManager {
   }
 
   /**
-   * 处理页面可见性变化
+   * Handle page visibility changes.
    */
   private handleVisibilityChange(): void {
     if (this.isManuallyReleased) {
@@ -105,7 +106,7 @@ export class WakeLockManager {
   }
 
   /**
-   * 重新获取锁（页面重新可见时调用）
+   * Reacquire the lock (called when the page becomes visible again).
    */
   private async reacquire(): Promise<void> {
     if (!this.isSupported() || this.isManuallyReleased) {
@@ -115,7 +116,7 @@ export class WakeLockManager {
     try {
       this.wakeLockSentinel = await navigator.wakeLock.request('screen')
     } catch {
-      // 重新获取失败时静默处理
+      // Silently handle reacquisition failures
     }
   }
 }

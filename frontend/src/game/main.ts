@@ -8,35 +8,35 @@ import { getInitialGameColors } from '@/theme'
 
 const { GRID_SIZE } = GAME_CONSTANTS
 
-// 地图格子数（与 mock 配置一致）
+// Map grid dimensions (consistent with mock config)
 const MAP_GRID_WIDTH = 16
 const MAP_GRID_HEIGHT = 16
 
-// 计算合适的游戏尺寸
+// Calculate appropriate game dimensions
 function calculateGameSize(): { width: number; height: number } {
   const screenWidth = window.innerWidth
   const screenHeight = window.innerHeight
 
-  // 地图实际像素大小
+  // Map pixel dimensions
   const mapPixelWidth = MAP_GRID_WIDTH * GRID_SIZE
   const mapPixelHeight = MAP_GRID_HEIGHT * GRID_SIZE
 
-  // UI 预留空间（状态栏 + 建筑面板）
+  // UI reserved space (status bar + building panel)
   const uiHeightReserve = 140
 
-  // 最小边距
+  // Minimum padding
   const minPadding = 10
 
-  // 计算可用空间
+  // Calculate available space
   const availableWidth = screenWidth - minPadding * 2
   const availableHeight = screenHeight - uiHeightReserve - minPadding * 2
 
-  // 计算缩放比例，确保地图完整显示
+  // Calculate scale ratio, ensuring the map displays completely
   const scaleX = availableWidth / mapPixelWidth
   const scaleY = availableHeight / mapPixelHeight
-  const scale = Math.min(scaleX, scaleY, 1) // 不放大超过原始尺寸
+  const scale = Math.min(scaleX, scaleY, 1) // Do not scale beyond original size
 
-  // 计算实际游戏尺寸
+  // Calculate actual game dimensions
   const gameWidth = Math.max(mapPixelWidth * scale + minPadding * 2, mapPixelWidth)
   const gameHeight = Math.max(mapPixelHeight * scale + uiHeightReserve + minPadding * 2, mapPixelHeight + uiHeightReserve)
 
@@ -48,7 +48,7 @@ function calculateGameSize(): { width: number; height: number } {
 
 const { width, height } = calculateGameSize()
 
-// 动态获取初始背景色（根据系统主题或用户设置）
+// Dynamically get initial background color (based on system theme or user setting)
 const initialColors = getInitialGameColors()
 
 const config: Phaser.Types.Core.GameConfig = {

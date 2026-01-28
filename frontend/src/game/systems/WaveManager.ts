@@ -1,7 +1,7 @@
 /**
- * WaveManager - 波次管理器
- * 负责波次状态管理和怪物生成调度
- * 参考旧实现：html5-tower-defense/src/js/td-data-stage-1.js
+ * WaveManager - Wave manager
+ * Handles wave state management and monster spawn scheduling
+ * Reference: html5-tower-defense/src/js/td-data-stage-1.js
  */
 
 import type { WaveConfig, MonsterConfig } from '@/types'
@@ -11,78 +11,78 @@ import { GAME_CONSTANTS } from '@/types'
 const { WAVE_INTERVAL_FRAMES, MONSTER_SPAWN_INTERVAL_FRAMES } = GAME_CONSTANTS
 
 /**
- * 波次状态
- * - idle: 等待开始新波次
- * - spawning: 正在生成怪物
- * - fighting: 所有怪物已生成，战斗中
- * - completed: 波次已完成（所有怪物死亡或穿过）
- * - interval: 波次间隔期（等待下一波）
+ * Wave state
+ * - idle: Waiting to start a new wave
+ * - spawning: Spawning monsters
+ * - fighting: All monsters spawned, combat in progress
+ * - completed: Wave completed (all monsters dead or passed)
+ * - interval: Wave interval period (waiting for next wave)
  */
 export type WaveState = 'idle' | 'spawning' | 'fighting' | 'completed' | 'interval'
 
-/** 波次统计信息 */
+/** Wave statistics */
 export interface WaveStats {
-  /** 本波次总怪物数 */
+  /** Total monsters in this wave */
   totalMonsters: number
-  /** 已生成的怪物数 */
+  /** Number of monsters spawned */
   spawnedMonsters: number
-  /** 当前存活怪物数 */
+  /** Number of currently alive monsters */
   aliveMonsters: number
-  /** 待生成怪物数 */
+  /** Number of monsters pending spawn */
   pendingMonsters: number
 }
 
-/** WaveManager 接口定义 */
+/** WaveManager interface definition */
 export interface WaveManager {
-  /** 获取当前状态 */
+  /** Get current state */
   getState(): WaveState
 
-  /** 获取当前波次号 */
+  /** Get current wave number */
   getCurrentWaveNumber(): number
 
-  /** 获取待生成的怪物配置列表 */
+  /** Get list of pending monster configs */
   getPendingMonsters(): readonly MonsterConfig[]
 
-  /** 获取当前存活的怪物列表 */
+  /** Get list of currently alive monsters */
   getAliveMonsters(): readonly IMonster[]
 
-  /** 开始新波次 */
+  /** Start a new wave */
   startWave(waveConfig: WaveConfig): void
 
   /**
-   * 每帧更新
-   * @param currentFrame 当前帧号
-   * @returns 需要生成的怪物配置，或 null
+   * Per-frame update
+   * @param currentFrame Current frame number
+   * @returns Monster config to spawn, or null
    */
   update(currentFrame: number): MonsterConfig | null
 
-  /** 注册怪物到管理器（用于追踪存活状态） */
+  /** Register a monster with the manager (for tracking alive status) */
   registerMonster(monster: IMonster): void
 
-  /** 通知怪物死亡或到达终点 */
+  /** Notify that a monster died or reached the exit */
   onMonsterRemoved(monster: IMonster): void
 
-  /** 检查波次是否完成 */
+  /** Check if the wave is complete */
   isWaveComplete(): boolean
 
-  /** 开始波次间隔 */
+  /** Start wave interval */
   startInterval(currentFrame: number): void
 
-  /** 检查波次间隔是否结束 */
+  /** Check if wave interval has ended */
   isIntervalComplete(currentFrame: number): boolean
 
-  /** 结束波次间隔，回到 idle 状态 */
+  /** End wave interval, return to idle state */
   completeInterval(): void
 
-  /** 获取波次统计信息 */
+  /** Get wave statistics */
   getWaveStats(): WaveStats
 
-  /** 重置管理器状态 */
+  /** Reset manager state */
   reset(): void
 }
 
 /**
- * 创建 WaveManager 实例
+ * Create a WaveManager instance
  */
 export function createWaveManager(): WaveManager {
   let state: WaveState = 'idle'
@@ -120,22 +120,22 @@ export function createWaveManager(): WaveManager {
       totalMonsters = waveConfig.monsters.length
       pendingMonsters = [...waveConfig.monsters]
       aliveMonsters = []
-      lastSpawnFrame = -MONSTER_SPAWN_INTERVAL_FRAMES // 确保第一帧立即生成
+      lastSpawnFrame = -MONSTER_SPAWN_INTERVAL_FRAMES // Ensure first frame spawns immediately
       state = 'spawning'
     },
 
     update(currentFrame: number): MonsterConfig | null {
-      // idle 或 interval 状态不处理
+      // No processing in idle or interval state
       if (state === 'idle' || state === 'interval') {
         return null
       }
 
-      // completed 状态不生成，但不返回错误
+      // No spawning in completed state, but no error
       if (state === 'completed') {
         return null
       }
 
-      // spawning 状态：检查是否可以生成下一个怪物
+      // Spawning state: check if next monster can be spawned
       if (state === 'spawning') {
         if (pendingMonsters.length > 0) {
           const framesSinceLastSpawn = currentFrame - lastSpawnFrame
@@ -146,12 +146,12 @@ export function createWaveManager(): WaveManager {
             return monsterConfig
           }
         } else {
-          // 所有怪物已生成完毕，转换到 fighting 状态
+          // All monsters spawned, transition to fighting state
           state = 'fighting'
         }
       }
 
-      // fighting 状态：检查是否所有怪物都已死亡/穿过
+      // Fighting state: check if all monsters are dead or passed
       if (state === 'fighting') {
         if (aliveMonsters.length === 0 && pendingMonsters.length === 0) {
           state = 'completed'
@@ -177,7 +177,7 @@ export function createWaveManager(): WaveManager {
         return false
       }
 
-      // 还有待生成的怪物或存活的怪物，波次未完成
+      // Pending or alive monsters remain, wave not complete
       if (pendingMonsters.length > 0 || aliveMonsters.length > 0) {
         return false
       }

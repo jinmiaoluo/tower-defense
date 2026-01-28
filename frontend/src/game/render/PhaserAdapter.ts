@@ -1,12 +1,12 @@
 /**
- * Phaser Graphics 适配器
- * 将 Phaser.GameObjects.Graphics 适配为 RenderContext 接口
+ * Phaser Graphics adapter
+ * Adapts Phaser.GameObjects.Graphics to the RenderContext interface
  */
 
 import type { RenderContext } from './types'
 
 /**
- * 创建 Phaser Graphics 渲染上下文适配器
+ * Create Phaser Graphics render context adapter
  */
 export function createPhaserAdapter(graphics: Phaser.GameObjects.Graphics): RenderContext {
   return {

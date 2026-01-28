@@ -31,9 +31,9 @@ function handleClose() {
   try {
     localStorage.setItem(STORAGE_KEY, 'true')
   } catch {
-    // 忽略 localStorage 写入失败（如隐私模式、配额满）
+    // Ignore localStorage write failures (e.g. private mode, quota exceeded)
   }
-  // 移除焦点，避免焦点转移到其他可交互元素（如 HelpButton）
+  // Remove focus to prevent it from shifting to other interactive elements (e.g. HelpButton)
   if (document.activeElement instanceof HTMLElement) {
     document.activeElement.blur()
   }

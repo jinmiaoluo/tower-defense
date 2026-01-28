@@ -1,5 +1,5 @@
 /**
- * Stores 统一导出
+ * Stores barrel exports
  */
 
 export { useThemeStore } from './theme'

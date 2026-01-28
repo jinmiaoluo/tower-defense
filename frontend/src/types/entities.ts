@@ -1,6 +1,6 @@
 /**
- * 游戏实体类型定义
- * 用于 Phaser 游戏对象的接口定义
+ * Game entity type definitions
+ * Interface definitions for Phaser game objects
  */
 
 import type { BuildingType, MonsterTypeId, Position } from './config'
@@ -8,115 +8,115 @@ import type { MonsterConfig } from './api'
 import type { IWaveRecorder } from './recorder'
 
 // ============================================================================
-// 怪物实体
+// Monster entity
 // ============================================================================
 
-/** 怪物实体接口 */
+/** Monster entity interface */
 export interface IMonster {
-  /** 唯一 ID（服务端下发的 UUID） */
+  /** Unique ID (UUID provided by the server) */
   readonly id: string
-  /** 怪物类型 */
+  /** Monster type */
   readonly type: MonsterTypeId
-  /** 最大生命值 */
+  /** Maximum hit points */
   readonly maxLife: number
-  /** 当前生命值 */
+  /** Current hit points */
   currentLife: number
-  /** 移动速度（格子/帧） */
+  /** Movement speed (grid cells per frame) */
   readonly speed: number
-  /** 护盾值（每次攻击减少的伤害量，静态值不递减） */
+  /** Shield value (damage reduction per attack, static value that does not deplete) */
   readonly shield: number
-  /** 击杀奖励金钱 */
+  /** Money reward on kill */
   readonly money: number
-  /** 到达终点造成的伤害（从 config.monsters[type].damage 获取） */
+  /** Damage dealt upon reaching the exit (from config.monsters[type].damage) */
   readonly damage: number
-  /** 碰撞半径（基于 damage 计算: floor(damage * 1.2)，范围 4-12） */
+  /** Collision radius (calculated from damage: floor(damage * 1.2), range 4-12) */
   readonly radius: number
-  /** 颜色（用于渲染，从 MonsterDisplayConfig 获取或随机生成） */
+  /** Color (for rendering, from MonsterDisplayConfig or randomly generated) */
   readonly color: string
-  /** 路径进度 (0-1) */
+  /** Path progress (0-1) */
   progress: number
-  /** 是否有效（未被击杀且未到达终点） */
+  /** Whether the monster is valid (not killed and has not reached the exit) */
   isValid: boolean
 
   /**
-   * 受到伤害，返回实际造成的伤害值
-   * 伤害计算: actualDamage = max(rawDamage - shield, rawDamage × 0.1)
-   * 最低伤害为原始伤害的 10%，保证高伤害武器打护盾怪更有效
-   * 与旧实现一致，shield 是静态值，不会随受击递减
+   * Take damage, returns the actual damage dealt
+   * Damage calculation: actualDamage = max(rawDamage - shield, rawDamage x 0.1)
+   * Minimum damage is 10% of raw damage, ensuring high-damage weapons are more effective against shielded monsters
+   * Consistent with the legacy implementation, shield is a static value that does not deplete on hit
    */
   takeDamage(rawDamage: number): number
 
-  /** 是否已死亡 */
+  /** Whether the monster is dead */
   isDead(): boolean
 
-  /** 是否到达终点 */
+  /** Whether the monster has reached the exit */
   reachedExit(): boolean
 
-  /** 获取当前格子坐标 */
+  /** Get the current grid position */
   getGridPosition(): Position
 
-  /** 获取当前像素坐标（用于渲染） */
+  /** Get the current pixel position (for rendering) */
   getPixelPosition(): { x: number; y: number }
 }
 
-/** 怪物创建参数 */
+/** Monster creation parameters */
 export interface MonsterCreateParams extends MonsterConfig {
-  /** 颜色（用于渲染，从 MonsterDisplayConfig 获取） */
+  /** Color (for rendering, from MonsterDisplayConfig) */
   color: string
-  /** 到达终点造成的伤害（从 config.monsters[type].damage 获取） */
+  /** Damage dealt upon reaching the exit (from config.monsters[type].damage) */
   damage: number
 }
 
 // ============================================================================
-// 建筑实体
+// Building entity
 // ============================================================================
 
-/** 建筑实体接口 */
+/** Building entity interface */
 export interface IBuilding {
-  /** 唯一 ID */
+  /** Unique ID */
   readonly id: string
-  /** 建筑类型 */
+  /** Building type */
   readonly type: BuildingType
-  /** 等级 */
+  /** Level */
   level: number
-  /** 位置 */
+  /** Position */
   readonly position: Position
-  /** 攻击冷却计数 */
+  /** Attack cooldown counter */
   cooldown: number
-  /** 本波累计伤害 */
+  /** Cumulative damage dealt this wave */
   damageDealt: number
-  /** 本波击杀数 */
+  /** Kills this wave */
   kills: number
 
-  /** 是否可以攻击 */
+  /** Whether the building can attack */
   canAttack(): boolean
 
-  /** 在怪物列表中寻找目标 */
+  /** Find a target among the monster list */
   findTarget(monsters: IMonster[]): IMonster | null
 
-  /** 攻击目标 */
+  /** Attack the target */
   attack(target: IMonster, recorder: IWaveRecorder, frame: number): void
 
-  /** 获取当前伤害值 */
+  /** Get the current damage value */
   getDamage(): number
 
-  /** 获取当前射程 */
+  /** Get the current range */
   getRange(): number
 
-  /** 获取攻击速度（帧间隔） */
+  /** Get the attack speed (frame interval) */
   getAttackSpeed(): number
 
-  /** 重置波次统计 */
+  /** Reset wave statistics */
   resetWaveStats(): void
 
-  /** 获取当前目标的格子位置（用于渲染炮管指向，包含最后目标位置） */
+  /** Get the current target grid position (for rendering turret orientation, includes last target position) */
   getCurrentTargetPosition(): Position | null
 
-  /** 是否有活跃目标（用于激光射线渲染判断） */
+  /** Whether there is an active target (for laser beam rendering) */
   hasActiveTarget(): boolean
 }
 
-/** 建筑创建参数 */
+/** Building creation parameters */
 export interface BuildingCreateParams {
   id: string
   type: BuildingType
@@ -125,33 +125,33 @@ export interface BuildingCreateParams {
 }
 
 // ============================================================================
-// 子弹实体
+// Bullet entity
 // ============================================================================
 
-/** 子弹实体接口 */
+/** Bullet entity interface */
 export interface IBullet {
-  /** 所属建筑 */
+  /** Owning building */
   readonly building: IBuilding
-  /** 目标怪物 */
+  /** Target monster */
   readonly target: IMonster
-  /** 伤害值 */
+  /** Damage value */
   readonly damage: number
-  /** 速度 */
+  /** Speed */
   readonly speed: number
-  /** 当前位置 */
+  /** Current position */
   x: number
   y: number
-  /** 是否有效 */
+  /** Whether the bullet is valid */
   isValid: boolean
 
-  /** 更新位置 */
+  /** Update position */
   update(): void
 
-  /** 检查是否命中 */
+  /** Check if the bullet has hit */
   checkHit(): boolean
 }
 
-/** 子弹创建参数 */
+/** Bullet creation parameters */
 export interface BulletCreateParams {
   building: IBuilding
   target: IMonster
@@ -162,18 +162,18 @@ export interface BulletCreateParams {
 }
 
 // ============================================================================
-// 路径相关
+// Path related
 // ============================================================================
 
-/** 路径点 */
+/** Path point */
 export type PathPoint = Position
 
-/** 路径（一系列坐标点） */
+/** Path (a series of coordinate points) */
 export type Path = PathPoint[]
 
-/** 路径计算接口 */
+/** Pathfinding interface */
 export interface IPathFinder {
-  /** 计算从起点到终点的路径 */
+  /** Find a path from start to end */
   findPath(
     start: Position,
     end: Position,
@@ -182,98 +182,98 @@ export interface IPathFinder {
 }
 
 // ============================================================================
-// 游戏场景相关
+// Game scene related
 // ============================================================================
 
-/** 格子状态 */
+/** Grid cell state */
 export interface GridCell {
-  /** 格子坐标 */
+  /** Grid coordinates */
   position: Position
-  /** 是否可通行 */
+  /** Whether the cell is passable */
   isPassable: boolean
-  /** 放置的建筑 ID（如有） */
+  /** Placed building ID (if any) */
   buildingId: string | null
-  /** 是否是入口 */
+  /** Whether this is the entrance */
   isEntrance: boolean
-  /** 是否是出口 */
+  /** Whether this is the exit */
   isExit: boolean
-  /** 是否是障碍物 */
+  /** Whether this is an obstacle */
   isObstacle: boolean
 }
 
-/** 地图状态 */
+/** Map state */
 export interface MapState {
-  /** 宽度（格子数） */
+  /** Width (in grid cells) */
   width: number
-  /** 高度（格子数） */
+  /** Height (in grid cells) */
   height: number
-  /** 格子数组 */
+  /** Grid cell array */
   cells: GridCell[][]
-  /** 当前路径缓存 */
+  /** Cached path */
   cachedPath: Path | null
 }
 
 // ============================================================================
-// 游戏场景接口
+// Game scene interface
 // ============================================================================
 
-/** 游戏场景接口 */
+/** Game scene interface */
 export interface IGameScene {
-  /** 当前帧号 */
+  /** Current frame number */
   currentFrame: number
-  /** 地图状态 */
+  /** Map state */
   map: MapState
-  /** 怪物列表 */
+  /** Monster list */
   monsters: IMonster[]
-  /** 建筑列表 */
+  /** Building list */
   buildings: IBuilding[]
-  /** 子弹列表 */
+  /** Bullet list */
   bullets: IBullet[]
-  /** 波次记录器 */
+  /** Wave recorder */
   recorder: IWaveRecorder
 
-  /** 添加怪物 */
+  /** Add a monster */
   addMonster(params: MonsterCreateParams): IMonster
 
-  /** 移除怪物 */
+  /** Remove a monster */
   removeMonster(id: string): void
 
-  /** 添加建筑 */
+  /** Add a building */
   addBuilding(params: BuildingCreateParams): IBuilding
 
-  /** 移除建筑 */
+  /** Remove a building */
   removeBuilding(id: string): void
 
-  /** 获取建筑 */
+  /** Get a building */
   getBuilding(id: string): IBuilding | null
 
-  /** 检查位置是否可以放置建筑 */
+  /** Check if a building can be placed at the position */
   canPlaceBuilding(position: Position): boolean
 
-  /** 获取路径 */
+  /** Get the path */
   getPath(): Path
 
-  /** 更新游戏逻辑 */
+  /** Update game logic */
   update(): void
 }
 
 // ============================================================================
-// 辅助类型
+// Helper types
 // ============================================================================
 
-/** 计算两点之间的距离 */
+/** Calculate the Euclidean distance between two points */
 export function calculateDistance(a: Position, b: Position): number {
   const dx = a[0] - b[0]
   const dy = a[1] - b[1]
   return Math.sqrt(dx * dx + dy * dy)
 }
 
-/** 计算曼哈顿距离 */
+/** Calculate the Manhattan distance between two points */
 export function manhattanDistance(a: Position, b: Position): number {
   return Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1])
 }
 
-/** 判断两个位置是否相同 */
+/** Check if two positions are the same */
 export function isSamePosition(a: Position, b: Position): boolean {
   return a[0] === b[0] && a[1] === b[1]
 }

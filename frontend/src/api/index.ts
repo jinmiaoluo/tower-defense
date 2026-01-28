@@ -1,5 +1,5 @@
 /**
- * API 模块导出入口
+ * API module export entry
  */
 
 export {

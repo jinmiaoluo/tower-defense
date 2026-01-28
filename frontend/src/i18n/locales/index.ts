@@ -1,5 +1,5 @@
 /**
- * 语言包导出
+ * Locale exports
  */
 
 export { zh, type MessageKey } from './zh'

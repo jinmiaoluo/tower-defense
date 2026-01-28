@@ -1,7 +1,7 @@
 /**
- * GameSceneLogic - 游戏场景核心逻辑
- * 整合所有游戏系统，与 Phaser 渲染解耦，便于单元测试
- * 参考旧实现：html5-tower-defense/src/js/td.js
+ * GameSceneLogic - Core game scene logic
+ * Integrates all game systems, decoupled from Phaser rendering for unit testing
+ * Reference: html5-tower-defense/src/js/td.js
  */
 
 import type {
@@ -21,15 +21,15 @@ import { createWaveManager } from './WaveManager'
 import { createWaveRecorder } from './WaveRecorder'
 import { createBuildingSystem } from './BuildingSystem'
 import { createBulletSystem, type Rect, type Bullet } from './BulletSystem'
-// 注意: DamageSystem 的伤害计算在 Monster 实体的 takeDamage 方法中完成
-// 注意: EconomySystem 的生命奖励功能由服务端计算并通过 API 返回
-// 客户端在 Game.ts 中根据服务端响应的 lifeReward 应用奖励
+// Note: DamageSystem damage calculation is done in the Monster entity's takeDamage method
+// Note: EconomySystem life reward is calculated server-side and returned via API
+// Client applies lifeReward from server response in Game.ts
 import { createMonster, type MonsterDependencies, type IMonsterRuntime } from '../entities/Monster'
 import { createBuilding, type BuildingDependencies, type IBuildingRuntime } from '../entities/Building'
 
 const { GRID_SIZE } = GAME_CONSTANTS
 
-/** 游戏状态 */
+/** Game state */
 export interface GameState {
   money: number
   life: number
@@ -41,7 +41,7 @@ export interface GameState {
   isGameOver: boolean
 }
 
-/** 建筑放置结果 */
+/** Building placement result */
 export interface PlaceBuildingResult {
   success: boolean
   buildingId?: string
@@ -53,15 +53,15 @@ export interface PlaceBuildingResult {
     | 'game_over'
 }
 
-/** 升级/出售结果 */
+/** Upgrade/sell result */
 export interface BuildingActionResult {
   success: boolean
   reason?: 'insufficient_money' | 'building_not_found' | 'game_over'
 }
 
-/** GameSceneLogic 接口 */
+/** GameSceneLogic interface */
 export interface GameSceneLogic {
-  // 状态获取
+  // State getters
   getState(): GameState
   getMonsters(): readonly IMonster[]
   getBuildings(): readonly IBuilding[]
@@ -72,17 +72,17 @@ export interface GameSceneLogic {
   canPlaceBuilding(position: Position): boolean
   getUpgradeCost(type: BuildingType, level: number): number
 
-  // 波次管理
+  // Wave management
   prepareNextWaveRecorder(waveNumber: number): void
   startWave(waveConfig: WaveConfig): void
   isWaveComplete(): boolean
 
-  // 建筑操作
+  // Building operations
   placeBuilding(position: Position, type: BuildingType): PlaceBuildingResult
   upgradeBuilding(buildingId: string): BuildingActionResult
   sellBuilding(buildingId: string): BuildingActionResult
 
-  // 游戏控制
+  // Game control
   update(): void
   pause(): void
   togglePause(): void
@@ -91,23 +91,23 @@ export interface GameSceneLogic {
 }
 
 /**
- * 创建 GameSceneLogic 实例
+ * Create a GameSceneLogic instance
  */
 export function createGameSceneLogic(config: GameConfig): GameSceneLogic {
-  // 系统实例
+  // System instances
   const pathSystem = createPathSystem()
   const gridSystem = createGridSystem(config.map)
   const waveManager = createWaveManager()
   const buildingSystem = createBuildingSystem(config)
   const bulletSystem = createBulletSystem()
 
-  // 波次记录器
+  // Wave recorder
   let waveRecorder = createWaveRecorder(0, 0)
 
-  // 累计分数（跨波次保持）
+  // Accumulated score (persists across waves)
   let accumulatedScore = 0
 
-  // 游戏状态
+  // Game state
   const state: GameState = {
     money: config.initial.money,
     life: config.initial.life,
@@ -119,14 +119,14 @@ export function createGameSceneLogic(config: GameConfig): GameSceneLogic {
     isGameOver: false,
   }
 
-  // 怪物和建筑列表
+  // Monster and building lists
   const monsters: (IMonster & IMonsterRuntime)[] = []
   const buildings: (IBuilding & IBuildingRuntime)[] = []
 
-  // 建筑 ID 计数器
+  // Building ID counter
   let buildingIdCounter = 0
 
-  // 地图边界（用于子弹系统）
+  // Map bounds (for bullet system)
   const mapBounds: Rect = {
     x: 0,
     y: 0,
@@ -134,7 +134,7 @@ export function createGameSceneLogic(config: GameConfig): GameSceneLogic {
     height: config.map.height * GRID_SIZE,
   }
 
-  // 怪物依赖
+  // Monster dependencies
   const monsterDeps: MonsterDependencies = {
     generatePathFrom: (startPosition) =>
       pathSystem.generatePathFrom(startPosition, gridSystem.getMapConfig()),
@@ -144,7 +144,7 @@ export function createGameSceneLogic(config: GameConfig): GameSceneLogic {
     getEntrance: () => gridSystem.getMapConfig().entrance,
   }
 
-  // 建筑依赖
+  // Building dependencies
   const buildingDeps: BuildingDependencies = {
     getDamageAtLevel: (type, level) => buildingSystem.getDamageAtLevel(type, level),
     getRangeAtLevel: (type, level) => buildingSystem.getRangeAtLevel(type, level),
@@ -155,7 +155,7 @@ export function createGameSceneLogic(config: GameConfig): GameSceneLogic {
   }
 
   /**
-   * 获取所有怪物的格子位置
+   * Get grid positions of all monsters
    */
   function getMonsterPositions(): Position[] {
     return monsters
@@ -164,7 +164,7 @@ export function createGameSceneLogic(config: GameConfig): GameSceneLogic {
   }
 
   /**
-   * 生成怪物
+   * Spawn a monster
    */
   function spawnMonster(monsterConfig: MonsterConfig): void {
     const displayConfig = config.monsters[monsterConfig.type]
@@ -189,7 +189,7 @@ export function createGameSceneLogic(config: GameConfig): GameSceneLogic {
   }
 
   /**
-   * 处理怪物击杀
+   * Handle monster kill
    */
   function handleMonsterKill(monster: IMonster): void {
     waveRecorder.recordKill({
@@ -203,7 +203,7 @@ export function createGameSceneLogic(config: GameConfig): GameSceneLogic {
   }
 
   /**
-   * 处理怪物到达终点
+   * Handle monster reaching the exit
    */
   function handleMonsterPassed(monster: IMonster): void {
     waveRecorder.recordPassed({ damage: monster.damage })
@@ -219,14 +219,14 @@ export function createGameSceneLogic(config: GameConfig): GameSceneLogic {
   }
 
   /**
-   * 更新所有怪物
+   * Update all monsters
    */
   function updateMonsters(): void {
     for (let i = monsters.length - 1; i >= 0; i--) {
       const monster = monsters[i]
 
       if (!monster.isValid) {
-        // 怪物已死亡或到达终点
+        // Monster is dead or reached the exit
         if (monster.isDead()) {
           handleMonsterKill(monster)
         } else if (monster.reachedExit()) {
@@ -236,13 +236,13 @@ export function createGameSceneLogic(config: GameConfig): GameSceneLogic {
         continue
       }
 
-      // 更新怪物位置
+      // Update monster position
       monster.update()
     }
   }
 
   /**
-   * 更新所有建筑
+   * Update all buildings
    */
   function updateBuildings(): void {
     const aliveMonsters = monsters.filter((m) => m.isValid)
@@ -255,10 +255,10 @@ export function createGameSceneLogic(config: GameConfig): GameSceneLogic {
       const target = building.findTarget(aliveMonsters)
       if (!target) continue
 
-      // 执行攻击
+      // Execute attack
       building.attack(target, waveRecorder, state.frame)
 
-      // 非激光枪需要创建子弹
+      // Non-laser weapons need to create a bullet
       const bulletParams = building.getBulletParams(target)
       if (bulletParams) {
         const pos = building.position
@@ -272,7 +272,7 @@ export function createGameSceneLogic(config: GameConfig): GameSceneLogic {
         })
       }
 
-      // 检查目标是否被击杀（激光枪直接命中）
+      // Check if target was killed (laser gun hits directly)
       if (target.isDead() && !target.isValid) {
         handleMonsterKill(target)
         const idx = monsters.indexOf(target as IMonster & IMonsterRuntime)
@@ -284,13 +284,13 @@ export function createGameSceneLogic(config: GameConfig): GameSceneLogic {
   }
 
   /**
-   * 更新子弹系统
+   * Update bullet system
    */
   function updateBullets(): void {
     const aliveMonsters = monsters.filter((m) => m.isValid)
     bulletSystem.update(aliveMonsters, mapBounds, waveRecorder, state.frame)
 
-    // 检查被子弹击杀的怪物
+    // Check for monsters killed by bullets
     for (let i = monsters.length - 1; i >= 0; i--) {
       const monster = monsters[i]
       if (monster.isDead() && !monster.isValid) {
@@ -342,21 +342,21 @@ export function createGameSceneLogic(config: GameConfig): GameSceneLogic {
     },
 
     prepareNextWaveRecorder(waveNumber: number): void {
-      // 保存之前波次的累计分数
+      // Save accumulated score from previous wave
       accumulatedScore += waveRecorder.getResult().scoreGained
-      // 更新状态中的分数
+      // Update score in state
       state.score = accumulatedScore
-      // 为下一波创建新的 recorder
+      // Create new recorder for the next wave
       waveRecorder = createWaveRecorder(waveNumber, state.frame)
     },
 
     startWave(waveConfig: WaveConfig): void {
-      // recorder 已由 prepareNextWaveRecorder 创建，这里只更新波次号和启动波次
+      // Recorder already created by prepareNextWaveRecorder, just update wave number and start wave
       state.wave = waveConfig.waveNumber
       waveManager.reset()
       waveManager.startWave(waveConfig)
 
-      // 重置建筑统计
+      // Reset building stats
       for (const building of buildings) {
         building.resetWaveStats()
       }
@@ -373,14 +373,14 @@ export function createGameSceneLogic(config: GameConfig): GameSceneLogic {
 
       const cost = buildingSystem.getBuildingConfig(type).cost
 
-      // 检查金钱
+      // Check money
       if (state.money < cost) {
         return { success: false, reason: 'insufficient_money' }
       }
 
-      // 检查位置（不考虑怪物）
+      // Check position (without considering monsters)
       if (!gridSystem.canPlaceBuilding(position)) {
-        // 细分原因
+        // Determine specific reason
         const cell = gridSystem.getCell(position)
         if (!cell || cell.isEntrance || cell.isExit || cell.isObstacle || cell.buildingId) {
           return { success: false, reason: 'invalid_position' }
@@ -388,13 +388,13 @@ export function createGameSceneLogic(config: GameConfig): GameSceneLogic {
         return { success: false, reason: 'would_block_path' }
       }
 
-      // 检查是否会阻断怪物
+      // Check if it would block monsters
       const monsterPositions = getMonsterPositions()
       if (gridSystem.wouldBlockMonsters(position, monsterPositions)) {
         return { success: false, reason: 'would_block_monsters' }
       }
 
-      // 放置建筑
+      // Place building
       const buildingId = `b-${++buildingIdCounter}`
       gridSystem.placeBuilding(position, buildingId)
 
@@ -404,10 +404,10 @@ export function createGameSceneLogic(config: GameConfig): GameSceneLogic {
       )
       buildings.push(building)
 
-      // 扣除金钱
+      // Deduct money
       state.money -= cost
 
-      // 记录操作
+      // Record action
       waveRecorder.recordBuild({
         buildingId,
         buildingType: type,
@@ -458,13 +458,13 @@ export function createGameSceneLogic(config: GameConfig): GameSceneLogic {
       const building = buildings[index]
       const income = buildingSystem.getSellIncome(building.type, building.level)
 
-      // 从格子系统移除
+      // Remove from grid system
       gridSystem.removeBuilding(building.position)
 
-      // 从列表移除
+      // Remove from list
       buildings.splice(index, 1)
 
-      // 增加金钱
+      // Add money
       state.money += income
 
       waveRecorder.recordSell({
@@ -482,25 +482,25 @@ export function createGameSceneLogic(config: GameConfig): GameSceneLogic {
 
       state.frame++
 
-      // 检查是否需要生成怪物
+      // Check if a monster needs to be spawned
       const monsterConfig = waveManager.update(state.frame)
       if (monsterConfig) {
         spawnMonster(monsterConfig)
       }
 
-      // 更新怪物
+      // Update monsters
       updateMonsters()
 
-      // 更新建筑
+      // Update buildings
       updateBuildings()
 
-      // 更新子弹
+      // Update bullets
       updateBullets()
 
-      // 更新波次记录器的持续时间
+      // Update wave recorder duration
       waveRecorder.setDuration(state.frame)
 
-      // 累计分数（之前波次 + 当前波次）
+      // Accumulated score (previous waves + current wave)
       state.score = accumulatedScore + waveRecorder.getResult().scoreGained
     },
 
@@ -520,7 +520,7 @@ export function createGameSceneLogic(config: GameConfig): GameSceneLogic {
     },
 
     reset(): void {
-      // 重置状态
+      // Reset state
       state.money = config.initial.money
       state.life = config.initial.life
       state.score = 0
@@ -530,15 +530,15 @@ export function createGameSceneLogic(config: GameConfig): GameSceneLogic {
       state.isPaused = false
       state.isGameOver = false
 
-      // 清空列表
+      // Clear lists
       monsters.length = 0
       buildings.length = 0
       buildingIdCounter = 0
 
-      // 重置累计分数
+      // Reset accumulated score
       accumulatedScore = 0
 
-      // 重置系统
+      // Reset systems
       gridSystem.reset()
       waveManager.reset()
       bulletSystem.clear()

@@ -1,6 +1,6 @@
 /**
- * Game API 层
- * 支持 Mock 模式和真实 API 模式的切换
+ * Game API layer
+ * Supports switching between mock mode and real API mode
  */
 
 import type {
@@ -18,29 +18,29 @@ import {
   mockGetLeaderboard,
 } from '@/mocks'
 
-/** API 配置选项 */
+/** API configuration options */
 export interface GameApiOptions {
-  /** 是否使用 Mock 模式 */
+  /** Whether to use mock mode */
   useMock?: boolean
-  /** API 基础 URL（真实模式下使用） */
+  /** API base URL (used in real mode) */
   baseUrl?: string
 }
 
-/** Game API 接口 */
+/** Game API interface */
 export interface GameApi {
-  /** 创建游戏会话 */
+  /** Create a game session */
   createSession(): Promise<GameStartResponse>
-  /** 提交波次结果 */
+  /** Submit wave result */
   submitWave(request: WaveRequest): Promise<WaveResponse>
-  /** 结束游戏 */
+  /** End the game */
   endGame(request: GameEndRequest): Promise<GameEndResponse>
-  /** 获取排行榜 */
+  /** Get leaderboard */
   getLeaderboard(limit?: number): Promise<LeaderboardResponse>
 }
 
 /**
- * 创建 Game API 实例
- * @param options API 配置选项
+ * Create a Game API instance
+ * @param options API configuration options
  */
 export function createGameApi(options: GameApiOptions = {}): GameApi {
   const { useMock = true, baseUrl = '/api/game' } = options
@@ -53,7 +53,7 @@ export function createGameApi(options: GameApiOptions = {}): GameApi {
 }
 
 /**
- * 创建 Mock API 实现
+ * Create mock API implementation
  */
 function createMockApi(): GameApi {
   return {
@@ -65,7 +65,7 @@ function createMockApi(): GameApi {
 }
 
 /**
- * 创建真实 API 实现
+ * Create real API implementation
  */
 function createRealApi(baseUrl: string): GameApi {
   async function request<T>(
@@ -113,7 +113,7 @@ function createRealApi(baseUrl: string): GameApi {
 }
 
 /**
- * API 错误类
+ * API error class
  */
 export class ApiError extends Error {
   constructor(
@@ -127,8 +127,8 @@ export class ApiError extends Error {
 }
 
 /**
- * 创建默认 API 实例
- * 根据环境变量自动选择模式
+ * Create default API instance
+ * Automatically selects mode based on environment variables
  */
 export function createDefaultApi(): GameApi {
   const useMock = import.meta.env.VITE_USE_MOCK !== 'false'
@@ -137,5 +137,5 @@ export function createDefaultApi(): GameApi {
   return createGameApi({ useMock, baseUrl })
 }
 
-/** 默认 API 实例（单例） */
+/** Default API instance (singleton) */
 export const gameApi = createDefaultApi()

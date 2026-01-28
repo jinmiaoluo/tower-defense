@@ -1,5 +1,5 @@
 /**
- * Theme Store 测试
+ * Theme Store tests
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
@@ -51,13 +51,13 @@ describe('ThemeStore', () => {
     vi.unstubAllGlobals()
   })
 
-  describe('初始化', () => {
-    it('默认检测系统主题', () => {
+  describe('initialization', () => {
+    it('should detect system theme by default', () => {
       const store = useThemeStore()
       expect(store.current).toBe('dark')
     })
 
-    it('系统亮色主题时检测为 light', () => {
+    it('should detect light when system theme is light', () => {
       mockMatchMedia = vi.fn(() => createMockMediaQueryList(false))
       vi.stubGlobal('matchMedia', mockMatchMedia)
       vi.stubGlobal('window', { matchMedia: mockMatchMedia })
@@ -69,7 +69,7 @@ describe('ThemeStore', () => {
   })
 
   describe('toggleTheme', () => {
-    it('从 dark 切换到 light', () => {
+    it('should toggle from dark to light', () => {
       const store = useThemeStore()
       store.initTheme()
       expect(store.current).toBe('dark')
@@ -77,7 +77,7 @@ describe('ThemeStore', () => {
       expect(store.current).toBe('light')
     })
 
-    it('从 light 切换到 dark', () => {
+    it('should toggle from light to dark', () => {
       mockMatchMedia = vi.fn(() => createMockMediaQueryList(false))
       vi.stubGlobal('matchMedia', mockMatchMedia)
       vi.stubGlobal('window', { matchMedia: mockMatchMedia })
@@ -92,20 +92,20 @@ describe('ThemeStore', () => {
   })
 
   describe('initTheme', () => {
-    it('调用 initTheme 后注册系统主题变化监听', () => {
+    it('should register system theme change listener after initTheme', () => {
       const store = useThemeStore()
       store.initTheme()
       expect(mockAddEventListener).toHaveBeenCalledWith('change', expect.any(Function))
     })
 
-    it('cleanup 移除事件监听', () => {
+    it('should remove event listener on cleanup', () => {
       const store = useThemeStore()
       store.initTheme()
       store.cleanup()
       expect(mockRemoveEventListener).toHaveBeenCalledWith('change', expect.any(Function))
     })
 
-    it('系统主题变化时自动切换', () => {
+    it('should auto-switch on system theme change', () => {
       const store = useThemeStore()
       store.initTheme()
       expect(store.current).toBe('dark')
@@ -115,7 +115,7 @@ describe('ThemeStore', () => {
       expect(store.current).toBe('light')
     })
 
-    it('系统主题变化时覆盖手动切换', () => {
+    it('should override manual toggle on system theme change', () => {
       const store = useThemeStore()
       store.initTheme()
       store.toggleTheme()
@@ -126,7 +126,7 @@ describe('ThemeStore', () => {
       expect(store.current).toBe('dark')
     })
 
-    it('系统事件不重复切换相同主题', () => {
+    it('should not redundantly switch to the same theme', () => {
       const store = useThemeStore()
       store.initTheme()
       expect(store.current).toBe('dark')
@@ -138,12 +138,12 @@ describe('ThemeStore', () => {
   })
 
   describe('getters', () => {
-    it('isDark 在暗色主题时返回 true', () => {
+    it('isDark should return true when dark theme is active', () => {
       const store = useThemeStore()
       expect(store.isDark).toBe(true)
     })
 
-    it('isDark 在亮色主题时返回 false', () => {
+    it('isDark should return false when light theme is active', () => {
       mockMatchMedia = vi.fn(() => createMockMediaQueryList(false))
       vi.stubGlobal('matchMedia', mockMatchMedia)
       vi.stubGlobal('window', { matchMedia: mockMatchMedia })
@@ -153,7 +153,7 @@ describe('ThemeStore', () => {
       expect(store.isDark).toBe(false)
     })
 
-    it('isLight 在亮色主题时返回 true', () => {
+    it('isLight should return true when light theme is active', () => {
       mockMatchMedia = vi.fn(() => createMockMediaQueryList(false))
       vi.stubGlobal('matchMedia', mockMatchMedia)
       vi.stubGlobal('window', { matchMedia: mockMatchMedia })

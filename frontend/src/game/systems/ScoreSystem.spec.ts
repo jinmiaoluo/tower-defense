@@ -1,10 +1,10 @@
 /**
- * ScoreSystem 测试用例
- * 测试命中得分计算逻辑
+ * ScoreSystem test cases
+ * Tests hit score calculation logic
  *
- * 得分规则（参考 SPEC.md）：
- * - 命中得分 = floor(sqrt(实际伤害))
- * - 最终得分 = 累计命中得分（无额外奖励，直接使用 state.score）
+ * Scoring rules (reference: SPEC.md):
+ * - Hit score = floor(sqrt(actualDamage))
+ * - Final score = cumulative hit score (no extra bonus, directly uses state.score)
  */
 
 import { beforeEach, describe, expect, it } from 'vitest'
@@ -18,11 +18,11 @@ describe('ScoreSystem', () => {
   })
 
   // ============================================================================
-  // calculateHitScore - 命中得分计算
+  // calculateHitScore - Hit score calculation
   // ============================================================================
 
   describe('calculateHitScore', () => {
-    it('得分 = floor(sqrt(actualDamage))', () => {
+    it('score = floor(sqrt(actualDamage))', () => {
       expect(system.calculateHitScore(1)).toBe(1) // sqrt(1) = 1
       expect(system.calculateHitScore(4)).toBe(2) // sqrt(4) = 2
       expect(system.calculateHitScore(9)).toBe(3) // sqrt(9) = 3
@@ -30,7 +30,7 @@ describe('ScoreSystem', () => {
       expect(system.calculateHitScore(100)).toBe(10) // sqrt(100) = 10
     })
 
-    it('非完全平方数向下取整', () => {
+    it('non-perfect squares are floored', () => {
       expect(system.calculateHitScore(2)).toBe(1) // sqrt(2) = 1.41 -> 1
       expect(system.calculateHitScore(3)).toBe(1) // sqrt(3) = 1.73 -> 1
       expect(system.calculateHitScore(5)).toBe(2) // sqrt(5) = 2.24 -> 2
@@ -38,35 +38,35 @@ describe('ScoreSystem', () => {
       expect(system.calculateHitScore(15)).toBe(3) // sqrt(15) = 3.87 -> 3
     })
 
-    it('高伤害得分更高', () => {
-      // HMG 单次 30 伤害
+    it('higher damage yields higher score', () => {
+      // HMG single hit 30 damage
       expect(system.calculateHitScore(30)).toBe(5)
-      // LMG 单次 5 伤害
+      // LMG single hit 5 damage
       expect(system.calculateHitScore(5)).toBe(2)
     })
 
-    it('伤害为 0 时得分为 0', () => {
+    it('score is 0 when damage is 0', () => {
       expect(system.calculateHitScore(0)).toBe(0)
     })
   })
 
   // ============================================================================
-  // calculateTotalHitScore - 批量计算命中得分
+  // calculateTotalHitScore - Batch hit score calculation
   // ============================================================================
 
   describe('calculateTotalHitScore', () => {
-    it('计算多次攻击的总得分', () => {
-      // 三次攻击：伤害 10, 20, 30
-      // 得分：3 + 4 + 5 = 12
+    it('calculates total score from multiple attacks', () => {
+      // Three attacks: damage 10, 20, 30
+      // Score: 3 + 4 + 5 = 12
       const damages = [10, 20, 30]
       expect(system.calculateTotalHitScore(damages)).toBe(12)
     })
 
-    it('空数组返回 0', () => {
+    it('returns 0 for an empty array', () => {
       expect(system.calculateTotalHitScore([])).toBe(0)
     })
 
-    it('单次攻击', () => {
+    it('single attack', () => {
       expect(system.calculateTotalHitScore([25])).toBe(5)
     })
   })

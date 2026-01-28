@@ -1,7 +1,7 @@
 /**
- * BulletSystem - 子弹系统
- * 负责子弹的创建、飞行、碰撞检测
- * 参考旧实现：html5-tower-defense/src/js/td-obj-building.js
+ * BulletSystem - Bullet system
+ * Handles bullet creation, flight, and collision detection
+ * Reference: html5-tower-defense/src/js/td-obj-building.js
  */
 
 import type { IBuilding, IMonster } from '@/types/entities'
@@ -11,17 +11,17 @@ import { GAME_CONSTANTS } from '@/types'
 
 const { GRID_SIZE, GLOBAL_SPEED, FPS } = GAME_CONSTANTS
 
-/** 旧实现的帧率（用于速度换算） */
+/** Old implementation frame rate (for speed conversion) */
 const OLD_FPS = 24
 
 /**
- * 子弹速度因子
- * 旧实现中：speed = 20 * this.speed * TD.global_speed
- * 其中 global_speed = 0.1，所以实际公式为: 20 * bullet_speed * 0.1 = 2 * bullet_speed
+ * Bullet speed factor
+ * Old implementation: speed = 20 * this.speed * TD.global_speed
+ * where global_speed = 0.1, so actual formula: 20 * bullet_speed * 0.1 = 2 * bullet_speed
  */
 const BULLET_SPEED_FACTOR = 20
 
-/** 矩形区域 */
+/** Rectangle area */
 export interface Rect {
   x: number
   y: number
@@ -29,33 +29,33 @@ export interface Rect {
   height: number
 }
 
-/** 子弹实体 */
+/** Bullet entity */
 export interface Bullet {
-  /** 所属建筑 */
+  /** Owning building */
   readonly building: IBuilding
-  /** 伤害值 */
+  /** Damage value */
   readonly damage: number
-  /** 飞行速度（像素/帧） */
+  /** Flight speed (pixels/frame) */
   readonly speed: number
-  /** 当前 X 位置 */
+  /** Current X position */
   x: number
-  /** 当前 Y 位置 */
+  /** Current Y position */
   y: number
-  /** X 方向速度分量 */
+  /** X velocity component */
   readonly vx: number
-  /** Y 方向速度分量 */
+  /** Y velocity component */
   readonly vy: number
-  /** 原始目标 ID（用于服务端验证） */
+  /** Original target ID (for server-side validation) */
   readonly originalTargetId: string
-  /** 原始目标位置（用于服务端射程验证） */
+  /** Original target position (for server-side range validation) */
   readonly originalTargetPosition: Position
-  /** 子弹半径（用于碰撞检测和渲染） */
+  /** Bullet radius (for collision detection and rendering) */
   readonly radius: number
-  /** 是否有效 */
+  /** Whether the bullet is valid */
   isValid: boolean
 }
 
-/** 子弹创建参数 */
+/** Bullet creation parameters */
 export interface BulletCreateParams {
   building: IBuilding
   target: IMonster
@@ -63,23 +63,23 @@ export interface BulletCreateParams {
   speed: number
   startX: number
   startY: number
-  /** 目标 X 位置（可选，默认从 target 计算） */
+  /** Target X position (optional, defaults to computed from target) */
   targetX?: number
-  /** 目标 Y 位置（可选，默认从 target 计算） */
+  /** Target Y position (optional, defaults to computed from target) */
   targetY?: number
 }
 
-/** BulletSystem 接口 */
+/** BulletSystem interface */
 export interface BulletSystem {
-  /** 创建子弹 */
+  /** Create a bullet */
   createBullet(params: BulletCreateParams): Bullet
 
   /**
-   * 每帧更新
-   * @param monsters 当前存活的怪物列表
-   * @param mapBounds 地图边界
-   * @param recorder 波次记录器
-   * @param currentFrame 当前帧号
+   * Per-frame update
+   * @param monsters Currently alive monsters
+   * @param mapBounds Map boundaries
+   * @param recorder Wave recorder
+   * @param currentFrame Current frame number
    */
   update(
     monsters: IMonster[],
@@ -88,16 +88,16 @@ export interface BulletSystem {
     currentFrame: number,
   ): void
 
-  /** 获取当前所有子弹（用于渲染） */
+  /** Get all current bullets (for rendering) */
   getBullets(): readonly Bullet[]
 
-  /** 清除所有子弹 */
+  /** Clear all bullets */
   clear(): void
 }
 
 /**
- * 获取怪物的像素位置
- * 怪物可能有 x/y 属性（运行时），也可能需要从 getGridPosition 计算
+ * Get pixel position of a monster
+ * Monster may have x/y properties (runtime), or may need to compute from getGridPosition
  */
 function getMonsterPixelPosition(monster: IMonster): { x: number; y: number } {
   const monsterAny = monster as unknown as { x?: number; y?: number }
@@ -112,8 +112,8 @@ function getMonsterPixelPosition(monster: IMonster): { x: number; y: number } {
 }
 
 /**
- * 计算子弹半径（基于伤害值）
- * 参考旧实现: r = max(log(damage), 2)，限制在 1-6 之间
+ * Calculate bullet radius (based on damage value)
+ * Reference old implementation: r = max(log(damage), 2), clamped to 1-6
  */
 function calculateBulletRadius(damage: number): number {
   const r = Math.max(Math.log(damage), 2)
@@ -121,8 +121,8 @@ function calculateBulletRadius(damage: number): number {
 }
 
 /**
- * 检测子弹与怪物的碰撞
- * 使用宽松的圆形碰撞检测
+ * Detect collision between bullet and monster
+ * Uses lenient circular collision detection
  */
 function checkCollision(bullet: Bullet, monster: IMonster): boolean {
   if (!monster.isValid) return false
@@ -132,7 +132,7 @@ function checkCollision(bullet: Bullet, monster: IMonster): boolean {
   const dy = monsterPos.y - bullet.y
   const distanceSquared = dx * dx + dy * dy
 
-  // 宽松碰撞检测：(r1 + r2)² × 2
+  // Lenient collision detection: (r1 + r2)^2 * 2
   const collisionRadiusSquared =
     Math.pow(bullet.radius + monster.radius, 2) * 2
 
@@ -140,7 +140,7 @@ function checkCollision(bullet: Bullet, monster: IMonster): boolean {
 }
 
 /**
- * 检测子弹是否飞出地图边界
+ * Detect whether a bullet has flown out of map bounds
  */
 function isOutOfBounds(bullet: Bullet, bounds: Rect): boolean {
   return (
@@ -152,7 +152,7 @@ function isOutOfBounds(bullet: Bullet, bounds: Rect): boolean {
 }
 
 /**
- * 创建 BulletSystem 实例
+ * Create a BulletSystem instance
  */
 export function createBulletSystem(): BulletSystem {
   const bullets: Bullet[] = []
@@ -161,22 +161,22 @@ export function createBulletSystem(): BulletSystem {
     createBullet(params: BulletCreateParams): Bullet {
       const { building, target, damage, speed, startX, startY } = params
 
-      // 获取目标位置
+      // Get target position
       const targetPos = getMonsterPixelPosition(target)
       const targetX = params.targetX ?? targetPos.x
       const targetY = params.targetY ?? targetPos.y
 
-      // 计算方向向量
+      // Calculate direction vector
       const dx = targetX - startX
       const dy = targetY - startY
       const distance = Math.sqrt(dx * dx + dy * dy)
 
-      // 计算实际像素速度
-      // 旧实现 (24 FPS): speed = 20 * this.speed * TD.global_speed (global_speed = 0.1)
-      // 新实现 (60 FPS): 需要乘以帧率比例 (24/60) 以保持相同的每秒移动距离
+      // Calculate actual pixel speed
+      // Old implementation (24 FPS): speed = 20 * this.speed * TD.global_speed (global_speed = 0.1)
+      // New implementation (60 FPS): multiply by frame rate ratio (24/60) to maintain same per-second movement
       const actualSpeed = speed * BULLET_SPEED_FACTOR * GLOBAL_SPEED * (OLD_FPS / FPS)
 
-      // 计算速度分量（如果距离为 0，默认向右）
+      // Calculate velocity components (if distance is 0, default to rightward)
       let vx: number, vy: number
       if (distance > 0) {
         vx = (dx * actualSpeed) / distance
@@ -186,7 +186,7 @@ export function createBulletSystem(): BulletSystem {
         vy = 0
       }
 
-      // 记录原始目标信息
+      // Record original target info
       const originalTargetPosition = target.getGridPosition()
 
       const bullet: Bullet = {
@@ -213,7 +213,7 @@ export function createBulletSystem(): BulletSystem {
       recorder: IWaveRecorder,
       currentFrame: number,
     ): void {
-      // 从后向前遍历，方便删除
+      // Iterate backwards for safe removal
       for (let i = bullets.length - 1; i >= 0; i--) {
         const bullet = bullets[i]
 
@@ -222,14 +222,14 @@ export function createBulletSystem(): BulletSystem {
           continue
         }
 
-        // 1. 检测是否飞出边界
+        // 1. Check if out of bounds
         if (isOutOfBounds(bullet, mapBounds)) {
           bullet.isValid = false
           bullets.splice(i, 1)
           continue
         }
 
-        // 2. 检测碰撞
+        // 2. Check collision
         let hitMonster: IMonster | null = null
         for (const monster of monsters) {
           if (checkCollision(bullet, monster)) {
@@ -239,16 +239,16 @@ export function createBulletSystem(): BulletSystem {
         }
 
         if (hitMonster) {
-          // 命中怪物
+          // Hit monster
           const actualDamage = hitMonster.takeDamage(bullet.damage)
 
-          // 更新建筑统计
+          // Update building stats
           bullet.building.damageDealt += actualDamage
           if (hitMonster.isDead()) {
             bullet.building.kills += 1
           }
 
-          // 记录攻击事件
+          // Record attack event
           recorder.recordAttack({
             buildingId: bullet.building.id,
             originalTargetId: bullet.originalTargetId,
@@ -259,13 +259,13 @@ export function createBulletSystem(): BulletSystem {
             frame: currentFrame,
           })
 
-          // 移除子弹
+          // Remove bullet
           bullet.isValid = false
           bullets.splice(i, 1)
           continue
         }
 
-        // 3. 移动子弹
+        // 3. Move bullet
         bullet.x += bullet.vx
         bullet.y += bullet.vy
       }

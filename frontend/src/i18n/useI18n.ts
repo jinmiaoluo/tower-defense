@@ -1,6 +1,6 @@
 /**
  * Vue 3 Composable for i18n
- * 提供响应式的多语言支持
+ * Provides reactive multilingual support.
  */
 
 import { ref, type Ref } from 'vue'
@@ -9,7 +9,7 @@ import { AppEventBus } from '@/utils/EventEmitter'
 
 const LOCALE_STORAGE_KEY = 'tower-defense-locale'
 
-/** 全局 i18n 实例 */
+/** Global i18n instance */
 let globalI18n: I18n | null = null
 
 function getInitialLocale(): Locale {
@@ -19,16 +19,16 @@ function getInitialLocale(): Locale {
       return saved
     }
   } catch {
-    // localStorage 可能被禁用
+    // localStorage may be disabled
   }
   return detectBrowserLocale()
 }
 
-/** 全局语言状态（响应式） */
+/** Global locale state (reactive) */
 const globalLocale = ref<Locale>(getInitialLocale())
 
 /**
- * 获取或创建全局 i18n 实例
+ * Get or create the global i18n instance.
  */
 function getGlobalI18n(): I18n {
   if (!globalI18n) {
@@ -38,7 +38,7 @@ function getGlobalI18n(): I18n {
 }
 
 /**
- * 设置全局语言
+ * Set the global locale.
  */
 export function setGlobalLocale(locale: Locale): void {
   globalLocale.value = locale
@@ -46,33 +46,33 @@ export function setGlobalLocale(locale: Locale): void {
   try {
     localStorage.setItem(LOCALE_STORAGE_KEY, locale)
   } catch {
-    // localStorage 可能被禁用
+    // localStorage may be disabled
   }
   AppEventBus.emit('locale-changed', locale)
 }
 
 /**
- * 获取全局语言
+ * Get the global locale.
  */
 export function getGlobalLocale(): Locale {
   return globalLocale.value
 }
 
 /**
- * useI18n composable 返回类型
+ * useI18n composable return type
  */
 export interface UseI18nReturn {
-  /** 翻译函数 */
+  /** Translation function */
   t: (key: string, args?: (string | number)[]) => string
-  /** 当前语言（响应式） */
+  /** Current locale (reactive) */
   locale: Ref<Locale>
-  /** 设置语言 */
+  /** Set locale */
   setLocale: (locale: Locale) => void
 }
 
 /**
  * Vue 3 Composable for i18n
- * 提供响应式的翻译功能
+ * Provides reactive translation capabilities.
  *
  * @example
  * ```vue
@@ -85,7 +85,7 @@ export interface UseI18nReturn {
  * <template>
  *   <div>{{ t('panel_money_title') }}{{ money }}</div>
  *   <button @click="setLocale('en')">English</button>
- *   <button @click="setLocale('zh')">中文</button>
+ *   <button @click="setLocale('zh')">Chinese</button>
  * </template>
  * ```
  */
@@ -108,7 +108,7 @@ export function useI18n(): UseI18nReturn {
 }
 
 /**
- * 获取翻译函数（非响应式，用于 Phaser 等非 Vue 环境）
+ * Get the translation function (non-reactive, for Phaser and other non-Vue contexts).
  */
 export function getTranslator(): (key: string, args?: (string | number)[]) => string {
   const i18n = getGlobalI18n()

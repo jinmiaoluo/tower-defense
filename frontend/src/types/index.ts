@@ -1,8 +1,8 @@
 /**
- * 类型定义统一导出
+ * Unified type definition exports
  */
 
-// 基础配置类型
+// Basic configuration types
 export type {
   Position,
   BuildingType,
@@ -29,7 +29,7 @@ export {
   parseGameConfig,
 } from './config'
 
-// API 类型
+// API types
 export type {
   GameStartResponse,
   WaveConfig,
@@ -51,7 +51,7 @@ export type {
   ApiErrorCode,
 } from './api'
 
-// 游戏状态类型
+// Game state types
 export type {
   GamePhase,
   GameStoreState,
@@ -64,7 +64,7 @@ export type {
   GameEndResult,
 } from './state'
 
-// 波次记录类型
+// Wave recorder types
 export type {
   WaveRecordState,
   MutableWaveResult,
@@ -83,7 +83,7 @@ export {
   toImmutableResult,
 } from './recorder'
 
-// 游戏实体类型
+// Game entity types
 export type {
   IMonster,
   MonsterCreateParams,
@@ -105,7 +105,7 @@ export {
   isSamePosition,
 } from './entities'
 
-// 主题类型
+// Theme types
 export type {
   Theme,
   ThemeColors,

@@ -1,11 +1,11 @@
 /**
- * 设备像素比常量
- * 用于高 DPR 显示适配
- * 独立模块避免循环依赖
+ * Device pixel ratio constant
+ * Used for high DPR display adaptation
+ * Separate module to avoid circular dependencies
  */
 
-// 获取设备像素比，限制最大为 2 以避免性能问题
-// 在 Node 测试环境中默认使用 1
+// Get device pixel ratio, capped at 2 to avoid performance issues
+// Defaults to 1 in Node test environment
 const getDevicePixelRatio = (): number => {
   if (typeof window !== 'undefined' && window.devicePixelRatio) {
     return window.devicePixelRatio

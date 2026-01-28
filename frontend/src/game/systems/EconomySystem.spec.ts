@@ -1,16 +1,16 @@
 /**
- * EconomySystem 测试用例
- * 测试游戏过程中的波次生命恢复奖励计算
+ * EconomySystem test cases
+ * Tests wave life recovery reward calculation during gameplay
  */
 
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { BuildingConfig, BuildingType, GameConfig } from '@/types'
 import { createEconomySystem, type EconomySystem } from './EconomySystem'
 
-// Mock 游戏配置
+// Mock game config
 const mockBuildingConfigs: Record<BuildingType, BuildingConfig> = {
   wall: {
-    name: '路障',
+    name: 'Wall',
     cost: 5,
     damage: 0,
     range: 0,
@@ -23,7 +23,7 @@ const mockBuildingConfigs: Record<BuildingType, BuildingConfig> = {
     sellRatio: 0.5,
   },
   cannon: {
-    name: '炮台',
+    name: 'Cannon',
     cost: 300,
     damage: 12,
     range: 4,
@@ -36,7 +36,7 @@ const mockBuildingConfigs: Record<BuildingType, BuildingConfig> = {
     sellRatio: 0.5,
   },
   LMG: {
-    name: '轻机枪',
+    name: 'LMG',
     cost: 100,
     damage: 5,
     range: 5,
@@ -49,7 +49,7 @@ const mockBuildingConfigs: Record<BuildingType, BuildingConfig> = {
     sellRatio: 0.5,
   },
   HMG: {
-    name: '重机枪',
+    name: 'HMG',
     cost: 800,
     damage: 30,
     range: 3,
@@ -62,7 +62,7 @@ const mockBuildingConfigs: Record<BuildingType, BuildingConfig> = {
     sellRatio: 0.5,
   },
   laser_gun: {
-    name: '激光枪',
+    name: 'Laser Gun',
     cost: 2000,
     damage: 25,
     range: 6,
@@ -101,11 +101,11 @@ describe('EconomySystem', () => {
   })
 
   // ============================================================================
-  // getLifeReward - 波次生命恢复奖励计算（游戏过程中的资源恢复，非得分）
+  // getLifeReward - Wave life recovery reward calculation (resource recovery during gameplay, not scoring)
   // ============================================================================
 
   describe('getLifeReward', () => {
-    it('普通波次（非 5 的倍数）没有奖励', () => {
+    it('normal waves (not multiples of 5) have no reward', () => {
       expect(system.getLifeReward(1)).toBe(0)
       expect(system.getLifeReward(2)).toBe(0)
       expect(system.getLifeReward(3)).toBe(0)
@@ -116,28 +116,28 @@ describe('EconomySystem', () => {
       expect(system.getLifeReward(9)).toBe(0)
     })
 
-    it('每 5 波（非 10 的倍数）奖励 5 点生命', () => {
+    it('every 5th wave (not multiples of 10) rewards 5 life', () => {
       expect(system.getLifeReward(5)).toBe(5)
       expect(system.getLifeReward(15)).toBe(5)
       expect(system.getLifeReward(25)).toBe(5)
       expect(system.getLifeReward(35)).toBe(5)
     })
 
-    it('每 10 波奖励 10 点生命', () => {
+    it('every 10th wave rewards 10 life', () => {
       expect(system.getLifeReward(10)).toBe(10)
       expect(system.getLifeReward(20)).toBe(10)
       expect(system.getLifeReward(30)).toBe(10)
       expect(system.getLifeReward(100)).toBe(10)
     })
 
-    it('10 的倍数优先于 5 的倍数规则', () => {
-      // 10 同时是 5 的倍数和 10 的倍数，应该返回 10 而不是 5
+    it('multiples of 10 take priority over multiples of 5', () => {
+      // 10 is both a multiple of 5 and 10, should return 10 not 5
       expect(system.getLifeReward(10)).toBe(10)
       expect(system.getLifeReward(20)).toBe(10)
       expect(system.getLifeReward(50)).toBe(10)
     })
 
-    it('高波次依然遵循相同规则', () => {
+    it('high waves follow the same rules', () => {
       expect(system.getLifeReward(99)).toBe(0)
       expect(system.getLifeReward(100)).toBe(10)
       expect(system.getLifeReward(105)).toBe(5)
@@ -146,28 +146,28 @@ describe('EconomySystem', () => {
   })
 
   // ============================================================================
-  // applyLifeReward - 应用生命奖励（考虑上限）
+  // applyLifeReward - Apply life reward (considering cap)
   // ============================================================================
 
   describe('applyLifeReward', () => {
-    it('生命值未满时正常增加', () => {
+    it('life increases normally when not full', () => {
       expect(system.applyLifeReward(90, 10)).toBe(100)
       expect(system.applyLifeReward(95, 5)).toBe(100)
       expect(system.applyLifeReward(50, 10)).toBe(60)
     })
 
-    it('生命值增加不超过 100 上限', () => {
+    it('life increase does not exceed 100 cap', () => {
       expect(system.applyLifeReward(95, 10)).toBe(100)
       expect(system.applyLifeReward(98, 5)).toBe(100)
       expect(system.applyLifeReward(100, 10)).toBe(100)
     })
 
-    it('生命值已满时奖励不生效', () => {
+    it('reward has no effect when life is already full', () => {
       expect(system.applyLifeReward(100, 5)).toBe(100)
       expect(system.applyLifeReward(100, 10)).toBe(100)
     })
 
-    it('奖励为 0 时生命值不变', () => {
+    it('life unchanged when reward is 0', () => {
       expect(system.applyLifeReward(50, 0)).toBe(50)
       expect(system.applyLifeReward(100, 0)).toBe(100)
     })

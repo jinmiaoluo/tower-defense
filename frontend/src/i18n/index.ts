@@ -1,5 +1,5 @@
 /**
- * i18n 多语言模块导出
+ * i18n module exports
  */
 
 export {

@@ -1,5 +1,5 @@
 /**
- * GameOverModal 组件测试
+ * GameOverModal component tests
  * @vitest-environment happy-dom
  */
 
@@ -16,8 +16,8 @@ describe('GameOverModal', () => {
     vi.useRealTimers()
   })
 
-  describe('自动 focus 昵称输入框', () => {
-    it('当 visible 变为 true 时，应自动 focus 昵称输入框', async () => {
+  describe('auto-focus nickname input', () => {
+    it('should auto-focus the nickname input when visible becomes true', async () => {
       const wrapper = mount(GameOverModal, {
         props: {
           visible: false,
@@ -44,7 +44,7 @@ describe('GameOverModal', () => {
       wrapper.unmount()
     })
 
-    it('当组件初始显示时，应自动 focus 昵称输入框', async () => {
+    it('should auto-focus the nickname input on initial display', async () => {
       const wrapper = mount(GameOverModal, {
         props: {
           visible: true,
@@ -66,7 +66,7 @@ describe('GameOverModal', () => {
       wrapper.unmount()
     })
 
-    it('已提交状态下不应尝试 focus（输入框不存在）', async () => {
+    it('should not attempt to focus when already submitted (input does not exist)', async () => {
       const wrapper = mount(GameOverModal, {
         props: {
           visible: true,
@@ -82,18 +82,18 @@ describe('GameOverModal', () => {
       await vi.runAllTimersAsync()
       await flushPromises()
 
-      // 模拟提交成功后的状态
+      // Simulate successful submission state
       wrapper.vm.setRankingResult({ rank: 1, total: 10, isNewRecord: true })
       await flushPromises()
 
-      // 输入框应该不存在
+      // The input should not exist
       expect(wrapper.find('input#nickname').exists()).toBe(false)
 
-      // 验证没有错误发生（可选链安全处理）
+      // Verify no errors occur (optional chaining handles this safely)
       wrapper.unmount()
     })
 
-    it('重置后应重新 focus 昵称输入框', async () => {
+    it('should re-focus the nickname input after reset', async () => {
       const wrapper = mount(GameOverModal, {
         props: {
           visible: true,
@@ -109,19 +109,19 @@ describe('GameOverModal', () => {
       await vi.runAllTimersAsync()
       await flushPromises()
 
-      // 模拟提交成功
+      // Simulate successful submission
       wrapper.vm.setRankingResult({ rank: 1, total: 10, isNewRecord: false })
       await flushPromises()
 
-      // 输入框应该不存在
+      // The input should not exist
       expect(wrapper.find('input#nickname').exists()).toBe(false)
 
-      // 重置状态（模拟用户想重新输入昵称的场景）
+      // Reset state (simulating user wanting to re-enter nickname)
       wrapper.vm.resetState()
       await vi.runAllTimersAsync()
       await flushPromises()
 
-      // 输入框应该重新出现并获得焦点
+      // The input should reappear and be focused
       const input = wrapper.find('input#nickname').element as HTMLInputElement
       expect(input).toBeTruthy()
       expect(document.activeElement).toBe(input)
@@ -129,7 +129,7 @@ describe('GameOverModal', () => {
       wrapper.unmount()
     })
 
-    it('弹窗关闭后重新打开应自动 focus', async () => {
+    it('should auto-focus after closing and reopening the modal', async () => {
       const wrapper = mount(GameOverModal, {
         props: {
           visible: true,
@@ -145,30 +145,30 @@ describe('GameOverModal', () => {
       await vi.runAllTimersAsync()
       await flushPromises()
 
-      // 初始显示时应该 focus
+      // Should be focused on initial display
       let input = wrapper.find('input#nickname').element as HTMLInputElement
       expect(document.activeElement).toBe(input)
 
-      // 关闭弹窗
+      // Close the modal
       await wrapper.setProps({ visible: false })
       await flushPromises()
 
-      // 弹窗关闭后输入框不存在
+      // Input should not exist when modal is closed
       expect(wrapper.find('input#nickname').exists()).toBe(false)
 
-      // 重新打开弹窗
+      // Reopen the modal
       await wrapper.setProps({ visible: true })
       await vi.runAllTimersAsync()
       await flushPromises()
 
-      // 应该重新 focus
+      // Should be focused again
       input = wrapper.find('input#nickname').element as HTMLInputElement
       expect(document.activeElement).toBe(input)
 
       wrapper.unmount()
     })
 
-    it('提交失败后输入框应自动 focus', async () => {
+    it('should auto-focus the input after a failed submission', async () => {
       const wrapper = mount(GameOverModal, {
         props: {
           visible: true,
@@ -184,25 +184,25 @@ describe('GameOverModal', () => {
       await vi.runAllTimersAsync()
       await flushPromises()
 
-      // 初始显示时应该 focus
+      // Should be focused on initial display
       const input = wrapper.find('input#nickname').element as HTMLInputElement
       expect(document.activeElement).toBe(input)
 
-      // 输入昵称使按钮可点击
+      // Enter nickname to make the button clickable
       await wrapper.find('input#nickname').setValue('TestUser')
       await flushPromises()
 
-      // 模拟用户点击提交按钮（焦点转移到按钮）
+      // Simulate user clicking submit button (focus shifts to button)
       const button = wrapper.find('button.btn-primary').element as HTMLButtonElement
       button.focus()
       expect(document.activeElement).toBe(button)
 
-      // 模拟提交失败
+      // Simulate submission failure
       wrapper.vm.setError('Network error')
       await vi.runAllTimersAsync()
       await flushPromises()
 
-      // 输入框应该仍然存在并重新获得焦点
+      // The input should still exist and regain focus
       expect(wrapper.find('input#nickname').exists()).toBe(true)
       expect(document.activeElement).toBe(input)
 

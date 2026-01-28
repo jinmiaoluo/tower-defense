@@ -1,6 +1,6 @@
 /**
- * WaveManager 波次管理器测试
- * 基于 TDD 方式编写，测试先于实现
+ * WaveManager tests
+ * Written in TDD style, tests before implementation
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
@@ -16,7 +16,7 @@ import { GAME_CONSTANTS } from '@/types'
 const { WAVE_INTERVAL_FRAMES, MONSTER_SPAWN_INTERVAL_FRAMES } = GAME_CONSTANTS
 
 // ============================================================================
-// Mock 工厂函数
+// Mock factory functions
 // ============================================================================
 
 function createMockMonsterConfig(overrides: Partial<MonsterConfig> = {}): MonsterConfig {
@@ -69,7 +69,7 @@ function createMockMonster(id: string, overrides: Partial<IMonster> = {}): IMons
 }
 
 // ============================================================================
-// 测试用例
+// Test cases
 // ============================================================================
 
 describe('WaveManager', () => {
@@ -79,26 +79,26 @@ describe('WaveManager', () => {
     waveManager = createWaveManager()
   })
 
-  describe('初始状态', () => {
-    it('初始状态应为 idle', () => {
+  describe('initial state', () => {
+    it('initial state should be idle', () => {
       expect(waveManager.getState()).toBe('idle')
     })
 
-    it('初始怪物队列应为空', () => {
+    it('initial monster queue should be empty', () => {
       expect(waveManager.getPendingMonsters()).toHaveLength(0)
     })
 
-    it('初始存活怪物列表应为空', () => {
+    it('initial alive monster list should be empty', () => {
       expect(waveManager.getAliveMonsters()).toHaveLength(0)
     })
 
-    it('初始波次号应为 0', () => {
+    it('initial wave number should be 0', () => {
       expect(waveManager.getCurrentWaveNumber()).toBe(0)
     })
   })
 
-  describe('startWave - 开始波次', () => {
-    it('开始波次后状态应变为 spawning', () => {
+  describe('startWave - start a wave', () => {
+    it('state should become spawning after starting a wave', () => {
       const waveConfig = createMockWaveConfig(1, 3)
 
       waveManager.startWave(waveConfig)
@@ -106,7 +106,7 @@ describe('WaveManager', () => {
       expect(waveManager.getState()).toBe('spawning')
     })
 
-    it('开始波次后应有待生成的怪物', () => {
+    it('should have pending monsters after starting a wave', () => {
       const waveConfig = createMockWaveConfig(1, 5)
 
       waveManager.startWave(waveConfig)
@@ -114,7 +114,7 @@ describe('WaveManager', () => {
       expect(waveManager.getPendingMonsters()).toHaveLength(5)
     })
 
-    it('开始波次后波次号应更新', () => {
+    it('wave number should be updated after starting a wave', () => {
       const waveConfig = createMockWaveConfig(3, 2)
 
       waveManager.startWave(waveConfig)
@@ -122,7 +122,7 @@ describe('WaveManager', () => {
       expect(waveManager.getCurrentWaveNumber()).toBe(3)
     })
 
-    it('不能在非 idle 状态开始新波次', () => {
+    it('cannot start a new wave when not in idle state', () => {
       const waveConfig1 = createMockWaveConfig(1)
       const waveConfig2 = createMockWaveConfig(2)
 
@@ -132,64 +132,64 @@ describe('WaveManager', () => {
     })
   })
 
-  describe('update - 怪物生成调度', () => {
-    it('每隔指定帧数应返回一个待生成的怪物配置', () => {
+  describe('update - monster spawn scheduling', () => {
+    it('should return a pending monster config at each spawn interval', () => {
       const waveConfig = createMockWaveConfig(1, 3)
       waveManager.startWave(waveConfig)
 
-      // 第一帧立即生成第一个怪物
+      // First frame immediately spawns the first monster
       const monster1 = waveManager.update(0)
       expect(monster1).not.toBeNull()
       expect(monster1!.id).toBe('m-1-0')
 
-      // 未到间隔时间不生成
+      // Before the interval, no spawn
       const noMonster = waveManager.update(MONSTER_SPAWN_INTERVAL_FRAMES - 1)
       expect(noMonster).toBeNull()
 
-      // 到达间隔时间生成第二个
+      // At the interval, spawn the second monster
       const monster2 = waveManager.update(MONSTER_SPAWN_INTERVAL_FRAMES)
       expect(monster2).not.toBeNull()
       expect(monster2!.id).toBe('m-1-1')
     })
 
-    it('所有怪物生成完毕后应返回 null', () => {
+    it('should return null after all monsters have been spawned', () => {
       const waveConfig = createMockWaveConfig(1, 2)
       waveManager.startWave(waveConfig)
 
-      // 生成两个怪物
-      waveManager.update(0) // 第一个
-      waveManager.update(MONSTER_SPAWN_INTERVAL_FRAMES) // 第二个
+      // Spawn two monsters
+      waveManager.update(0) // first
+      waveManager.update(MONSTER_SPAWN_INTERVAL_FRAMES) // second
 
-      // 再调用应返回 null
+      // Further calls should return null
       const result = waveManager.update(MONSTER_SPAWN_INTERVAL_FRAMES * 2)
       expect(result).toBeNull()
     })
 
-    it('所有怪物生成完毕后状态应变为 fighting', () => {
+    it('state should become fighting after all monsters are spawned', () => {
       const waveConfig = createMockWaveConfig(1, 2)
       waveManager.startWave(waveConfig)
 
-      // 注册生成的怪物
+      // Register spawned monsters
       const config1 = waveManager.update(0)!
       waveManager.registerMonster(createMockMonster(config1.id))
 
       const config2 = waveManager.update(MONSTER_SPAWN_INTERVAL_FRAMES)!
       waveManager.registerMonster(createMockMonster(config2.id))
 
-      // 再次 update 触发状态检查
+      // Another update triggers state check
       waveManager.update(MONSTER_SPAWN_INTERVAL_FRAMES * 2)
 
       expect(waveManager.getState()).toBe('fighting')
     })
 
-    it('idle 状态下 update 应返回 null', () => {
+    it('update should return null in idle state', () => {
       const result = waveManager.update(0)
       expect(result).toBeNull()
     })
   })
 
-  describe('registerMonster - 注册怪物', () => {
-    it('注册的怪物应出现在存活列表中', () => {
+  describe('registerMonster - register a monster', () => {
+    it('registered monster should appear in the alive list', () => {
       const waveConfig = createMockWaveConfig(1, 1)
       waveManager.startWave(waveConfig)
 
@@ -201,7 +201,7 @@ describe('WaveManager', () => {
       expect(waveManager.getAliveMonsters()).toContain(monster)
     })
 
-    it('多次注册不同怪物应都在列表中', () => {
+    it('registering multiple different monsters should all be in the list', () => {
       const waveConfig = createMockWaveConfig(1, 3)
       waveManager.startWave(waveConfig)
 
@@ -219,12 +219,12 @@ describe('WaveManager', () => {
     })
   })
 
-  describe('onMonsterRemoved - 怪物移除', () => {
-    it('移除怪物后应从存活列表中消失', () => {
+  describe('onMonsterRemoved - monster removal', () => {
+    it('removed monster should disappear from the alive list', () => {
       const waveConfig = createMockWaveConfig(1, 2)
       waveManager.startWave(waveConfig)
 
-      // 生成并注册两个怪物
+      // Spawn and register two monsters
       const config1 = waveManager.update(0)!
       const monster1 = createMockMonster(config1.id)
       waveManager.registerMonster(monster1)
@@ -233,26 +233,26 @@ describe('WaveManager', () => {
       const monster2 = createMockMonster(config2.id)
       waveManager.registerMonster(monster2)
 
-      // 移除一个
+      // Remove one
       waveManager.onMonsterRemoved(monster1)
 
       expect(waveManager.getAliveMonsters()).not.toContain(monster1)
       expect(waveManager.getAliveMonsters()).toContain(monster2)
     })
 
-    it('移除不存在的怪物不应报错', () => {
+    it('removing a non-existent monster should not throw', () => {
       const monster = createMockMonster('unknown-id')
 
       expect(() => waveManager.onMonsterRemoved(monster)).not.toThrow()
     })
   })
 
-  describe('isWaveComplete - 波次完成判断', () => {
-    it('所有怪物死亡或穿过后波次应完成', () => {
+  describe('isWaveComplete - wave completion check', () => {
+    it('wave should be complete after all monsters are dead or passed', () => {
       const waveConfig = createMockWaveConfig(1, 2)
       waveManager.startWave(waveConfig)
 
-      // 生成并注册怪物
+      // Spawn and register monsters
       const config1 = waveManager.update(0)!
       const monster1 = createMockMonster(config1.id)
       waveManager.registerMonster(monster1)
@@ -261,63 +261,63 @@ describe('WaveManager', () => {
       const monster2 = createMockMonster(config2.id)
       waveManager.registerMonster(monster2)
 
-      // 进入 fighting 状态
+      // Enter fighting state
       waveManager.update(MONSTER_SPAWN_INTERVAL_FRAMES * 2)
 
       expect(waveManager.isWaveComplete()).toBe(false)
 
-      // 移除所有怪物
+      // Remove all monsters
       waveManager.onMonsterRemoved(monster1)
       waveManager.onMonsterRemoved(monster2)
 
       expect(waveManager.isWaveComplete()).toBe(true)
     })
 
-    it('还有待生成怪物时波次不应完成', () => {
+    it('wave should not be complete when there are pending monsters', () => {
       const waveConfig = createMockWaveConfig(1, 5)
       waveManager.startWave(waveConfig)
 
-      // 只生成一个
+      // Only spawn one
       waveManager.update(0)
 
       expect(waveManager.isWaveComplete()).toBe(false)
     })
 
-    it('idle 状态下波次不算完成', () => {
+    it('wave is not considered complete in idle state', () => {
       expect(waveManager.isWaveComplete()).toBe(false)
     })
   })
 
-  describe('状态转换: spawning → fighting → completed', () => {
-    it('所有怪物死亡后状态应变为 completed', () => {
+  describe('state transitions: spawning -> fighting -> completed', () => {
+    it('state should become completed after all monsters are dead', () => {
       const waveConfig = createMockWaveConfig(1, 1)
       waveManager.startWave(waveConfig)
 
-      // 生成并注册
+      // Spawn and register
       const config = waveManager.update(0)!
       const monster = createMockMonster(config.id)
       waveManager.registerMonster(monster)
 
-      // 进入 fighting
+      // Enter fighting
       waveManager.update(MONSTER_SPAWN_INTERVAL_FRAMES)
       expect(waveManager.getState()).toBe('fighting')
 
-      // 怪物死亡
+      // Monster dies
       waveManager.onMonsterRemoved(monster)
 
-      // 再次 update 检查波次完成
+      // Another update checks wave completion
       waveManager.update(MONSTER_SPAWN_INTERVAL_FRAMES * 2)
 
       expect(waveManager.getState()).toBe('completed')
     })
   })
 
-  describe('startInterval - 波次间隔', () => {
-    it('completed 状态下可以开始间隔', () => {
+  describe('startInterval - wave interval', () => {
+    it('can start interval in completed state', () => {
       const waveConfig = createMockWaveConfig(1, 1)
       waveManager.startWave(waveConfig)
 
-      // 快速完成波次
+      // Quickly complete the wave
       const config = waveManager.update(0)!
       const monster = createMockMonster(config.id)
       waveManager.registerMonster(monster)
@@ -332,12 +332,12 @@ describe('WaveManager', () => {
       expect(waveManager.getState()).toBe('interval')
     })
 
-    it('非 completed 状态不能开始间隔', () => {
+    it('cannot start interval in non-completed state', () => {
       expect(() => waveManager.startInterval(0)).toThrow()
     })
   })
 
-  describe('isIntervalComplete - 间隔完成判断', () => {
+  describe('isIntervalComplete - interval completion check', () => {
     let currentFrame: number
 
     beforeEach(() => {
@@ -345,7 +345,7 @@ describe('WaveManager', () => {
       const waveConfig = createMockWaveConfig(1, 1)
       waveManager.startWave(waveConfig)
 
-      // 快速完成波次
+      // Quickly complete the wave
       const config = waveManager.update(currentFrame)!
       const monster = createMockMonster(config.id)
       waveManager.registerMonster(monster)
@@ -357,27 +357,27 @@ describe('WaveManager', () => {
       waveManager.startInterval(currentFrame)
     })
 
-    it('间隔时间未到应返回 false', () => {
+    it('should return false before interval time is reached', () => {
       expect(waveManager.isIntervalComplete(currentFrame + 1)).toBe(false)
       expect(waveManager.isIntervalComplete(currentFrame + WAVE_INTERVAL_FRAMES - 1)).toBe(false)
     })
 
-    it('间隔时间到达应返回 true', () => {
+    it('should return true when interval time is reached', () => {
       expect(waveManager.isIntervalComplete(currentFrame + WAVE_INTERVAL_FRAMES)).toBe(true)
     })
 
-    it('非 interval 状态应返回 false', () => {
+    it('should return false in non-interval state', () => {
       const freshManager = createWaveManager()
       expect(freshManager.isIntervalComplete(1000)).toBe(false)
     })
   })
 
-  describe('completeInterval - 结束间隔', () => {
-    it('间隔结束后状态应回到 idle', () => {
+  describe('completeInterval - end interval', () => {
+    it('state should return to idle after interval ends', () => {
       const waveConfig = createMockWaveConfig(1, 1)
       waveManager.startWave(waveConfig)
 
-      // 快速完成波次
+      // Quickly complete the wave
       const config = waveManager.update(0)!
       const monster = createMockMonster(config.id)
       waveManager.registerMonster(monster)
@@ -393,11 +393,11 @@ describe('WaveManager', () => {
       expect(waveManager.getState()).toBe('idle')
     })
 
-    it('idle 状态后可以开始新波次', () => {
+    it('can start a new wave after returning to idle', () => {
       const waveConfig1 = createMockWaveConfig(1, 1)
       waveManager.startWave(waveConfig1)
 
-      // 完成第一波
+      // Complete the first wave
       const config = waveManager.update(0)!
       const monster = createMockMonster(config.id)
       waveManager.registerMonster(monster)
@@ -407,7 +407,7 @@ describe('WaveManager', () => {
       waveManager.startInterval(MONSTER_SPAWN_INTERVAL_FRAMES * 2)
       waveManager.completeInterval()
 
-      // 开始第二波
+      // Start the second wave
       const waveConfig2 = createMockWaveConfig(2, 2)
 
       expect(() => waveManager.startWave(waveConfig2)).not.toThrow()
@@ -415,12 +415,12 @@ describe('WaveManager', () => {
     })
   })
 
-  describe('getWaveStats - 波次统计', () => {
-    it('应返回正确的波次统计信息', () => {
+  describe('getWaveStats - wave statistics', () => {
+    it('should return correct wave statistics', () => {
       const waveConfig = createMockWaveConfig(1, 3)
       waveManager.startWave(waveConfig)
 
-      // 生成 2 个怪物
+      // Spawn 2 monsters
       const config1 = waveManager.update(0)!
       const monster1 = createMockMonster(config1.id)
       waveManager.registerMonster(monster1)
@@ -438,12 +438,12 @@ describe('WaveManager', () => {
     })
   })
 
-  describe('reset - 重置', () => {
-    it('重置后应回到初始状态', () => {
+  describe('reset', () => {
+    it('should return to initial state after reset', () => {
       const waveConfig = createMockWaveConfig(1, 3)
       waveManager.startWave(waveConfig)
 
-      // 生成一些怪物
+      // Spawn some monsters
       const config = waveManager.update(0)!
       const monster = createMockMonster(config.id)
       waveManager.registerMonster(monster)

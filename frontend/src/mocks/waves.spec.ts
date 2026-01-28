@@ -1,14 +1,14 @@
 /**
- * 波次配置测试
- * 验证预定义波次配置与旧实现（td-data-stage-1.js:184-250）一致
+ * Wave configuration tests
+ * Verify predefined wave configs match old implementation (td-data-stage-1.js:184-250)
  */
 
 import { describe, expect, it } from 'vitest'
 import { PREDEFINED_WAVES, generateWaveConfig } from './waves'
 
 /**
- * 旧实现的预定义波次配置（来源：td-data-stage-1.js:184-250）
- * 格式：[[count, type], ...]
+ * Predefined wave configs from old implementation (source: td-data-stage-1.js:184-250)
+ * Format: [[count, type], ...]
  */
 const OLD_IMPLEMENTATION_WAVES: Record<number, [number, number][]> = {
   1: [[1, 0]],
@@ -28,7 +28,7 @@ describe('PREDEFINED_WAVES', () => {
     const oldWave = OLD_IMPLEMENTATION_WAVES[waveNumber]
     const newWave = PREDEFINED_WAVES[waveNumber]
 
-    // 转换旧格式为新格式进行对比
+    // Convert old format to new format for comparison
     const expectedGroups = oldWave.map(([count, type]) => ({ type, count }))
 
     expect(newWave).toEqual(expectedGroups)
@@ -44,7 +44,7 @@ describe('PREDEFINED_WAVES', () => {
     expect(actualTotal).toBe(expectedTotal)
   })
 
-  // 波次 1-10 的详细怪物数量验证
+  // Detailed monster count validation for waves 1-10
   const expectedTotals: Record<number, number> = {
     1: 1,
     2: 2,
@@ -80,17 +80,17 @@ describe('generateWaveConfig', () => {
   })
 
   it('should use correct monster types for wave 1-10', () => {
-    // 波次 1: 只有 type 0
+    // Wave 1: only type 0
     const wave1 = generateWaveConfig(1, 1.0)
     expect(wave1.monsters.every(m => m.type === 0)).toBe(true)
 
-    // 波次 2: type 0 和 type 1
+    // Wave 2: type 0 and type 1
     const wave2 = generateWaveConfig(2, 1.0)
     const types2 = new Set(wave2.monsters.map(m => m.type))
     expect(types2.has(0)).toBe(true)
     expect(types2.has(1)).toBe(true)
 
-    // 波次 7-10 开始出现 type 2
+    // Waves 7-10 start including type 2
     const wave7 = generateWaveConfig(7, 1.0)
     const types7 = new Set(wave7.monsters.map(m => m.type))
     expect(types7.has(2)).toBe(true)
@@ -106,15 +106,15 @@ describe('generateWaveConfig', () => {
 
   describe('wave 11+ auto-generation', () => {
     it('should calculate total monsters as min(wave^1.1, 100)', () => {
-      // 波次 11: floor(11^1.1) = 13
+      // Wave 11: floor(11^1.1) = 13
       const wave11 = generateWaveConfig(11, 1.0)
       expect(wave11.monsters.length).toBe(Math.floor(Math.pow(11, 1.1)))
 
-      // 波次 20: floor(20^1.1) = 26
+      // Wave 20: floor(20^1.1) = 26
       const wave20 = generateWaveConfig(20, 1.0)
       expect(wave20.monsters.length).toBe(Math.floor(Math.pow(20, 1.1)))
 
-      // 波次 100+: 上限 100
+      // Wave 100+: capped at 100
       const wave100 = generateWaveConfig(100, 1.0)
       expect(wave100.monsters.length).toBeLessThanOrEqual(100)
     })

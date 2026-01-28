@@ -1,5 +1,5 @@
 /**
- * 游戏实体模块导出
+ * Game entity module exports
  */
 
 export { createMonster, type MonsterDependencies, type IMonsterRuntime } from './Monster'

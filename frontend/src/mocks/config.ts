@@ -1,6 +1,6 @@
 /**
- * 游戏配置 Mock 数据
- * 数据来源：docs/BACKEND_GUIDE.md
+ * Game configuration mock data
+ * Data source: docs/BACKEND_GUIDE.md
  */
 
 import type {
@@ -13,10 +13,10 @@ import type {
   MonsterTypeId,
 } from '@/types'
 
-/** 建筑配置（参考 SPEC.md 塔类型表格） */
+/** Building configuration (reference: SPEC.md tower type table) */
 export const MOCK_BUILDINGS: Record<BuildingType, BuildingConfig> = {
   wall: {
-    name: '路障',
+    name: 'Wall',
     cost: 5,
     damage: 0,
     range: 0,
@@ -29,7 +29,7 @@ export const MOCK_BUILDINGS: Record<BuildingType, BuildingConfig> = {
     sellRatio: 0.5,
   },
   cannon: {
-    name: '炮台',
+    name: 'Cannon',
     cost: 300,
     damage: 12,
     range: 4,
@@ -42,7 +42,7 @@ export const MOCK_BUILDINGS: Record<BuildingType, BuildingConfig> = {
     sellRatio: 0.5,
   },
   LMG: {
-    name: '轻机枪',
+    name: 'Light Machine Gun',
     cost: 100,
     damage: 5,
     range: 5,
@@ -55,7 +55,7 @@ export const MOCK_BUILDINGS: Record<BuildingType, BuildingConfig> = {
     sellRatio: 0.5,
   },
   HMG: {
-    name: '重机枪',
+    name: 'Heavy Machine Gun',
     cost: 800,
     damage: 30,
     range: 3,
@@ -68,7 +68,7 @@ export const MOCK_BUILDINGS: Record<BuildingType, BuildingConfig> = {
     sellRatio: 0.5,
   },
   laser_gun: {
-    name: '激光枪',
+    name: 'Laser Gun',
     cost: 2000,
     damage: 25,
     range: 6,
@@ -82,23 +82,23 @@ export const MOCK_BUILDINGS: Record<BuildingType, BuildingConfig> = {
   },
 }
 
-/** 怪物静态配置（name, color, damage） */
+/** Monster static configuration (name, color, damage) */
 export const MOCK_MONSTERS: Record<MonsterTypeId, MonsterDisplayConfig> = {
-  0: { name: '普通怪', color: '#00ff00', damage: 1 },
-  1: { name: '稍强怪', color: '#33ff33', damage: 2 },
-  2: { name: '速度怪', color: '#66ff66', damage: 3 },
-  3: { name: '血量怪', color: '#ff0000', damage: 3 },
-  4: { name: '护盾怪', color: '#0000ff', damage: 3 },
-  5: { name: '伤害怪', color: '#ff00ff', damage: 10 },
-  6: { name: '速度血量怪', color: '#ffff00', damage: 3 },
-  7: { name: '极速怪', color: '#00ffff', damage: 4 },
-  8: { name: '护盾血量怪', color: '#ff6600', damage: 5 },
+  0: { name: 'Normal', color: '#00ff00', damage: 1 },
+  1: { name: 'Slightly Strong', color: '#33ff33', damage: 2 },
+  2: { name: 'Speeder', color: '#66ff66', damage: 3 },
+  3: { name: 'Tank', color: '#ff0000', damage: 3 },
+  4: { name: 'Shielded', color: '#0000ff', damage: 3 },
+  5: { name: 'Heavy Hitter', color: '#ff00ff', damage: 10 },
+  6: { name: 'Fast Tank', color: '#ffff00', damage: 3 },
+  7: { name: 'Ultra Speeder', color: '#00ffff', damage: 4 },
+  8: { name: 'Shielded Tank', color: '#ff6600', damage: 5 },
 }
 
 /**
- * 怪物基础属性（用于波次生成时计算）
- * life/speed/shield 会根据难度系数动态调整
- * max_speed 是速度上限，防止高难度时怪物过快
+ * Monster base stats (used for wave generation calculations)
+ * life/speed/shield are dynamically adjusted by difficulty coefficient
+ * max_speed is the speed cap to prevent monsters from being too fast at high difficulty
  */
 export const MOCK_MONSTER_BASE_STATS: Record<
   MonsterTypeId,
@@ -115,7 +115,7 @@ export const MOCK_MONSTER_BASE_STATS: Record<
   8: { life: 300, speed: 3, max_speed: 10, shield: 15, money: 60 },
 }
 
-/** 地图配置 */
+/** Map configuration */
 export const MOCK_MAP: MapConfig = {
   width: 16,
   height: 16,
@@ -124,14 +124,14 @@ export const MOCK_MAP: MapConfig = {
   obstacles: [],
 }
 
-/** 初始状态 */
+/** Initial state */
 export const MOCK_INITIAL: InitialConfig = {
   money: 500,
   life: 100,
   difficulty: 1.0,
 }
 
-/** 完整游戏配置 */
+/** Full game configuration */
 export const MOCK_GAME_CONFIG: GameConfig = {
   buildings: MOCK_BUILDINGS,
   monsters: MOCK_MONSTERS,

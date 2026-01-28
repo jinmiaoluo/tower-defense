@@ -1,95 +1,95 @@
 /**
- * GridSystem - 格子管理系统
- * 负责管理地图格子状态，包括建筑放置和路径计算
- * 参考旧实现：html5-tower-defense/src/js/td-obj-grid.js
+ * GridSystem - Grid management system
+ * Manages map grid state, including building placement and path calculation
+ * Reference: html5-tower-defense/src/js/td-obj-grid.js
  */
 
 import type { MapConfig, Position } from '@/types'
 import type { GridCell, MapState } from '@/types/entities'
 import { createPathSystem } from './PathSystem'
 
-/** GridSystem 接口定义 */
+/** GridSystem interface definition */
 export interface GridSystem {
-  /** 获取地图宽度 */
+  /** Get map width */
   getWidth(): number
 
-  /** 获取地图高度 */
+  /** Get map height */
   getHeight(): number
 
-  /** 获取指定位置的格子，超出边界返回 null */
+  /** Get cell at position, returns null if out of bounds */
   getCell(position: Position): GridCell | null
 
-  /** 检查是否可以在指定位置放置建筑 */
+  /** Check if a building can be placed at the specified position */
   canPlaceBuilding(position: Position): boolean
 
   /**
-   * 检查是否可以在指定位置放置建筑（考虑怪物阻断）
-   * 参考旧实现：html5-tower-defense/src/js/td-obj-grid.js:47 checkBlock()
-   * @param position 要放置建筑的位置
-   * @param monsterPositions 当前所有怪物的格子位置
+   * Check if a building can be placed at the specified position (considering monster blocking)
+   * Reference: html5-tower-defense/src/js/td-obj-grid.js:47 checkBlock()
+   * @param position Position to place the building
+   * @param monsterPositions Grid positions of all current monsters
    */
   canPlaceBuildingWithMonsters(position: Position, monsterPositions: Position[]): boolean
 
   /**
-   * 检查放置建筑是否会阻断怪物到出口的路径
-   * 参考旧实现：html5-tower-defense/src/js/td-obj-monster.js:211 chkIfBlocked()
-   * @param position 要放置建筑的位置
-   * @param monsterPositions 当前所有怪物的格子位置
+   * Check if placing a building would block monsters' path to the exit
+   * Reference: html5-tower-defense/src/js/td-obj-monster.js:211 chkIfBlocked()
+   * @param position Position to place the building
+   * @param monsterPositions Grid positions of all current monsters
    */
   wouldBlockMonsters(position: Position, monsterPositions: Position[]): boolean
 
   /**
-   * 从指定位置计算到出口的路径
-   * 用于检查怪物是否能到达出口
-   * @param position 起始位置
+   * Calculate path from the specified position to the exit
+   * Used to check if a monster can reach the exit
+   * @param position Starting position
    */
   findPathFromPosition(position: Position): Position[]
 
-  /** 在指定位置放置建筑，返回是否成功 */
+  /** Place a building at the specified position, returns whether successful */
   placeBuilding(position: Position, buildingId: string): boolean
 
-  /** 移除指定位置的建筑，返回是否成功 */
+  /** Remove the building at the specified position, returns whether successful */
   removeBuilding(position: Position): boolean
 
-  /** 获取当前路径（从入口到出口） */
+  /** Get current path (from entrance to exit) */
   getCurrentPath(): Position[]
 
-  /** 检查指定位置是否可通行 */
+  /** Check if the specified position is passable */
   isPassable(position: Position): boolean
 
-  /** 获取所有障碍物位置（包括建筑） */
+  /** Get all obstacle positions (including buildings) */
   getObstacles(): Position[]
 
-  /** 获取指定位置的建筑 ID */
+  /** Get building ID at the specified position */
   getBuildingAt(position: Position): string | null
 
-  /** 获取所有格子的二维数组 */
+  /** Get 2D array of all cells */
   getAllCells(): GridCell[][]
 
-  /** 获取当前地图配置（障碍物包含建筑） */
+  /** Get current map config (obstacles include buildings) */
   getMapConfig(): MapConfig
 
-  /** 获取当前地图状态快照（用于 IGameScene.map） */
+  /** Get current map state snapshot (for IGameScene.map) */
   getMapState(): MapState
 
-  /** 获取入口位置 */
+  /** Get entrance position */
   getEntrance(): Position
 
-  /** 获取出口位置 */
+  /** Get exit position */
   getExit(): Position
 
-  /** 重置网格状态（清除所有建筑） */
+  /** Reset grid state (clear all buildings) */
   reset(): void
 }
 
 /**
- * 创建 GridSystem 实例
+ * Create a GridSystem instance
  */
 export function createGridSystem(mapConfig: MapConfig): GridSystem {
   const { width, height, entrance, exit, obstacles } = mapConfig
   const pathSystem = createPathSystem()
 
-  // 初始化格子网格
+  // Initialize grid cells
   const cells: GridCell[][] = []
   const obstacleSet = new Set(obstacles.map((p) => `${p[0]},${p[1]}`))
   const entranceKey = `${entrance[0]},${entrance[1]}`
@@ -114,10 +114,10 @@ export function createGridSystem(mapConfig: MapConfig): GridSystem {
     }
   }
 
-  // 缓存当前路径
+  // Cache current path
   let cachedPath: Position[] = pathSystem.generatePath(getMapConfigWithBuildings())
 
-  /** 获取包含建筑的地图配置 */
+  /** Get map config including buildings as obstacles */
   function getMapConfigWithBuildings(): MapConfig {
     const allObstacles: Position[] = [...obstacles]
     for (let y = 0; y < height; y++) {
@@ -136,21 +136,21 @@ export function createGridSystem(mapConfig: MapConfig): GridSystem {
     }
   }
 
-  /** 重新计算路径 */
+  /** Recalculate path */
   function recalculatePath(): void {
     cachedPath = pathSystem.generatePath(getMapConfigWithBuildings())
   }
 
-  /** 检查坐标是否在边界内 */
+  /** Check if coordinates are within bounds */
   function isInBounds(x: number, y: number): boolean {
     return x >= 0 && x < width && y >= 0 && y < height
   }
 
-  /** 检查放置建筑是否会阻断入口到出口的路径 */
+  /** Check if placing a building would block the path from entrance to exit */
   function wouldBlockPath(position: Position): boolean {
     const [x, y] = position
 
-    // 临时将该位置标记为不可通行
+    // Temporarily mark this position as impassable
     const tempObstacles: Position[] = [...getMapConfigWithBuildings().obstacles, [x, y]]
     const tempConfig: MapConfig = {
       width,
@@ -165,63 +165,63 @@ export function createGridSystem(mapConfig: MapConfig): GridSystem {
   }
 
   /**
-   * 从指定位置计算到出口的路径
-   * 参考旧实现：html5-tower-defense/src/js/td-walk.js
+   * Calculate path from a specified position to the exit
+   * Reference: html5-tower-defense/src/js/td-walk.js
    */
   function findPathFromPositionImpl(startPosition: Position): Position[] {
     const [startX, startY] = startPosition
 
-    // 如果起点就是终点，直接返回
+    // If start is already the exit, return directly
     if (startX === exit[0] && startY === exit[1]) {
       return [exit]
     }
 
-    // 使用当前地图配置（包含建筑）从指定位置计算到出口的路径
+    // Use current map config (including buildings) to calculate path from position to exit
     const currentMapConfig = getMapConfigWithBuildings()
     const tempConfig: MapConfig = {
       ...currentMapConfig,
-      entrance: startPosition, // 临时将起点设为入口
+      entrance: startPosition, // Temporarily set start as entrance
     }
 
     return pathSystem.generatePath(tempConfig)
   }
 
   /**
-   * 检查放置建筑是否会阻断指定怪物到出口的路径
-   * 参考旧实现：html5-tower-defense/src/js/td-obj-monster.js:211 chkIfBlocked()
+   * Check if placing a building would block specific monsters' path to the exit
+   * Reference: html5-tower-defense/src/js/td-obj-monster.js:211 chkIfBlocked()
    */
   function wouldBlockMonstersImpl(position: Position, monsterPositions: Position[]): boolean {
-    // 没有怪物时，不存在阻断问题
+    // No blocking issue when there are no monsters
     if (monsterPositions.length === 0) {
       return false
     }
 
     const [buildX, buildY] = position
 
-    // 创建临时地图配置（包含待放置的建筑）
+    // Create temporary map config (including the building to be placed)
     const tempObstacles: Position[] = [...getMapConfigWithBuildings().obstacles, [buildX, buildY]]
 
-    // 检查每个怪物是否能到达出口
+    // Check if each monster can reach the exit
     for (const monsterPos of monsterPositions) {
       const [mx, my] = monsterPos
 
-      // 如果怪物已在出口，不需要检查
+      // No need to check if monster is already at the exit
       if (mx === exit[0] && my === exit[1]) {
         continue
       }
 
-      // 创建临时配置检查怪物路径
+      // Create temporary config to check monster path
       const tempConfig: MapConfig = {
         width,
         height,
-        entrance: monsterPos, // 从怪物位置开始
+        entrance: monsterPos, // Start from monster position
         exit,
         obstacles: tempObstacles,
       }
 
       const testPath = pathSystem.generatePath(tempConfig)
 
-      // 如果怪物无法到达出口，则放置会阻断
+      // If monster cannot reach the exit, placement would block
       if (testPath.length === 0) {
         return true
       }
@@ -256,17 +256,17 @@ export function createGridSystem(mapConfig: MapConfig): GridSystem {
 
       const cell = cells[y][x]
 
-      // 入口、出口、障碍物不能放置建筑
+      // Cannot place buildings on entrance, exit, or obstacles
       if (cell.isEntrance || cell.isExit || cell.isObstacle) {
         return false
       }
 
-      // 已有建筑的格子不能放置
+      // Cannot place on cells that already have a building
       if (cell.buildingId !== null) {
         return false
       }
 
-      // 检查是否会阻断路径
+      // Check if it would block the path
       if (wouldBlockPath(position)) {
         return false
       }
@@ -275,12 +275,12 @@ export function createGridSystem(mapConfig: MapConfig): GridSystem {
     },
 
     canPlaceBuildingWithMonsters(position: Position, monsterPositions: Position[]): boolean {
-      // 首先检查基本条件
+      // First check basic conditions
       if (!this.canPlaceBuilding(position)) {
         return false
       }
 
-      // 然后检查是否会阻断怪物路径
+      // Then check if it would block monster paths
       if (wouldBlockMonstersImpl(position, monsterPositions)) {
         return false
       }
@@ -386,20 +386,20 @@ export function createGridSystem(mapConfig: MapConfig): GridSystem {
     },
 
     reset(): void {
-      // 清除所有建筑
+      // Clear all buildings
       for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
           const cell = cells[y][x]
           if (cell.buildingId !== null) {
             cell.buildingId = null
-            // 恢复可通行状态（如果不是原始障碍物）
+            // Restore passable state (if not an original obstacle)
             if (!cell.isObstacle) {
               cell.isPassable = true
             }
           }
         }
       }
-      // 重新计算路径
+      // Recalculate path
       recalculatePath()
     },
   }

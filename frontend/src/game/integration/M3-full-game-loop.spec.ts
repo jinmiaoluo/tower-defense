@@ -1,6 +1,6 @@
 /**
- * M3 集成测试: 完整游戏循环
- * 测试: 建筑放置 -> 攻击 -> 怪物死亡 -> 金钱获得 -> 波次完成
+ * M3 integration test: Full game loop
+ * Test: Building placement -> Attack -> Monster death -> Money earned -> Wave complete
  */
 
 import { describe, it, expect, beforeEach } from 'vitest'
@@ -8,7 +8,7 @@ import { createGameSceneLogic, type GameSceneLogic } from '../systems/GameSceneL
 import { MOCK_GAME_CONFIG } from '@/mocks/config'
 import type { WaveConfig, MonsterConfig, GameConfig } from '@/types'
 
-describe('M3: 完整游戏循环', () => {
+describe('M3: Full game loop', () => {
   let logic: GameSceneLogic
   let config: GameConfig
 
@@ -18,7 +18,7 @@ describe('M3: 完整游戏循环', () => {
   })
 
   /**
-   * 创建测试用波次配置
+   * Create test wave config
    */
   function createWaveConfig(monsters: Partial<MonsterConfig>[]): WaveConfig {
     return {
@@ -34,8 +34,8 @@ describe('M3: 完整游戏循环', () => {
     }
   }
 
-  describe('建筑放置流程', () => {
-    it('放置建筑应扣除金钱', () => {
+  describe('Building placement flow', () => {
+    it('Placing a building should deduct money', () => {
       const initialMoney = logic.getState().money
 
       const result = logic.placeBuilding([5, 5], 'LMG')
@@ -45,140 +45,140 @@ describe('M3: 完整游戏循环', () => {
       expect(logic.getState().money).toBe(initialMoney - cost)
     })
 
-    it('金钱不足时无法放置建筑', () => {
-      // 放置多个昂贵建筑耗尽金钱
+    it('Cannot place building when money is insufficient', () => {
+      // Place multiple expensive buildings to exhaust money
       logic.placeBuilding([3, 3], 'cannon') // 300
-      logic.placeBuilding([3, 5], 'laser_gun') // 2000 - 应该失败
+      logic.placeBuilding([3, 5], 'laser_gun') // 2000 - should fail
 
       const result = logic.placeBuilding([5, 5], 'laser_gun')
       expect(result.success).toBe(false)
       expect(result.reason).toBe('insufficient_money')
     })
 
-    it('放置建筑应更新路径', () => {
+    it('Placing a building should update the path', () => {
       const pathBefore = logic.getCurrentPath()
 
-      // 找到路径上的一个点来放置建筑
-      // 路径通常经过对角线，找一个中间点
+      // Find a point on the path to place the building
+      // Path usually goes diagonally, find a midpoint
       const midPoint = pathBefore[Math.floor(pathBefore.length / 2)]
 
-      // 放置建筑在路径上的点
+      // Place building on a path point
       const result = logic.placeBuilding(midPoint, 'wall')
 
       if (result.success) {
         const pathAfter = logic.getCurrentPath()
-        // 路径应该改变以绕过建筑
+        // Path should change to route around the building
         expect(pathAfter).not.toEqual(pathBefore)
       } else {
-        // 如果放置失败（可能阻断路径），则测试跳过
+        // If placement fails (may block path), skip the test
         expect(result.reason).toBe('would_block_path')
       }
     })
 
-    it('不能在入口/出口放置建筑', () => {
-      const result1 = logic.placeBuilding([0, 0], 'wall') // 入口
+    it('Cannot place building on entrance/exit', () => {
+      const result1 = logic.placeBuilding([0, 0], 'wall') // entrance
       expect(result1.success).toBe(false)
 
-      const result2 = logic.placeBuilding([15, 15], 'wall') // 出口
+      const result2 = logic.placeBuilding([15, 15], 'wall') // exit
       expect(result2.success).toBe(false)
     })
   })
 
-  describe('建筑攻击流程', () => {
-    it('建筑应攻击射程内的怪物', () => {
-      // 放置 LMG 在入口附近，确保无论路径如何随机都能覆盖怪物
-      // 入口在 [0,0]，怪物必然从这里出发
+  describe('Building attack flow', () => {
+    it('Building should attack monsters within range', () => {
+      // Place LMG near entrance to ensure it covers monsters regardless of path randomness
+      // Entrance is at [0,0], monsters always start here
       logic.placeBuilding([1, 1], 'LMG')
 
-      // 开始波次
+      // Start wave
       const waveConfig = createWaveConfig([{ life: 100, speed: 3 }])
       logic.startWave(waveConfig)
 
-      // 运行足够帧数让怪物进入射程并被攻击
+      // Run enough frames for monsters to enter range and be attacked
       for (let i = 0; i < 500; i++) {
         logic.update()
       }
 
-      // 检查是否有攻击记录
+      // Check for attack records
       const attacks = logic.getWaveRecorder().getAttacks()
       expect(attacks.length).toBeGreaterThan(0)
     })
 
-    it('激光枪应立即命中', () => {
-      // 激光枪成本 2000，需要先增加金钱
-      // 通过出售建筑获得金钱
+    it('Laser gun should hit instantly', () => {
+      // Laser gun costs 2000, need to increase money first
+      // Get money by selling buildings
       logic.placeBuilding([5, 5], 'LMG')
 
-      // 放置一个激光枪位置
+      // Place a laser gun if affordable
       const state = logic.getState()
       if (state.money >= 2000) {
         logic.placeBuilding([3, 3], 'laser_gun')
       }
 
-      // 开始波次
+      // Start wave
       const waveConfig = createWaveConfig([{ life: 50, speed: 3 }])
       logic.startWave(waveConfig)
 
-      // 运行帧数
+      // Run frames
       for (let i = 0; i < 300; i++) {
         logic.update()
       }
 
-      // 激光枪攻击不产生子弹
+      // Laser gun attack does not produce bullets
       const bullets = logic.getBullets()
-      // 应该只有 LMG 的子弹
+      // Should only have LMG bullets
       expect(bullets.every((b) => b.building.type !== 'laser_gun')).toBe(true)
     })
   })
 
-  describe('怪物死亡和金钱奖励', () => {
-    it('击杀怪物应获得金钱', () => {
-      // 放置多个建筑确保能击杀
+  describe('Monster death and money reward', () => {
+    it('Killing monsters should earn money', () => {
+      // Place multiple buildings to ensure kills
       logic.placeBuilding([5, 5], 'LMG')
       logic.placeBuilding([7, 7], 'LMG')
       logic.placeBuilding([9, 9], 'LMG')
 
-      // 开始波次（低生命值怪物便于测试击杀）
+      // Start wave (low-health monsters for easy kill testing)
       const waveConfig = createWaveConfig([
         { life: 20, speed: 3, money: 10 },
         { life: 20, speed: 3, money: 10 },
       ])
       logic.startWave(waveConfig)
 
-      // 运行直到波次完成
-      // 怪物速度慢（0.12 像素/帧），需要足够帧数确保到达建筑射程
+      // Run until wave completes
+      // Monster speed is slow (0.12 pixels/frame), need enough frames to reach building range
       let maxFrames = 5000
       while (!logic.isWaveComplete() && maxFrames > 0) {
         logic.update()
         maxFrames--
       }
 
-      // 检查击杀记录
+      // Check kill records
       const result = logic.getWaveRecorder().getResult()
       expect(result.killed).toBeGreaterThan(0)
 
-      // 金钱应该增加（击杀奖励 - 可能有怪物穿过）
+      // Money should increase (kill reward - some monsters may pass through)
       if (result.killed > 0) {
         expect(result.moneyGained).toBeGreaterThan(0)
       }
     })
 
-    it('击杀应累计正确的分数', () => {
+    it('Kills should accumulate correct score', () => {
       logic.placeBuilding([5, 5], 'LMG')
       logic.placeBuilding([7, 7], 'LMG')
 
-      // 开始波次
+      // Start wave
       const waveConfig = createWaveConfig([{ life: 30, speed: 3 }])
       logic.startWave(waveConfig)
 
-      // 运行直到波次完成
+      // Run until wave completes
       let maxFrames = 2000
       while (!logic.isWaveComplete() && maxFrames > 0) {
         logic.update()
         maxFrames--
       }
 
-      // 检查分数（分数 = sum(floor(sqrt(每次攻击伤害)))）
+      // Check score (score = sum(floor(sqrt(damage per attack))))
       const result = logic.getWaveRecorder().getResult()
       if (result.totalDamageDealt > 0) {
         expect(result.scoreGained).toBeGreaterThan(0)
@@ -186,25 +186,25 @@ describe('M3: 完整游戏循环', () => {
     })
   })
 
-  describe('怪物到达终点', () => {
-    it('怪物到达终点应扣除生命', () => {
-      // 不放置任何建筑
+  describe('Monster reaching exit', () => {
+    it('Monster reaching exit should deduct life', () => {
+      // Do not place any buildings
       const initialLife = logic.getState().life
 
-      // 开始波次（高速低生命怪物）
+      // Start wave (fast high-health monster)
       const waveConfig = createWaveConfig([
-        { life: 1000, speed: 30, money: 5 }, // 高速高血量，难以击杀
+        { life: 1000, speed: 30, money: 5 }, // fast and tanky, hard to kill
       ])
       logic.startWave(waveConfig)
 
-      // 运行直到波次完成
+      // Run until wave completes
       let maxFrames = 3000
       while (!logic.isWaveComplete() && maxFrames > 0) {
         logic.update()
         maxFrames--
       }
 
-      // 检查生命是否减少
+      // Check if life decreased
       const result = logic.getWaveRecorder().getResult()
       if (result.passed > 0) {
         expect(result.lifeLost).toBeGreaterThan(0)
@@ -213,15 +213,15 @@ describe('M3: 完整游戏循环', () => {
     })
   })
 
-  describe('波次完成判定', () => {
-    it('所有怪物死亡后波次应完成', () => {
-      // 放置足够建筑击杀所有怪物
+  describe('Wave completion check', () => {
+    it('Wave should complete after all monsters die', () => {
+      // Place enough buildings to kill all monsters
       logic.placeBuilding([3, 3], 'LMG')
       logic.placeBuilding([5, 5], 'LMG')
       logic.placeBuilding([7, 7], 'LMG')
       logic.placeBuilding([9, 9], 'LMG')
 
-      // 开始波次（低生命怪物）
+      // Start wave (low-health monsters)
       const waveConfig = createWaveConfig([
         { life: 10, speed: 3 },
         { life: 10, speed: 3 },
@@ -230,7 +230,7 @@ describe('M3: 完整游戏循环', () => {
 
       expect(logic.isWaveComplete()).toBe(false)
 
-      // 运行直到完成
+      // Run until complete
       let maxFrames = 2000
       while (!logic.isWaveComplete() && maxFrames > 0) {
         logic.update()
@@ -240,14 +240,14 @@ describe('M3: 完整游戏循环', () => {
       expect(logic.isWaveComplete()).toBe(true)
     })
 
-    it('所有怪物穿过后波次应完成', () => {
-      // 不放置建筑
+    it('Wave should complete after all monsters pass through', () => {
+      // Do not place buildings
       const waveConfig = createWaveConfig([
-        { life: 100, speed: 30 }, // 高速
+        { life: 100, speed: 30 }, // fast
       ])
       logic.startWave(waveConfig)
 
-      // 运行直到完成
+      // Run until complete
       let maxFrames = 3000
       while (!logic.isWaveComplete() && maxFrames > 0) {
         logic.update()
@@ -261,8 +261,8 @@ describe('M3: 完整游戏循环', () => {
     })
   })
 
-  describe('建筑升级和出售', () => {
-    it('升级建筑应增加伤害和射程', () => {
+  describe('Building upgrade and sell', () => {
+    it('Upgrading building should increase damage and range', () => {
       const result = logic.placeBuilding([5, 5], 'LMG')
       expect(result.success).toBe(true)
 
@@ -271,7 +271,7 @@ describe('M3: 完整游戏循环', () => {
       const damageBefore = buildingBefore.getDamage()
       const rangeBefore = buildingBefore.getRange()
 
-      // 升级
+      // Upgrade
       const upgradeResult = logic.upgradeBuilding(buildingId)
       expect(upgradeResult.success).toBe(true)
 
@@ -281,172 +281,171 @@ describe('M3: 完整游戏循环', () => {
       expect(buildingAfter.getRange()).toBeGreaterThanOrEqual(rangeBefore)
     })
 
-    it('出售建筑应返回金钱', () => {
+    it('Selling building should return money', () => {
       const result = logic.placeBuilding([5, 5], 'LMG')
       const buildingId = result.buildingId!
       const moneyBefore = logic.getState().money
 
-      // 出售
+      // Sell
       const sellResult = logic.sellBuilding(buildingId)
       expect(sellResult.success).toBe(true)
 
-      // 金钱应增加
+      // Money should increase
       expect(logic.getState().money).toBeGreaterThan(moneyBefore)
 
-      // 建筑应被移除
+      // Building should be removed
       expect(logic.getBuilding(buildingId)).toBeNull()
     })
 
-    it('出售后可用金钱购买新建筑', () => {
-      // 初始金钱 500，放置 cannon（300）后剩余 200
+    it('After selling can use money to buy new building', () => {
+      // Initial money 500, place cannon (300), remaining 200
       const { buildingId } = logic.placeBuilding([3, 3], 'cannon')
       expect(logic.getState().money).toBe(200)
 
-      // 此时无法购买另一个 cannon
+      // Cannot buy another cannon now
       const failResult = logic.placeBuilding([5, 5], 'cannon')
       expect(failResult.success).toBe(false)
       expect(failResult.reason).toBe('insufficient_money')
 
-      // 出售 cannon，获得 150（300 x 0.5）
+      // Sell cannon, get 150 (300 x 0.5)
       logic.sellBuilding(buildingId!)
       expect(logic.getState().money).toBe(350)
 
-      // 现在仍然无法购买 cannon（需要 300，只有 350 勉强够）
-      // 实际上 350 >= 300，可以购买
+      // Now 350 >= 300, can buy cannon
       const successResult = logic.placeBuilding([5, 5], 'cannon')
       expect(successResult.success).toBe(true)
     })
 
-    it('出售升级后的建筑返回累计投资的一半', () => {
-      // 放置 LMG (100) 并升级两次
+    it('Selling upgraded building returns half of cumulative investment', () => {
+      // Place LMG (100) and upgrade twice
       const { buildingId } = logic.placeBuilding([5, 5], 'LMG')
-      // 金钱: 500 - 100 = 400
+      // Money: 500 - 100 = 400
 
-      // 第一次升级: 花费 floor(100 x 0.75) = 75
+      // First upgrade: cost floor(100 x 0.75) = 75
       logic.upgradeBuilding(buildingId!)
-      // 金钱: 400 - 75 = 325
+      // Money: 400 - 75 = 325
 
-      // 第二次升级: 花费 floor((100+75) x 0.75) = floor(131.25) = 131
+      // Second upgrade: cost floor((100+75) x 0.75) = floor(131.25) = 131
       logic.upgradeBuilding(buildingId!)
-      // 金钱: 325 - 131 = 194
+      // Money: 325 - 131 = 194
 
       const building = logic.getBuilding(buildingId!)!
       expect(building.level).toBe(3)
       expect(logic.getState().money).toBe(194)
 
-      // 出售 3 级 LMG
-      // 累计花费 = 100 + 75 + 131 = 306
-      // 出售回收 = floor(306 x 0.5) = 153
+      // Sell level 3 LMG
+      // Cumulative cost = 100 + 75 + 131 = 306
+      // Sell income = floor(306 x 0.5) = 153
       logic.sellBuilding(buildingId!)
       expect(logic.getState().money).toBe(194 + 153)
     })
 
-    it('出售后位置可立即重新使用', () => {
+    it('Position can be reused immediately after selling', () => {
       const position: [number, number] = [5, 5]
 
-      // 放置并出售
+      // Place and sell
       const { buildingId } = logic.placeBuilding(position, 'LMG')
       logic.sellBuilding(buildingId!)
 
-      // 同一位置放置不同类型的建筑
+      // Place a different type of building at the same position
       const result = logic.placeBuilding(position, 'cannon')
       expect(result.success).toBe(true)
       expect(logic.getBuildings()).toHaveLength(1)
       expect(logic.getBuilding(result.buildingId!)?.type).toBe('cannon')
     })
 
-    it('波次中出售建筑后怪物路径可能变化', () => {
-      // 放置 wall 阻挡部分路径
+    it('Monster path may change after selling building during wave', () => {
+      // Place wall to block part of the path
       const { buildingId } = logic.placeBuilding([1, 0], 'wall')
 
-      // 出售 wall
+      // Sell wall
       logic.sellBuilding(buildingId!)
 
       const pathWithoutWall = logic.getCurrentPath()
 
-      // 路径可能变化（如果 wall 影响了路径）
-      // 至少确保路径仍然有效
+      // Path may change (if wall affected the path)
+      // At least ensure the path is still valid
       expect(pathWithoutWall.length).toBeGreaterThan(0)
     })
   })
 
-  describe('游戏结束', () => {
-    it('生命值归零时游戏应结束', () => {
-      // 创建一个低生命值的游戏配置
+  describe('Game over', () => {
+    it('Game should end when life reaches zero', () => {
+      // Create a low-life game config
       const lowLifeConfig: GameConfig = {
         ...config,
         initial: { ...config.initial, life: 1 },
       }
       logic = createGameSceneLogic(lowLifeConfig)
 
-      // 开始波次（高伤害怪物）
+      // Start wave (high-damage monster)
       const waveConfig = createWaveConfig([
-        { life: 10000, speed: 30, money: 5 }, // 几乎不可能击杀
+        { life: 10000, speed: 30, money: 5 }, // nearly impossible to kill
       ])
       logic.startWave(waveConfig)
 
-      // 运行直到游戏结束或超时
+      // Run until game over or timeout
       let maxFrames = 5000
       while (!logic.getState().isGameOver && maxFrames > 0) {
         logic.update()
         maxFrames--
       }
 
-      // 怪物到达终点后应该游戏结束
+      // After monster reaches exit, game should be over
       if (logic.getState().life <= 0) {
         expect(logic.getState().isGameOver).toBe(true)
       }
     })
   })
 
-  describe('子弹系统', () => {
-    it('子弹应该飞向目标', () => {
+  describe('Bullet system', () => {
+    it('Bullets should fly toward the target', () => {
       logic.placeBuilding([5, 5], 'cannon')
 
       const waveConfig = createWaveConfig([{ life: 100, speed: 3 }])
       logic.startWave(waveConfig)
 
-      // 运行让怪物进入射程
+      // Run to let monsters enter range
       for (let i = 0; i < 200; i++) {
         logic.update()
       }
 
-      // 检查子弹
+      // Check bullets
       const bullets = logic.getBullets()
-      // 可能已经命中消失，所以不强制要求有子弹
-      // 但如果有子弹，它们应该是有效的
+      // May have already hit and disappeared, so don't require bullets to exist
+      // But if there are bullets, they should be valid
       for (const bullet of bullets) {
         expect(bullet.isValid).toBe(true)
         expect(bullet.damage).toBeGreaterThan(0)
       }
     })
 
-    it('子弹命中应造成伤害', () => {
-      // 使用 LMG (射程 5) 而非 cannon (射程 4)，更容易命中
+    it('Bullet hit should deal damage', () => {
+      // Use LMG (range 5) instead of cannon (range 4), easier to hit
       logic.placeBuilding([5, 5], 'LMG')
 
       const waveConfig = createWaveConfig([{ life: 200, speed: 3, shield: 0 }])
       logic.startWave(waveConfig)
 
-      // 运行足够帧数让怪物进入射程并被攻击
-      // 怪物速度慢（speed * GLOBAL_SPEED * FPS_RATIO = 0.12 像素/帧）
-      // 需要足够时间让怪物移动到建筑射程内
+      // Run enough frames for monsters to enter range and be attacked
+      // Monster speed is slow (speed * GLOBAL_SPEED * FPS_RATIO = 0.12 pixels/frame)
+      // Need enough time for monster to move into building range
       for (let i = 0; i < 2000; i++) {
         logic.update()
       }
 
-      // 检查伤害记录
+      // Check damage records
       const result = logic.getWaveRecorder().getResult()
       expect(result.totalDamageDealt).toBeGreaterThan(0)
     })
   })
 
-  describe('分数累计', () => {
-    it('跨波次分数应正确累计', () => {
+  describe('Score accumulation', () => {
+    it('Score should accumulate correctly across waves', () => {
       logic.placeBuilding([5, 5], 'LMG')
       logic.placeBuilding([7, 7], 'LMG')
 
-      // 第一波
+      // Wave 1
       const wave1 = createWaveConfig([{ life: 30, speed: 3 }])
       logic.startWave(wave1)
 
@@ -458,7 +457,7 @@ describe('M3: 完整游戏循环', () => {
 
       const scoreAfterWave1 = logic.getState().score
 
-      // 第二波
+      // Wave 2
       const wave2: WaveConfig = {
         waveNumber: 2,
         monsters: [{ id: 'w2-m1', type: 0, life: 30, speed: 3, shield: 0, money: 5 }],
@@ -473,7 +472,7 @@ describe('M3: 完整游戏循环', () => {
 
       const scoreAfterWave2 = logic.getState().score
 
-      // 第二波分数应该累加
+      // Wave 2 score should accumulate on top of wave 1
       expect(scoreAfterWave2).toBeGreaterThanOrEqual(scoreAfterWave1)
     })
   })

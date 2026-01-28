@@ -1,106 +1,106 @@
 /**
- * BuildingSystem - 建筑系统
- * 负责建筑相关的计算逻辑，包括成本、伤害、射程等
- * 参考旧实现：html5-tower-defense/src/js/td-obj-building.js
+ * BuildingSystem - Building system
+ * Handles building-related calculations including cost, damage, range, etc.
+ * Reference: html5-tower-defense/src/js/td-obj-building.js
  */
 
 import type { BuildingConfig, BuildingType, GameConfig, Position } from '@/types'
 import { GAME_CONSTANTS, getUpgradeMultiplier, calculateDistance } from '@/types'
 
-/** 用于射程检查的建筑信息 */
+/** Building info for range checking */
 export interface BuildingForRangeCheck {
   type: BuildingType
   level: number
   position: Position
 }
 
-/** BuildingSystem 接口定义 */
+/** BuildingSystem interface definition */
 export interface BuildingSystem {
   /**
-   * 计算建筑累计花费（建造成本 + 所有升级成本）
-   * @param type 建筑类型
-   * @param level 当前等级
+   * Calculate cumulative building cost (build cost + all upgrade costs)
+   * @param type Building type
+   * @param level Current level
    */
   getTotalCost(type: BuildingType, level: number): number
 
   /**
-   * 计算从当前等级升级到下一级的成本
-   * @param type 建筑类型
-   * @param level 当前等级
+   * Calculate the cost to upgrade from current level to the next
+   * @param type Building type
+   * @param level Current level
    */
   getUpgradeCost(type: BuildingType, level: number): number
 
   /**
-   * 计算出售建筑可回收的金钱
-   * @param type 建筑类型
-   * @param level 当前等级
+   * Calculate the money recovered from selling a building
+   * @param type Building type
+   * @param level Current level
    */
   getSellIncome(type: BuildingType, level: number): number
 
   /**
-   * 计算指定等级的伤害值
-   * @param type 建筑类型
-   * @param level 当前等级
+   * Calculate damage at a given level
+   * @param type Building type
+   * @param level Current level
    */
   getDamageAtLevel(type: BuildingType, level: number): number
 
   /**
-   * 计算指定等级的射程
-   * @param type 建筑类型
-   * @param level 当前等级
+   * Calculate range at a given level
+   * @param type Building type
+   * @param level Current level
    */
   getRangeAtLevel(type: BuildingType, level: number): number
 
   /**
-   * 检查目标是否在建筑的攻击范围内
-   * @param building 建筑信息
-   * @param targetPos 目标位置
+   * Check whether a target is within the building's attack range
+   * @param building Building info
+   * @param targetPos Target position
    */
   isInRange(building: BuildingForRangeCheck, targetPos: Position): boolean
 
   /**
-   * 获取攻击间隔帧数
-   * @param type 建筑类型
+   * Get attack interval in frames
+   * @param type Building type
    */
   getAttackSpeedFrames(type: BuildingType): number
 
   /**
-   * 检查是否有足够的金钱建造建筑
-   * @param money 当前金钱
-   * @param type 建筑类型
+   * Check whether there is enough money to build
+   * @param money Current money
+   * @param type Building type
    */
   canAfford(money: number, type: BuildingType): boolean
 
   /**
-   * 检查是否有足够的金钱升级建筑
-   * @param money 当前金钱
-   * @param type 建筑类型
-   * @param level 当前等级
+   * Check whether there is enough money to upgrade
+   * @param money Current money
+   * @param type Building type
+   * @param level Current level
    */
   canAffordUpgrade(money: number, type: BuildingType, level: number): boolean
 
   /**
-   * 判断建筑是否为武器（可攻击）
-   * @param type 建筑类型
+   * Determine whether a building is a weapon (can attack)
+   * @param type Building type
    */
   isWeapon(type: BuildingType): boolean
 
   /**
-   * 获取建筑配置
-   * @param type 建筑类型
+   * Get building configuration
+   * @param type Building type
    */
   getBuildingConfig(type: BuildingType): BuildingConfig
 }
 
 /**
- * 创建 BuildingSystem 实例
+ * Create a BuildingSystem instance
  */
 export function createBuildingSystem(config: GameConfig): BuildingSystem {
   const { buildings } = config
 
   /**
-   * 计算累计花费
-   * 公式: totalCost(level) = cost + Σ(totalCost(i) × upgradeCostRatio) for i=1 to level-1
+   * Calculate cumulative cost
+   * Formula: totalCost(level) = cost + sum(totalCost(i) * upgradeCostRatio) for i=1 to level-1
    */
   function getTotalCost(type: BuildingType, level: number): number {
     const buildingConfig = buildings[type]
@@ -114,8 +114,8 @@ export function createBuildingSystem(config: GameConfig): BuildingSystem {
   }
 
   /**
-   * 计算升级成本
-   * 公式: upgradeCost = totalCost(currentLevel) × upgradeCostRatio
+   * Calculate upgrade cost
+   * Formula: upgradeCost = totalCost(currentLevel) * upgradeCostRatio
    */
   function getUpgradeCost(type: BuildingType, level: number): number {
     const buildingConfig = buildings[type]
@@ -124,8 +124,8 @@ export function createBuildingSystem(config: GameConfig): BuildingSystem {
   }
 
   /**
-   * 计算出售回收金额
-   * 公式: sellIncome = max(totalCost × sellRatio, 1)
+   * Calculate sell income
+   * Formula: sellIncome = max(totalCost * sellRatio, 1)
    */
   function getSellIncome(type: BuildingType, level: number): number {
     const buildingConfig = buildings[type]
@@ -135,8 +135,8 @@ export function createBuildingSystem(config: GameConfig): BuildingSystem {
   }
 
   /**
-   * 计算指定等级的伤害值
-   * 使用升级倍率逐级计算
+   * Calculate damage at a given level
+   * Uses upgrade multiplier calculated level by level
    */
   function getDamageAtLevel(type: BuildingType, level: number): number {
     const buildingConfig = buildings[type]
@@ -155,9 +155,9 @@ export function createBuildingSystem(config: GameConfig): BuildingSystem {
   }
 
   /**
-   * 计算指定等级的射程
-   * 公式: range = min(baseRange × 1.2^(level-1), maxRange)
-   * 参考旧实现: td-obj-building.js:258-289，使用默认升级规则每级 ×1.2
+   * Calculate range at a given level
+   * Formula: range = min(baseRange * 1.2^(level-1), maxRange)
+   * Reference: td-obj-building.js:258-289, using default upgrade rule x1.2 per level
    */
   function getRangeAtLevel(type: BuildingType, level: number): number {
     const buildingConfig = buildings[type]
@@ -167,7 +167,7 @@ export function createBuildingSystem(config: GameConfig): BuildingSystem {
       return 0
     }
 
-    // 逐级计算：每级 × 1.2，与伤害升级规则一致
+    // Calculate level by level: x1.2 per level, consistent with damage upgrade rule
     let currentRange = range
     for (let i = 1; i < level; i++) {
       currentRange = currentRange * 1.2
@@ -176,11 +176,11 @@ export function createBuildingSystem(config: GameConfig): BuildingSystem {
   }
 
   /**
-   * 检查目标是否在射程内
-   * 射程规则（参考旧实现 td-obj-building.js:187-204）:
-   * - range: 初始射程（1 级时的值）
-   * - max_range: 射程升级上限
-   * - 无最小射程限制，建筑可攻击 0 到当前射程内的任意目标
+   * Check whether the target is within range
+   * Range rules (reference: td-obj-building.js:187-204):
+   * - range: initial range (value at level 1)
+   * - max_range: maximum range after upgrades
+   * - No minimum range restriction; building can attack any target from 0 to current range
    */
   function isInRange(building: BuildingForRangeCheck, targetPos: Position): boolean {
     const { type, level, position } = building
@@ -193,20 +193,20 @@ export function createBuildingSystem(config: GameConfig): BuildingSystem {
     const distance = calculateDistance(position, targetPos)
     const currentRange = getRangeAtLevel(type, level)
 
-    // 只检查最大射程，无最小射程限制
+    // Only check maximum range, no minimum range restriction
     return distance <= currentRange
   }
 
   /**
-   * 获取攻击间隔帧数
-   * 参考旧实现 td-obj-building.js:168
-   * 旧公式: floor(max(2 / (speed * global_speed), 1))
-   * 其中 global_speed = 0.1，简化为 floor(20 / speed)
+   * Get attack interval in frames
+   * Reference: td-obj-building.js:168
+   * Old formula: floor(max(2 / (speed * global_speed), 1))
+   * where global_speed = 0.1, simplified to floor(20 / speed)
    *
-   * 由于帧率差异（旧 24 FPS，新 60 FPS），需要乘以帧率比例
-   * 新公式: floor(max(2 / (speed * global_speed) * (60 / 24), 1))
-   *       = floor(max(20 / speed * 2.5, 1))
-   *       = floor(max(50 / speed, 1))
+   * Due to frame rate difference (old 24 FPS, new 60 FPS), multiply by frame rate ratio
+   * New formula: floor(max(2 / (speed * global_speed) * (60 / 24), 1))
+   *            = floor(max(20 / speed * 2.5, 1))
+   *            = floor(max(50 / speed, 1))
    */
   function getAttackSpeedFrames(type: BuildingType): number {
     const buildingConfig = buildings[type]
@@ -216,8 +216,8 @@ export function createBuildingSystem(config: GameConfig): BuildingSystem {
       return Infinity
     }
 
-    // 旧实现基础攻击间隔：2 / (speed * GLOBAL_SPEED) = 20 / speed 帧（24 FPS）
-    // 换算到 60 FPS：乘以帧率比例 60 / 24 = 2.5
+    // Old implementation base attack interval: 2 / (speed * GLOBAL_SPEED) = 20 / speed frames (24 FPS)
+    // Convert to 60 FPS: multiply by frame rate ratio 60 / 24 = 2.5
     const OLD_FPS = 24
     const baseInterval = 2 / (speed * GAME_CONSTANTS.GLOBAL_SPEED)
     const scaledInterval = baseInterval * (GAME_CONSTANTS.FPS / OLD_FPS)
@@ -226,7 +226,7 @@ export function createBuildingSystem(config: GameConfig): BuildingSystem {
   }
 
   /**
-   * 检查是否能负担建造成本
+   * Check whether the player can afford to build
    */
   function canAfford(money: number, type: BuildingType): boolean {
     const buildingConfig = buildings[type]
@@ -234,7 +234,7 @@ export function createBuildingSystem(config: GameConfig): BuildingSystem {
   }
 
   /**
-   * 检查是否能负担升级成本
+   * Check whether the player can afford to upgrade
    */
   function canAffordUpgrade(money: number, type: BuildingType, level: number): boolean {
     const cost = getUpgradeCost(type, level)
@@ -242,14 +242,14 @@ export function createBuildingSystem(config: GameConfig): BuildingSystem {
   }
 
   /**
-   * 判断是否为武器建筑
+   * Determine whether a building is a weapon
    */
   function isWeapon(type: BuildingType): boolean {
     return type !== 'wall'
   }
 
   /**
-   * 获取建筑配置
+   * Get building configuration
    */
   function getBuildingConfig(type: BuildingType): BuildingConfig {
     return buildings[type]

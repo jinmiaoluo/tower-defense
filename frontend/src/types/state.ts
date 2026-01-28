@@ -1,109 +1,109 @@
 /**
- * 游戏状态类型定义
- * 用于 Pinia store 和游戏运行时状态管理
+ * Game state type definitions
+ * Used for Pinia store and game runtime state management
  */
 
 import type { BuildingType, GameConfig, Position } from './config'
 import type { ServerState, WaveConfig } from './api'
 
 // ============================================================================
-// 游戏运行时状态
+// Game runtime state
 // ============================================================================
 
-/** 游戏阶段 */
+/** Game phase */
 export type GamePhase =
-  | 'idle'        // 等待开始
-  | 'preparing'   // 准备中（可放置建筑）
-  | 'playing'     // 游戏进行中
-  | 'paused'      // 已暂停
-  | 'waveEnd'     // 波次结束，等待下一波
-  | 'gameOver'    // 游戏结束
+  | 'idle'        // Waiting to start
+  | 'preparing'   // Preparing (can place buildings)
+  | 'playing'     // Game in progress
+  | 'paused'      // Paused
+  | 'waveEnd'     // Wave ended, waiting for next wave
+  | 'gameOver'    // Game over
 
-/** 游戏 Store 状态 */
+/** Game store state */
 export interface GameStoreState {
-  /** 会话 ID */
+  /** Session ID */
   sessionId: string | null
-  /** 游戏配置（从服务端获取） */
+  /** Game configuration (fetched from server) */
   config: GameConfig | null
 
-  /** 游戏阶段 */
+  /** Game phase */
   phase: GamePhase
-  /** 当前帧号 */
+  /** Current frame number */
   currentFrame: number
 
-  /** 金钱 */
+  /** Money */
   money: number
-  /** 生命值 */
+  /** Life */
   life: number
-  /** 分数 */
+  /** Score */
   score: number
-  /** 难度系数 */
+  /** Difficulty modifier */
   difficulty: number
-  /** 当前波次 */
+  /** Current wave number */
   waveNumber: number
 
-  /** 建筑列表 */
+  /** Building list */
   buildings: BuildingRuntimeState[]
 
-  /** 当前波次配置 */
+  /** Current wave configuration */
   currentWave: WaveConfig | null
-  /** 待应用的生命恢复奖励 */
+  /** Pending life recovery reward to apply */
   pendingLifeReward: number
 }
 
-/** 建筑运行时状态 */
+/** Building runtime state */
 export interface BuildingRuntimeState {
-  /** 建筑唯一 ID */
+  /** Building unique ID */
   id: string
-  /** 建筑类型 */
+  /** Building type */
   type: BuildingType
-  /** 位置 */
+  /** Position */
   position: Position
-  /** 等级 */
+  /** Level */
   level: number
-  /** 本波造成的伤害 */
+  /** Damage dealt this wave */
   damageDealt: number
-  /** 本波击杀数 */
+  /** Kills this wave */
   kills: number
-  /** 累计花费（建造 + 升级） */
+  /** Total cost (build + upgrades) */
   totalCost: number
 }
 
 // ============================================================================
-// UI 状态
+// UI state
 // ============================================================================
 
-/** UI Store 状态 */
+/** UI store state */
 export interface UIStoreState {
-  /** 当前选中的建筑类型（用于建造） */
+  /** Currently selected building type (for building) */
   selectedBuildingType: BuildingType | null
-  /** 当前选中的已放置建筑 ID（用于升级/出售） */
+  /** Currently selected placed building ID (for upgrade/sell) */
   selectedBuildingId: string | null
-  /** 是否显示游戏结束弹窗 */
+  /** Whether to show the game over modal */
   showGameOverModal: boolean
-  /** 是否显示排行榜 */
+  /** Whether to show the leaderboard */
   showLeaderboard: boolean
-  /** 错误消息 */
+  /** Error message */
   errorMessage: string | null
-  /** 是否显示所有建筑射程 */
+  /** Whether to show all building ranges */
   showAllRanges: boolean
-  /** 是否显示怪物生命条 */
+  /** Whether to show monster health bars */
   showMonsterHealth: boolean
 }
 
 // ============================================================================
-// 状态同步
+// State synchronization
 // ============================================================================
 
-/** 同步服务端状态的数据 */
+/** Data for synchronizing server state */
 export interface StateSyncData extends ServerState {
-  /** 下一波配置 */
+  /** Next wave configuration */
   nextWave?: WaveConfig & {
     lifeReward?: number
   }
 }
 
-/** 初始化游戏的数据 */
+/** Data for initializing a game */
 export interface GameInitData {
   sessionId: string
   config: GameConfig
@@ -111,17 +111,17 @@ export interface GameInitData {
 }
 
 // ============================================================================
-// 操作结果
+// Operation results
 // ============================================================================
 
-/** 建筑操作结果 */
+/** Building operation result */
 export interface BuildingOperationResult {
   success: boolean
   message?: string
   buildingId?: string
 }
 
-/** 波次提交结果 */
+/** Wave submission result */
 export interface WaveSubmitResult {
   success: boolean
   message?: string
@@ -129,7 +129,7 @@ export interface WaveSubmitResult {
   lifeReward?: number
 }
 
-/** 游戏结束结果 */
+/** Game end result */
 export interface GameEndResult {
   success: boolean
   verified: boolean

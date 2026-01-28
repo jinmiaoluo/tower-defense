@@ -1,6 +1,6 @@
 /**
- * Theme Store - 主题状态管理
- * 始终跟随系统主题，手动切换为临时覆盖
+ * Theme Store - theme state management.
+ * Always follows the system theme; manual toggle is a temporary override.
  */
 
 import { defineStore } from 'pinia'

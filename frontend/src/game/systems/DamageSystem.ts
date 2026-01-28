@@ -1,85 +1,85 @@
 /**
- * DamageSystem - 伤害计算系统
- * 负责伤害计算、得分计算和击杀判定
- * 参考旧实现：html5-tower-defense/src/js/td-obj-monster.js:beHit
+ * DamageSystem - Damage calculation system
+ * Handles damage calculation, score calculation, and kill determination
+ * Reference: html5-tower-defense/src/js/td-obj-monster.js:beHit
  */
 
 import type { IMonster } from '@/types/entities'
 
-/** 最低伤害比例（保证高伤害武器对护盾怪的优势） */
+/** Minimum damage ratio (ensures high-damage weapons have advantage against shielded monsters) */
 const MIN_DAMAGE_RATIO = 0.1
 
-/** DamageSystem 接口定义 */
+/** DamageSystem interface definition */
 export interface DamageSystem {
   /**
-   * 计算实际伤害
-   * 公式: actualDamage = max(rawDamage - shield, ceil(rawDamage × 0.1))
-   * @param rawDamage 原始伤害值
-   * @param shield 护盾值
-   * @returns 实际伤害值
+   * Calculate actual damage
+   * Formula: actualDamage = max(rawDamage - shield, ceil(rawDamage * 0.1))
+   * @param rawDamage Raw damage value
+   * @param shield Shield value
+   * @returns Actual damage value
    */
   calculate(rawDamage: number, shield: number): number
 
   /**
-   * 判断伤害是否足以击杀怪物
-   * @param monster 怪物实例
-   * @param damage 伤害值（已扣除护盾后的实际伤害）
-   * @returns 是否击杀
+   * Determine whether damage is enough to kill a monster
+   * @param monster Monster instance
+   * @param damage Damage value (actual damage after shield reduction)
+   * @returns Whether the monster is killed
    */
   isKilled(monster: IMonster, damage: number): boolean
 
   /**
-   * 预判是否会击杀怪物（考虑护盾）
-   * @param monster 怪物实例
-   * @param rawDamage 原始伤害值
-   * @returns 是否会击杀
+   * Predict whether the attack would kill the monster (considering shield)
+   * @param monster Monster instance
+   * @param rawDamage Raw damage value
+   * @returns Whether it would kill the monster
    */
   wouldKill(monster: IMonster, rawDamage: number): boolean
 
   /**
-   * 获取对特定怪物的有效伤害
-   * @param monster 怪物实例
-   * @param rawDamage 原始伤害值
-   * @returns 有效伤害值
+   * Get effective damage against a specific monster
+   * @param monster Monster instance
+   * @param rawDamage Raw damage value
+   * @returns Effective damage value
    */
   getEffectiveDamage(monster: IMonster, rawDamage: number): number
 
   /**
-   * 计算击杀怪物所需的总伤害
-   * @param monster 怪物实例
-   * @returns 所需总伤害（简化计算：生命 + 护盾）
+   * Calculate total damage required to kill a monster
+   * @param monster Monster instance
+   * @returns Total damage required (simplified: life + shield)
    */
   getDamageToKill(monster: IMonster): number
 }
 
 /**
- * 创建 DamageSystem 实例
+ * Create a DamageSystem instance
  */
 export function createDamageSystem(): DamageSystem {
   /**
-   * 计算实际伤害
-   * 公式: actualDamage = max(rawDamage - shield, ceil(rawDamage × 0.1))
+   * Calculate actual damage
+   * Formula: actualDamage = max(rawDamage - shield, ceil(rawDamage * 0.1))
    */
   function calculate(rawDamage: number, shield: number): number {
-    // 计算最低伤害（向上取整，保证至少 1 点伤害）
+    // Calculate minimum damage (round up, guarantees at least 1 point of damage)
     const minDamage = Math.ceil(rawDamage * MIN_DAMAGE_RATIO)
 
-    // 计算减免后伤害
+    // Calculate damage after reduction
     const reducedDamage = rawDamage - shield
 
-    // 取两者较大值
+    // Take the larger value
     return Math.max(reducedDamage, minDamage)
   }
 
   /**
-   * 判断伤害是否足以击杀怪物
+   * Determine whether damage is enough to kill a monster
    */
   function isKilled(monster: IMonster, damage: number): boolean {
     return monster.currentLife <= damage
   }
 
   /**
-   * 预判是否会击杀怪物（考虑护盾）
+   * Predict whether the attack would kill the monster (considering shield)
    */
   function wouldKill(monster: IMonster, rawDamage: number): boolean {
     const effectiveDamage = calculate(rawDamage, monster.shield)
@@ -87,15 +87,15 @@ export function createDamageSystem(): DamageSystem {
   }
 
   /**
-   * 获取对特定怪物的有效伤害
+   * Get effective damage against a specific monster
    */
   function getEffectiveDamage(monster: IMonster, rawDamage: number): number {
     return calculate(rawDamage, monster.shield)
   }
 
   /**
-   * 计算击杀怪物所需的总伤害（简化计算）
-   * 护盾是静态减伤值，不会递减
+   * Calculate total damage required to kill a monster (simplified)
+   * Shield is a static damage reduction value and does not deplete
    */
   function getDamageToKill(monster: IMonster): number {
     return monster.currentLife + monster.shield

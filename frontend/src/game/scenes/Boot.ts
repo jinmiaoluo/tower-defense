@@ -6,7 +6,7 @@ export class Boot extends Scene {
   }
 
   preload() {
-    // 加载 Preloader 场景所需的最小资源
+    // Load minimal assets required by the Preloader scene
   }
 
   create() {

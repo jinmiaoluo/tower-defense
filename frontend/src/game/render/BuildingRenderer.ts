@@ -1,14 +1,14 @@
 /**
- * 建筑渲染器 - 简单动画风格
+ * Building renderer - simple animated style
  */
 
 import type { RenderContext, BuildingRenderData } from './types'
 import { DPR } from '../dpr'
 
-/** 选中建筑的高亮颜色 */
+/** Highlight color for selected buildings */
 const SELECTED_COLOR = 0x00ffff
 
-/** 简单风格建筑颜色配置 */
+/** Simple style building color configuration */
 const COLORS = {
   wall: {
     base: 0x666666,
@@ -41,17 +41,17 @@ const COLORS = {
   },
 }
 
-/** 计算呼吸动画缩放 */
+/** Calculate breathing animation scale */
 function calcBreath(frame: number, speed: number = 0.08): number {
   return 1 + Math.sin(frame * speed) * 0.05
 }
 
-/** 计算脉冲动画亮度 */
+/** Calculate pulse animation brightness */
 function calcPulse(frame: number, speed: number = 0.1): number {
   return (Math.sin(frame * speed) + 1) / 2
 }
 
-/** 调整颜色亮度 */
+/** Adjust color brightness */
 function adjustBrightness(color: number, factor: number): number {
   const r = Math.min(255, Math.floor(((color >> 16) & 0xff) * factor))
   const g = Math.min(255, Math.floor(((color >> 8) & 0xff) * factor))
@@ -60,7 +60,7 @@ function adjustBrightness(color: number, factor: number): number {
 }
 
 /**
- * 渲染单个建筑
+ * Render a single building
  */
 export function renderBuilding(ctx: RenderContext, data: BuildingRenderData): void {
   switch (data.type) {
@@ -83,7 +83,7 @@ export function renderBuilding(ctx: RenderContext, data: BuildingRenderData): vo
 }
 
 /**
- * 渲染墙 - 简单方块
+ * Render wall - simple block
  */
 function renderWall(ctx: RenderContext, data: BuildingRenderData): void {
   const { centerX, centerY, gridSize, isSelected, frame = 0 } = data
@@ -91,29 +91,29 @@ function renderWall(ctx: RenderContext, data: BuildingRenderData): void {
   const size = gridSize - 4 * DPR
   const half = size / 2
 
-  // 简单呼吸动画
+  // Breathing animation
   const scale = calcBreath(frame, 0.05)
   const animSize = size * scale
   const animHalf = animSize / 2
 
-  // 外层深色
+  // Outer dark layer
   ctx.fillStyle(colors.dark, 1)
   ctx.fillRect(centerX - animHalf, centerY - animHalf, animSize, animSize)
 
-  // 内层主色
+  // Inner main color
   const innerSize = animSize - 4 * DPR
   ctx.fillStyle(colors.base, 1)
   ctx.fillRect(centerX - innerSize / 2, centerY - innerSize / 2, innerSize, innerSize)
 
-  // 高光
+  // Highlight
   ctx.fillStyle(colors.light, 1)
   ctx.fillRect(centerX - innerSize / 2, centerY - innerSize / 2, innerSize / 3, 3 * DPR)
 
-  // 边框
+  // Border
   ctx.lineStyle(1 * DPR, 0x000000, 1)
   ctx.strokeRect(centerX - animHalf, centerY - animHalf, animSize, animSize)
 
-  // 选中高亮
+  // Selection highlight
   if (isSelected) {
     ctx.lineStyle(2 * DPR, SELECTED_COLOR, 1)
     ctx.strokeRect(centerX - half - 2 * DPR, centerY - half - 2 * DPR, size + 4 * DPR, size + 4 * DPR)
@@ -121,30 +121,30 @@ function renderWall(ctx: RenderContext, data: BuildingRenderData): void {
 }
 
 /**
- * 渲染炮台 - 圆形底座 + 炮管
+ * Render cannon - circular base + barrel
  */
 function renderCannon(ctx: RenderContext, data: BuildingRenderData): void {
   const { centerX, centerY, gridSize, isSelected, targetPosition, frame = 0 } = data
   const colors = COLORS.cannon
   const baseRadius = 10 * DPR
 
-  // 呼吸动画
+  // Breathing animation
   const scale = calcBreath(frame, 0.06)
   const animRadius = baseRadius * scale
 
-  // 外圈深色
+  // Outer dark ring
   ctx.fillStyle(colors.dark, 1)
   ctx.fillCircle(centerX, centerY, animRadius + 2 * DPR)
 
-  // 主圆
+  // Main circle
   ctx.fillStyle(colors.base, 1)
   ctx.fillCircle(centerX, centerY, animRadius)
 
-  // 高光
+  // Highlight
   ctx.fillStyle(colors.light, 1)
   ctx.fillCircle(centerX - 3 * DPR, centerY - 3 * DPR, 4 * DPR)
 
-  // 炮管
+  // Barrel
   const barrelLength = gridSize / 2
   let angle = 0
   if (targetPosition) {
@@ -158,15 +158,15 @@ function renderCannon(ctx: RenderContext, data: BuildingRenderData): void {
   ctx.lineStyle(5 * DPR, colors.barrel, 1)
   ctx.lineBetween(centerX, centerY, endX, endY)
 
-  // 炮口
+  // Muzzle
   ctx.fillStyle(colors.dark, 1)
   ctx.fillCircle(endX, endY, 3 * DPR)
 
-  // 边框
+  // Border
   ctx.lineStyle(1 * DPR, 0x000000, 1)
   ctx.strokeCircle(centerX, centerY, animRadius + 2 * DPR)
 
-  // 选中高亮
+  // Selection highlight
   if (isSelected) {
     ctx.lineStyle(2 * DPR, SELECTED_COLOR, 1)
     ctx.strokeCircle(centerX, centerY, baseRadius + 6 * DPR)
@@ -174,30 +174,30 @@ function renderCannon(ctx: RenderContext, data: BuildingRenderData): void {
 }
 
 /**
- * 渲染轻机枪 - 小圆形底座 + 细枪管
+ * Render LMG - small circular base + thin barrel
  */
 function renderLMG(ctx: RenderContext, data: BuildingRenderData): void {
   const { centerX, centerY, gridSize, isSelected, targetPosition, frame = 0 } = data
   const colors = COLORS.LMG
   const baseRadius = 8 * DPR
 
-  // 呼吸动画
+  // Breathing animation
   const scale = calcBreath(frame, 0.07)
   const animRadius = baseRadius * scale
 
-  // 外圈
+  // Outer ring
   ctx.fillStyle(colors.dark, 1)
   ctx.fillCircle(centerX, centerY, animRadius + 2 * DPR)
 
-  // 主圆
+  // Main circle
   ctx.fillStyle(colors.base, 1)
   ctx.fillCircle(centerX, centerY, animRadius)
 
-  // 高光
+  // Highlight
   ctx.fillStyle(colors.light, 1)
   ctx.fillCircle(centerX - 2 * DPR, centerY - 2 * DPR, 3 * DPR)
 
-  // 枪管
+  // Barrel
   const barrelLength = gridSize / 2 + 4 * DPR
   let angle = 0
   if (targetPosition) {
@@ -211,11 +211,11 @@ function renderLMG(ctx: RenderContext, data: BuildingRenderData): void {
   ctx.lineStyle(3 * DPR, colors.barrel, 1)
   ctx.lineBetween(centerX, centerY, endX, endY)
 
-  // 边框
+  // Border
   ctx.lineStyle(1 * DPR, 0x000000, 1)
   ctx.strokeCircle(centerX, centerY, animRadius + 2 * DPR)
 
-  // 选中高亮
+  // Selection highlight
   if (isSelected) {
     ctx.lineStyle(2 * DPR, SELECTED_COLOR, 1)
     ctx.strokeCircle(centerX, centerY, baseRadius + 5 * DPR)
@@ -223,34 +223,34 @@ function renderLMG(ctx: RenderContext, data: BuildingRenderData): void {
 }
 
 /**
- * 渲染重机枪 - 大圆形底座 + 粗枪管
+ * Render HMG - large circular base + thick barrel
  */
 function renderHMG(ctx: RenderContext, data: BuildingRenderData): void {
   const { centerX, centerY, gridSize, isSelected, targetPosition, frame = 0 } = data
   const colors = COLORS.HMG
   const baseRadius = 12 * DPR
 
-  // 呼吸动画
+  // Breathing animation
   const scale = calcBreath(frame, 0.05)
   const animRadius = baseRadius * scale
 
-  // 外圈
+  // Outer ring
   ctx.fillStyle(colors.dark, 1)
   ctx.fillCircle(centerX, centerY, animRadius + 3 * DPR)
 
-  // 主圆
+  // Main circle
   ctx.fillStyle(colors.base, 1)
   ctx.fillCircle(centerX, centerY, animRadius)
 
-  // 内圈
+  // Inner ring
   ctx.fillStyle(colors.light, 1)
   ctx.fillCircle(centerX, centerY, animRadius - 4 * DPR)
 
-  // 高光
+  // Highlight
   ctx.fillStyle(0xffffff, 0.3)
   ctx.fillCircle(centerX - 4 * DPR, centerY - 4 * DPR, 4 * DPR)
 
-  // 粗枪管
+  // Thick barrel
   const barrelLength = gridSize / 2 + 6 * DPR
   let angle = 0
   if (targetPosition) {
@@ -264,15 +264,15 @@ function renderHMG(ctx: RenderContext, data: BuildingRenderData): void {
   ctx.lineStyle(7 * DPR, colors.barrel, 1)
   ctx.lineBetween(centerX, centerY, endX, endY)
 
-  // 炮口
+  // Muzzle
   ctx.fillStyle(colors.dark, 1)
   ctx.fillCircle(endX, endY, 4 * DPR)
 
-  // 边框
+  // Border
   ctx.lineStyle(1 * DPR, 0x000000, 1)
   ctx.strokeCircle(centerX, centerY, animRadius + 3 * DPR)
 
-  // 选中高亮
+  // Selection highlight
   if (isSelected) {
     ctx.lineStyle(2 * DPR, SELECTED_COLOR, 1)
     ctx.strokeCircle(centerX, centerY, baseRadius + 6 * DPR)
@@ -280,25 +280,25 @@ function renderHMG(ctx: RenderContext, data: BuildingRenderData): void {
 }
 
 /**
- * 渲染激光枪 - 三角形 + 脉冲动画
+ * Render laser gun - triangle + pulse animation
  */
 function renderLaserGun(ctx: RenderContext, data: BuildingRenderData): void {
   const { centerX, centerY, isSelected, frame = 0 } = data
   const colors = COLORS.laser_gun
   const size = 12 * DPR
 
-  // 脉冲动画
+  // Pulse animation
   const pulse = calcPulse(frame, 0.12)
   const crystalColor = adjustBrightness(colors.crystal, 0.8 + pulse * 0.4)
 
-  // 底座圆形
+  // Base circle
   ctx.fillStyle(colors.dark, 1)
   ctx.fillCircle(centerX, centerY + 4 * DPR, 10 * DPR)
 
   ctx.fillStyle(colors.base, 1)
   ctx.fillCircle(centerX, centerY + 4 * DPR, 8 * DPR)
 
-  // 水晶三角形
+  // Crystal triangle
   const topY = centerY - size
   const bottomY = centerY + 2 * DPR
   const halfWidth = 6 * DPR
@@ -310,7 +310,7 @@ function renderLaserGun(ctx: RenderContext, data: BuildingRenderData): void {
     centerX + halfWidth, bottomY
   )
 
-  // 水晶高光
+  // Crystal highlight
   ctx.fillStyle(0xffffff, 0.5)
   ctx.fillTriangle(
     centerX - 2 * DPR, topY + 4 * DPR,
@@ -318,7 +318,7 @@ function renderLaserGun(ctx: RenderContext, data: BuildingRenderData): void {
     centerX - 1 * DPR, bottomY - 4 * DPR
   )
 
-  // 水晶边框
+  // Crystal border
   ctx.lineStyle(1 * DPR, colors.dark, 1)
   ctx.strokeTriangle(
     centerX, topY,
@@ -326,12 +326,12 @@ function renderLaserGun(ctx: RenderContext, data: BuildingRenderData): void {
     centerX + halfWidth, bottomY
   )
 
-  // 中心能量点
+  // Center energy point
   const energyRadius = 2 * DPR + pulse * 1 * DPR
   ctx.fillStyle(0xffffff, 1)
   ctx.fillCircle(centerX, centerY - 2 * DPR, energyRadius)
 
-  // 选中高亮
+  // Selection highlight
   if (isSelected) {
     ctx.lineStyle(2 * DPR, SELECTED_COLOR, 1)
     ctx.strokeCircle(centerX, centerY, 14 * DPR)
@@ -339,7 +339,7 @@ function renderLaserGun(ctx: RenderContext, data: BuildingRenderData): void {
 }
 
 /**
- * 建筑渲染器接口
+ * Building renderer interface
  */
 export interface BuildingRenderer {
   render(data: BuildingRenderData): void
@@ -347,7 +347,7 @@ export interface BuildingRenderer {
 }
 
 /**
- * 创建建筑渲染器
+ * Create a building renderer
  */
 export function createBuildingRenderer(ctx: RenderContext): BuildingRenderer {
   return {

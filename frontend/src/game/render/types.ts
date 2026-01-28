@@ -1,10 +1,10 @@
 /**
- * 渲染模块类型定义
+ * Render module type definitions
  */
 
 import type { BuildingType, Position } from '@/types'
 
-/** 渲染上下文接口（抽象 Phaser Graphics） */
+/** Render context interface (abstracts Phaser Graphics) */
 export interface RenderContext {
   clear(): void
   fillStyle(color: number, alpha?: number): void
@@ -24,7 +24,7 @@ export interface RenderContext {
   strokeTriangle(x1: number, y1: number, x2: number, y2: number, x3: number, y3: number): void
 }
 
-/** 建筑渲染数据 */
+/** Building render data */
 export interface BuildingRenderData {
   id: string
   type: BuildingType
@@ -38,7 +38,7 @@ export interface BuildingRenderData {
   frame?: number
 }
 
-/** 怪物渲染数据 */
+/** Monster render data */
 export interface MonsterRenderData {
   id: string
   x: number
@@ -51,7 +51,7 @@ export interface MonsterRenderData {
   frame?: number
 }
 
-/** 子弹渲染数据 */
+/** Bullet render data */
 export interface BulletRenderData {
   x: number
   y: number
@@ -61,7 +61,7 @@ export interface BulletRenderData {
   color?: number
 }
 
-/** 建筑颜色配置 */
+/** Building color scheme */
 export interface BuildingColorScheme {
   primary: number
   secondary: number
@@ -69,7 +69,7 @@ export interface BuildingColorScheme {
   barrel?: number
 }
 
-/** 建筑颜色映射 */
+/** Building color map */
 export const BUILDING_COLORS: Record<BuildingType, BuildingColorScheme> = {
   wall: {
     primary: 0x666666,

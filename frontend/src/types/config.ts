@@ -1,60 +1,60 @@
 /**
- * 游戏配置类型定义
- * 所有配置由服务端下发，客户端不内置任何默认值
+ * Game configuration type definitions
+ * All configurations are provided by the server; the client has no built-in defaults
  */
 
 // ============================================================================
-// 基础类型
+// Basic types
 // ============================================================================
 
-/** 坐标元组 [x, y] */
+/** Coordinate tuple [x, y] */
 export type Position = [number, number]
 
-/** 建筑类型枚举 */
+/** Building type enum */
 export type BuildingType = 'wall' | 'cannon' | 'LMG' | 'HMG' | 'laser_gun'
 
-/** 怪物类型索引 (0-8) */
+/** Monster type index (0-8) */
 export type MonsterTypeId = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
 
 // ============================================================================
-// 服务端下发的配置类型
+// Server-provided configuration types
 // ============================================================================
 
-/** 建筑配置（服务端下发） */
+/** Building configuration (from server) */
 export interface BuildingConfig {
-  /** 建筑名称 */
+  /** Building name */
   name: string
-  /** 建造费用 */
+  /** Build cost */
   cost: number
-  /** 基础伤害（wall 为 0） */
+  /** Base damage (0 for wall) */
   damage: number
-  /** 最小攻击范围（格子数） */
+  /** Minimum attack range (in grid cells) */
   range: number
-  /** 最大攻击范围（格子数，升级可扩展到此值） */
+  /** Maximum attack range (in grid cells, upgradable to this value) */
   max_range: number
-  /** 攻击速度（越高攻击越快，wall 为 0） */
+  /** Attack speed (higher means faster; 0 for wall) */
   speed: number
-  /** 子弹速度（laser_gun 为 0，即时命中） */
+  /** Bullet speed (0 for laser_gun, instant hit) */
   bullet_speed: number
-  /** 建筑生命值 */
+  /** Building hit points */
   life: number
-  /** 建筑护盾值 */
+  /** Building shield value */
   shield: number
-  /** 升级成本比例（默认 0.75） */
+  /** Upgrade cost ratio (default 0.75) */
   upgradeCostRatio: number
-  /** 出售回收比例（默认 0.5） */
+  /** Sell refund ratio (default 0.5) */
   sellRatio: number
 }
 
-/** 怪物静态配置（服务端下发） */
+/** Monster display configuration (from server) */
 export interface MonsterDisplayConfig {
   name: string
   color: string
-  /** 到达终点造成的伤害（1-10，固定值不受难度影响） */
+  /** Damage dealt upon reaching the exit (1-10, fixed value unaffected by difficulty) */
   damage: number
 }
 
-/** 地图配置（服务端下发） */
+/** Map configuration (from server) */
 export interface MapConfig {
   width: number
   height: number
@@ -63,14 +63,14 @@ export interface MapConfig {
   obstacles: Position[]
 }
 
-/** 初始状态配置（服务端下发） */
+/** Initial state configuration (from server) */
 export interface InitialConfig {
   money: number
   life: number
   difficulty: number
 }
 
-/** 完整游戏配置（服务端下发） */
+/** Complete game configuration (from server) */
 export interface GameConfig {
   buildings: Record<BuildingType, BuildingConfig>
   monsters: Record<MonsterTypeId, MonsterDisplayConfig>
@@ -79,28 +79,28 @@ export interface GameConfig {
 }
 
 // ============================================================================
-// 游戏常量
+// Game constants
 // ============================================================================
 
-/** 游戏常量 */
+/** Game constants */
 export const GAME_CONSTANTS = {
-  /** 格子大小（像素） */
+  /** Grid cell size (pixels) */
   GRID_SIZE: 32,
-  /** 游戏帧率 */
+  /** Game frame rate */
   FPS: 60,
-  /** 波次间隔帧数（3 秒） */
+  /** Interval frames between waves (3 seconds) */
   WAVE_INTERVAL_FRAMES: 180,
-  /** 最大生命值上限 */
+  /** Maximum life cap */
   MAX_LIFE: 100,
-  /** 同一类型怪物单波最大数量 */
+  /** Maximum number of monsters of the same type per wave */
   MAX_MONSTERS_PER_TYPE_PER_WAVE: 3,
-  /** 怪物生成间隔帧数（怪物逐个从入口出现的间隔） */
+  /** Monster spawn interval frames (interval between monsters appearing from the entrance) */
   MONSTER_SPAWN_INTERVAL_FRAMES: 30,
-  /** 全局速度系数（参考旧实现 TD.global_speed = 0.1） */
+  /** Global speed factor (based on legacy implementation TD.global_speed = 0.1) */
   GLOBAL_SPEED: 0.1,
 } as const
 
-/** 建筑类型数组（用于 UI 展示顺序） */
+/** Building type array (for UI display order) */
 export const BUILDING_TYPES: readonly BuildingType[] = [
   'wall',
   'cannon',
@@ -109,42 +109,42 @@ export const BUILDING_TYPES: readonly BuildingType[] = [
   'laser_gun',
 ] as const
 
-/** 怪物类型数组 */
+/** Monster type array */
 export const MONSTER_TYPES: readonly MonsterTypeId[] = [
   0, 1, 2, 3, 4, 5, 6, 7, 8,
 ] as const
 
-/** 怪物类型数量 */
+/** Number of monster types */
 export const MONSTER_TYPE_COUNT = MONSTER_TYPES.length
 
 // ============================================================================
-// 类型守卫
+// Type guards
 // ============================================================================
 
-/** 判断是否为有效的建筑类型 */
+/** Check if the value is a valid building type */
 export function isBuildingType(value: string): value is BuildingType {
   return BUILDING_TYPES.includes(value as BuildingType)
 }
 
-/** 判断建筑是否为武器（可攻击） */
+/** Check if the building is a weapon (can attack) */
 export function isWeaponBuilding(type: BuildingType): boolean {
   return type !== 'wall'
 }
 
-/** 判断是否为有效的怪物类型 */
+/** Check if the value is a valid monster type */
 export function isMonsterType(value: number): value is MonsterTypeId {
   return MONSTER_TYPES.includes(value as MonsterTypeId)
 }
 
 // ============================================================================
-// 升级规则
+// Upgrade rules
 // ============================================================================
 
 /**
- * 升级倍率配置
- * - 默认: 每级属性 × 1.2
- * - cannon: 1-10 级 × 1.2，11 级起 × 1.3
- * - HMG: 每级 × 1.3
+ * Upgrade multiplier configuration
+ * - Default: attribute x 1.2 per level
+ * - cannon: levels 1-10 x 1.2, level 11+ x 1.3
+ * - HMG: x 1.3 per level
  */
 export interface UpgradeMultiplier {
   default: number
@@ -170,7 +170,7 @@ export const UPGRADE_MULTIPLIERS: Record<BuildingType, UpgradeMultiplier> = {
   laser_gun: { default: 1.2 },
 }
 
-/** 获取指定建筑类型和等级的升级倍率 */
+/** Get the upgrade multiplier for a given building type and level */
 export function getUpgradeMultiplier(type: BuildingType, level: number): number {
   const config = UPGRADE_MULTIPLIERS[type]
   if (config.special) {
@@ -182,12 +182,12 @@ export function getUpgradeMultiplier(type: BuildingType, level: number): number 
 }
 
 // ============================================================================
-// JSON 转换辅助函数
+// JSON conversion helpers
 // ============================================================================
 
 /**
- * 将 API 返回的 monsters 配置转换为正确的键类型
- * JSON 中键是字符串 "0", "1"，需要转换为数字索引
+ * Convert the API-returned monsters config to the correct key type
+ * JSON keys are strings "0", "1", etc., and need to be converted to numeric indices
  */
 export function parseMonsterConfigs(
   raw: Record<string, MonsterDisplayConfig>,
@@ -203,8 +203,8 @@ export function parseMonsterConfigs(
 }
 
 /**
- * 验证并转换 API 返回的 GameConfig
- * 处理 JSON 序列化导致的键类型问题
+ * Validate and convert the API-returned GameConfig
+ * Handles key type issues caused by JSON serialization
  */
 export function parseGameConfig(raw: unknown): GameConfig {
   const config = raw as {

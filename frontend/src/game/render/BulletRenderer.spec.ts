@@ -1,12 +1,12 @@
 /**
- * 子弹渲染器测试
+ * Bullet renderer tests
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderBullet, createBulletRenderer } from './BulletRenderer'
 import type { RenderContext, BulletRenderData } from './types'
 
-/** 创建 Mock 渲染上下文 */
+/** Create mock render context */
 function createMockContext(): RenderContext & { calls: string[] } {
   const calls: string[] = []
 
@@ -39,7 +39,7 @@ describe('BulletRenderer', () => {
   })
 
   describe('renderBullet', () => {
-    it('渲染子弹应绘制圆形', () => {
+    it('should draw a circle when rendering a bullet', () => {
       const data: BulletRenderData = {
         x: 100,
         y: 100,
@@ -53,7 +53,7 @@ describe('BulletRenderer', () => {
       expect(ctx.fillCircle).toHaveBeenCalled()
     })
 
-    it('子弹应默认为黑色', () => {
+    it('should default to black color', () => {
       const data: BulletRenderData = {
         x: 100,
         y: 100,
@@ -65,12 +65,12 @@ describe('BulletRenderer', () => {
       renderBullet(ctx, data)
 
       const fillStyleCalls = (ctx.fillStyle as ReturnType<typeof vi.fn>).mock.calls
-      // 主子弹应为黑色
+      // Main bullet should be black
       const hasBlackColor = fillStyleCalls.some((call) => call[0] === 0x000000)
       expect(hasBlackColor).toBe(true)
     })
 
-    it('可以自定义子弹颜色', () => {
+    it('should support custom bullet color', () => {
       const data: BulletRenderData = {
         x: 100,
         y: 100,
@@ -87,7 +87,7 @@ describe('BulletRenderer', () => {
       expect(hasRedColor).toBe(true)
     })
 
-    it('有速度时应绘制拖尾效果', () => {
+    it('should draw trail effect when bullet has velocity', () => {
       const data: BulletRenderData = {
         x: 100,
         y: 100,
@@ -98,12 +98,12 @@ describe('BulletRenderer', () => {
 
       renderBullet(ctx, data)
 
-      // 拖尾效果会绘制多个圆形
+      // Trail effect draws multiple circles
       const fillCircleCalls = (ctx.fillCircle as ReturnType<typeof vi.fn>).mock.calls
       expect(fillCircleCalls.length).toBeGreaterThan(1)
     })
 
-    it('静止子弹不应有拖尾', () => {
+    it('should not draw trail for stationary bullet', () => {
       const data: BulletRenderData = {
         x: 100,
         y: 100,
@@ -114,12 +114,12 @@ describe('BulletRenderer', () => {
 
       renderBullet(ctx, data)
 
-      // 静止子弹只绘制一个圆
+      // Stationary bullet draws only one circle
       const fillCircleCalls = (ctx.fillCircle as ReturnType<typeof vi.fn>).mock.calls
       expect(fillCircleCalls.length).toBe(1)
     })
 
-    it('拖尾应有透明度渐变', () => {
+    it('should have alpha gradient in trail', () => {
       const data: BulletRenderData = {
         x: 100,
         y: 100,
@@ -131,7 +131,7 @@ describe('BulletRenderer', () => {
       renderBullet(ctx, data)
 
       const fillStyleCalls = (ctx.fillStyle as ReturnType<typeof vi.fn>).mock.calls
-      // 应该有不同透明度的调用
+      // Should have calls with different alpha values
       const alphas = fillStyleCalls.map((call) => call[1])
       const hasVaryingAlpha = new Set(alphas).size > 1
       expect(hasVaryingAlpha).toBe(true)
@@ -139,7 +139,7 @@ describe('BulletRenderer', () => {
   })
 
   describe('createBulletRenderer', () => {
-    it('应创建子弹渲染器', () => {
+    it('should create a bullet renderer', () => {
       const renderer = createBulletRenderer(ctx)
 
       expect(renderer).toBeDefined()
@@ -147,7 +147,7 @@ describe('BulletRenderer', () => {
       expect(typeof renderer.clear).toBe('function')
     })
 
-    it('批量渲染多个子弹', () => {
+    it('should render multiple bullets', () => {
       const renderer = createBulletRenderer(ctx)
 
       const bullets: BulletRenderData[] = [

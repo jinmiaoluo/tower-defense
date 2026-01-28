@@ -1,5 +1,5 @@
 /**
- * 主题颜色配置
+ * Theme color configuration
  */
 
 import type { ThemeConfig, Theme, GameColors } from '@/types/theme'
@@ -7,32 +7,32 @@ import type { ThemeConfig, Theme, GameColors } from '@/types/theme'
 export const darkTheme: ThemeConfig = {
   name: 'dark',
   colors: {
-    // 背景色
+    // Background colors
     background: '#1a1a2e',
     backgroundSecondary: '#2a2a3e',
     backgroundTertiary: '#3a3a4e',
 
-    // 文本色
+    // Text colors
     text: 'rgba(255, 255, 255, 0.87)',
     textSecondary: 'rgba(255, 255, 255, 0.6)',
     textMuted: 'rgba(255, 255, 255, 0.38)',
 
-    // 边框色
+    // Border colors
     border: '#4a4a6e',
     borderLight: '#5a5a7e',
 
-    // 交互色
+    // Interactive colors
     primary: '#4488ff',
     primaryHover: '#5599ff',
     primaryActive: '#3377ee',
 
-    // 状态色
+    // Status colors
     success: '#00ff00',
     warning: '#ffcc00',
     danger: '#ff4444',
     info: '#00ffff',
 
-    // 游戏特定色
+    // Game-specific colors
     gridLine: '#444444',
     gridFill: '#2a2a3e',
     pathColor: '#3a3a5e',
@@ -63,32 +63,32 @@ export const darkTheme: ThemeConfig = {
 export const lightTheme: ThemeConfig = {
   name: 'light',
   colors: {
-    // 背景色
+    // Background colors
     background: '#f5f5f5',
     backgroundSecondary: '#ffffff',
     backgroundTertiary: '#e8e8e8',
 
-    // 文本色
+    // Text colors
     text: 'rgba(0, 0, 0, 0.87)',
     textSecondary: 'rgba(0, 0, 0, 0.6)',
     textMuted: 'rgba(0, 0, 0, 0.38)',
 
-    // 边框色
+    // Border colors
     border: '#d0d0d0',
     borderLight: '#e0e0e0',
 
-    // 交互色
+    // Interactive colors
     primary: '#2266cc',
     primaryHover: '#3377dd',
     primaryActive: '#1155bb',
 
-    // 状态色
+    // Status colors
     success: '#00aa00',
     warning: '#cc9900',
     danger: '#cc3333',
     info: '#0099aa',
 
-    // 游戏特定色
+    // Game-specific colors
     gridLine: '#cccccc',
     gridFill: '#e8e8e8',
     pathColor: '#d8d8d8',
@@ -162,8 +162,8 @@ export function applyThemeToCSSVariables(theme: ThemeConfig): void {
 }
 
 /**
- * 获取初始游戏颜色（用于 Phaser canvas 初始化）
- * 始终检测系统主题
+ * Get the initial game colors for Phaser canvas initialization.
+ * Always detects the system theme.
  */
 export function getInitialGameColors(): GameColors {
   const MEDIA_QUERY = '(prefers-color-scheme: dark)'

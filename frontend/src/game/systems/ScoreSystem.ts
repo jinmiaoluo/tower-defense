@@ -1,46 +1,46 @@
 /**
- * ScoreSystem - 得分计算系统
- * 负责命中得分计算
+ * ScoreSystem - Score calculation system
+ * Handles hit score calculation
  *
- * 得分规则（参考 SPEC.md）：
- * - 命中得分 = floor(sqrt(实际伤害))
- * - 最终得分 = 累计命中得分（无额外奖励，直接使用 state.score）
+ * Score rules (reference: SPEC.md):
+ * - Hit score = floor(sqrt(actual damage))
+ * - Final score = cumulative hit score (no extra bonuses, uses state.score directly)
  *
- * 命中得分参考旧实现：html5-tower-defense/src/js/td-obj-monster.js:85
+ * Hit score reference: html5-tower-defense/src/js/td-obj-monster.js:85
  */
 
-/** ScoreSystem 接口定义 */
+/** ScoreSystem interface definition */
 export interface ScoreSystem {
   /**
-   * 计算单次命中得分
-   * 公式: score = floor(sqrt(actualDamage))
-   * @param actualDamage 实际伤害值（已扣除护盾后）
-   * @returns 得分
+   * Calculate single hit score
+   * Formula: score = floor(sqrt(actualDamage))
+   * @param actualDamage Actual damage value (after shield reduction)
+   * @returns Score
    */
   calculateHitScore(actualDamage: number): number
 
   /**
-   * 计算多次攻击的总命中得分
-   * @param damages 每次攻击的实际伤害数组
-   * @returns 总得分
+   * Calculate total hit score from multiple attacks
+   * @param damages Array of actual damage values per attack
+   * @returns Total score
    */
   calculateTotalHitScore(damages: number[]): number
 }
 
 /**
- * 创建 ScoreSystem 实例
+ * Create a ScoreSystem instance
  */
 export function createScoreSystem(): ScoreSystem {
   /**
-   * 计算单次命中得分
-   * 参考旧实现：TD.score += Math.floor(Math.sqrt(damage))
+   * Calculate single hit score
+   * Reference: TD.score += Math.floor(Math.sqrt(damage))
    */
   function calculateHitScore(actualDamage: number): number {
     return Math.floor(Math.sqrt(actualDamage))
   }
 
   /**
-   * 计算多次攻击的总命中得分
+   * Calculate total hit score from multiple attacks
    */
   function calculateTotalHitScore(damages: number[]): number {
     return damages.reduce((total, damage) => total + calculateHitScore(damage), 0)

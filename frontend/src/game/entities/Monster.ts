@@ -1,7 +1,7 @@
 /**
- * Monster - 怪物实体
- * 负责怪物的状态管理、伤害计算和路径跟随
- * 参考旧实现：html5-tower-defense/src/js/td-obj-monster.js
+ * Monster - Monster entity
+ * Handles monster state management, damage calculation, and path following
+ * Reference: html5-tower-defense/src/js/td-obj-monster.js
  */
 
 import type { IMonster, MonsterCreateParams, Path } from '@/types/entities'
@@ -10,20 +10,20 @@ import { GAME_CONSTANTS } from '@/types'
 
 const { GRID_SIZE, GLOBAL_SPEED, FPS } = GAME_CONSTANTS
 
-/** 旧实现的帧率（用于速度换算） */
+/** Frame rate of the old implementation (used for speed conversion) */
 const OLD_FPS = 24
 
-/** 最低伤害比例（保证高伤害武器对护盾怪的优势） */
+/** Minimum damage ratio (guarantees high-damage weapons advantage against shielded monsters) */
 const MIN_DAMAGE_RATIO = 0.1
 
-/** 怪物半径计算常量（参考旧实现: this.r = Math.floor(this.damage * 1.2)） */
+/** Monster radius calculation constants (reference: this.r = Math.floor(this.damage * 1.2)) */
 const MONSTER_RADIUS_FACTOR = 1.2
 const MONSTER_RADIUS_MIN = 4
 const MONSTER_RADIUS_MAX = 12
 
 /**
- * 计算怪物半径
- * 基于伤害值计算: floor(damage * 1.2)，范围 4-12
+ * Calculate monster radius
+ * Based on damage value: floor(damage * 1.2), clamped to range 4-12
  */
 function calculateMonsterRadius(damage: number): number {
   const r = Math.floor(damage * MONSTER_RADIUS_FACTOR)
@@ -31,31 +31,31 @@ function calculateMonsterRadius(damage: number): number {
 }
 
 /**
- * Monster 依赖接口
- * 通过依赖注入方式获取 PathSystem 功能，便于测试和解耦
+ * Monster dependencies interface
+ * Uses dependency injection to access PathSystem functionality for testability and decoupling
  */
 export interface MonsterDependencies {
-  /** 从指定位置生成到出口的路径（用于独立寻路） */
+  /** Generate a path from the specified position to the exit (for independent pathfinding) */
   generatePathFrom: (startPosition: Position) => Path
-  /** 根据进度获取像素位置 */
+  /** Get pixel position at the given progress */
   getPositionAtProgress: (path: Path, progress: number) => { x: number; y: number }
-  /** 检查指定位置是否可通行 */
+  /** Check whether the specified position is passable */
   isPassable: (position: Position) => boolean
-  /** 获取地图入口位置 */
+  /** Get the map entrance position */
   getEntrance: () => Position
 }
 
-/** 10% 概率重新寻路（与旧实现一致） */
+/** 10% re-pathing probability (consistent with old implementation) */
 const REPATH_PROBABILITY = 0.1
 
 /**
- * Monster 实现类
+ * Monster implementation class
  *
- * 移动机制与旧实现保持一致：
- * - 直接追踪像素位置 (pixelX, pixelY)，与旧实现的 (cx, cy) 对应
- * - 每帧朝下一个格子中心移动固定像素距离
- * - 重新寻路时只改变目标，不改变当前位置，保证移动连续性
- * - 参考旧实现: td-obj-monster.js:238-278 step()
+ * Movement mechanism consistent with the old implementation:
+ * - Directly tracks pixel position (pixelX, pixelY), corresponding to (cx, cy) in the old implementation
+ * - Each frame moves a fixed pixel distance toward the next cell center
+ * - Re-pathing only changes the target, not the current position, ensuring movement continuity
+ * - Reference: td-obj-monster.js:238-278 step()
  */
 class Monster implements IMonster {
   readonly id: string
@@ -71,34 +71,34 @@ class Monster implements IMonster {
   isValid: boolean
 
   private readonly deps: MonsterDependencies
-  /** 怪物独立的路径数组（与旧实现的 this.way 对应） */
+  /** Monster's independent path array (corresponds to this.way in the old implementation) */
   private path: Path = []
-  /** 当前像素位置 X（与旧实现的 this.cx 对应） */
+  /** Current pixel position X (corresponds to this.cx in the old implementation) */
   private pixelX: number = 0
-  /** 当前像素位置 Y（与旧实现的 this.cy 对应） */
+  /** Current pixel position Y (corresponds to this.cy in the old implementation) */
   private pixelY: number = 0
-  /** 当前路径中的目标格子索引 */
+  /** Target cell index in the current path */
   private targetGridIndex: number = 1
-  /** 内部进度值 */
+  /** Internal progress value */
   private _progress: number = 0
 
   /**
-   * 获取进度（0-1）
-   * 进度是从像素位置计算的派生值
+   * Get progress (0-1)
+   * Progress is a derived value calculated from pixel position
    */
   get progress(): number {
     return this._progress
   }
 
   /**
-   * 设置进度（0-1）
-   * 设置进度时会同步更新像素位置，保持向后兼容性
-   * 这使得测试代码可以通过设置 progress 来定位怪物
+   * Set progress (0-1)
+   * Setting progress synchronizes the pixel position for backward compatibility
+   * This allows test code to position the monster by setting progress
    */
   set progress(value: number) {
     this._progress = Math.max(0, Math.min(1, value))
 
-    // 如果路径有效，根据 progress 计算像素位置
+    // If the path is valid, calculate pixel position from progress
     if (this.path.length >= 2) {
       const totalSegments = this.path.length - 1
       const exactPosition = this._progress * totalSegments
@@ -116,7 +116,7 @@ class Monster implements IMonster {
       this.pixelX = startPixelX + (endPixelX - startPixelX) * segmentProgress
       this.pixelY = startPixelY + (endPixelY - startPixelY) * segmentProgress
 
-      // 更新目标格子索引
+      // Update target cell index
       this.targetGridIndex = Math.min(segmentIndex + 1, this.path.length - 1)
     }
   }
@@ -136,50 +136,50 @@ class Monster implements IMonster {
     this.isValid = true
     this.deps = deps
 
-    // 初始化像素位置为入口中心
+    // Initialize pixel position to the entrance center
     const entrance = deps.getEntrance()
     this.pixelX = entrance[0] * GRID_SIZE + GRID_SIZE / 2
     this.pixelY = entrance[1] * GRID_SIZE + GRID_SIZE / 2
 
-    // 初始寻路
+    // Initial pathfinding
     this.findPath()
   }
 
   /**
-   * 独立寻路
-   * 参考旧实现: td-obj-monster.js:124-136 findWay()
+   * Independent pathfinding
+   * Reference: td-obj-monster.js:124-136 findWay()
    *
-   * 重要：重新寻路时不改变像素位置，只改变路径
-   * 这保证了移动的连续性，与旧实现行为一致
+   * Important: re-pathing does not change pixel position, only the path
+   * This ensures movement continuity, consistent with old implementation behavior
    */
   private findPath(): void {
     const currentGridPos = this.getGridPosition()
     this.path = this.deps.generatePathFrom(currentGridPos)
-    // 目标格子是路径中的下一个格子（索引 1），索引 0 是当前格子
+    // Target cell is the next cell in the path (index 1); index 0 is the current cell
     this.targetGridIndex = 1
   }
 
   /**
-   * 受到伤害
-   * 伤害计算公式: actualDamage = max(rawDamage - shield, rawDamage × 0.1)
-   * 与旧实现一致，shield 是静态值，不会递减
+   * Take damage
+   * Damage formula: actualDamage = max(rawDamage - shield, rawDamage * 0.1)
+   * Consistent with old implementation; shield is a static value and does not decrease
    */
   takeDamage(rawDamage: number): number {
     if (!this.isValid) {
       return 0
     }
 
-    // 计算最低伤害（保证高伤害武器的优势）
+    // Calculate minimum damage (guarantees high-damage weapon advantage)
     const minDamage = Math.ceil(rawDamage * MIN_DAMAGE_RATIO)
 
-    // 计算实际伤害（使用静态 shield 值）
+    // Calculate actual damage (using static shield value)
     const reducedDamage = rawDamage - this.shield
     const actualDamage = Math.max(reducedDamage, minDamage)
 
-    // 扣除生命值
+    // Deduct life
     this.currentLife = Math.max(0, this.currentLife - actualDamage)
 
-    // 检查是否死亡
+    // Check for death
     if (this.currentLife <= 0) {
       this.isValid = false
     }
@@ -187,39 +187,39 @@ class Monster implements IMonster {
     return actualDamage
   }
 
-  /** 是否已死亡 */
+  /** Whether the monster is dead */
   isDead(): boolean {
     return this.currentLife <= 0
   }
 
-  /** 是否到达终点 */
+  /** Whether the monster has reached the exit */
   reachedExit(): boolean {
-    // progress >= 1 表示已到达终点（update 方法在到达时设置 progress = 1）
+    // progress >= 1 means the exit has been reached (update method sets progress = 1 on arrival)
     return this.progress >= 1
   }
 
   /**
-   * 获取当前格子坐标
-   * 基于像素位置计算，与旧实现一致
+   * Get current grid coordinates
+   * Calculated from pixel position, consistent with old implementation
    */
   getGridPosition(): Position {
-    // 从像素位置计算格子坐标
+    // Calculate grid coordinates from pixel position
     const gridX = Math.floor(this.pixelX / GRID_SIZE)
     const gridY = Math.floor(this.pixelY / GRID_SIZE)
     return [gridX, gridY]
   }
 
   /**
-   * 获取当前像素位置
-   * 直接返回追踪的像素位置，与旧实现一致
+   * Get current pixel position
+   * Directly returns the tracked pixel position, consistent with old implementation
    */
   getPixelPosition(): { x: number; y: number } {
     return { x: this.pixelX, y: this.pixelY }
   }
 
   /**
-   * 获取路径上下一个要去的格子
-   * 参考旧实现: td-obj-monster.js:184-203 getNextGrid()
+   * Get the next cell to move to in the path
+   * Reference: td-obj-monster.js:184-203 getNextGrid()
    */
   private getNextGridInPath(): Position | null {
     if (this.path.length <= 1 || this.targetGridIndex >= this.path.length) {
@@ -229,18 +229,18 @@ class Monster implements IMonster {
   }
 
   /**
-   * 计算到达出口的总路径长度（像素）
-   * 用于计算 progress
+   * Calculate the total path length to the exit (in pixels)
+   * Used for calculating progress
    */
   private calculateTotalPathLength(): number {
     if (this.path.length <= 1) return 0
-    // 路径长度 = (格子数 - 1) * GRID_SIZE
+    // Path length = (number of cells - 1) * GRID_SIZE
     return (this.path.length - 1) * GRID_SIZE
   }
 
   /**
-   * 计算当前已走过的路径长度（像素）
-   * 基于像素位置计算
+   * Calculate the distance already traveled (in pixels)
+   * Calculated from pixel position
    */
   private calculateTraveledDistance(): number {
     if (this.path.length === 0) return 0
@@ -249,44 +249,44 @@ class Monster implements IMonster {
     const startPixelX = startX * GRID_SIZE + GRID_SIZE / 2
     const startPixelY = startY * GRID_SIZE + GRID_SIZE / 2
 
-    // 简化计算：使用曼哈顿距离（因为怪物只能水平或垂直移动）
+    // Simplified calculation: use Manhattan distance (monsters can only move horizontally or vertically)
     return Math.abs(this.pixelX - startPixelX) + Math.abs(this.pixelY - startPixelY)
   }
 
   /**
-   * 每帧更新
-   * 参考旧实现: td-obj-monster.js:238-278 step()
+   * Per-frame update
+   * Reference: td-obj-monster.js:238-278 step()
    *
-   * 核心机制：直接追踪像素位置
-   * - 每帧朝目标格子中心移动固定像素距离
-   * - 到达目标后切换到下一个目标
-   * - 重新寻路时只改变目标，不改变当前位置，保证移动连续性
+   * Core mechanism: directly track pixel position
+   * - Each frame moves a fixed pixel distance toward the target cell center
+   * - Switches to the next target upon arrival
+   * - Re-pathing only changes the target, not the current position, ensuring movement continuity
    */
   update(): void {
     if (!this.isValid) {
       return
     }
 
-    // 路径为空时强制寻路
+    // Force pathfinding when path is empty
     if (this.path.length === 0) {
       this.findPath()
     }
 
-    // 检查下一个格子是否可通行，不可通行则强制重新寻路
-    // 参考旧实现: td-obj-monster.js:192-195
+    // Check if the next cell is passable; force re-pathing if not
+    // Reference: td-obj-monster.js:192-195
     const nextGrid = this.getNextGridInPath()
     if (nextGrid && !this.deps.isPassable(nextGrid)) {
       this.findPath()
     }
 
-    // 路径被阻塞（无法到达出口）
+    // Path is blocked (cannot reach the exit)
     if (this.path.length === 0) {
       return
     }
 
-    // 检查是否已经到达路径终点
+    // Check if the end of the path has been reached
     if (this.path.length <= 1 || this.targetGridIndex >= this.path.length) {
-      // 到达出口
+      // Reached the exit
       const [exitX, exitY] = this.path[this.path.length - 1]
       this.pixelX = exitX * GRID_SIZE + GRID_SIZE / 2
       this.pixelY = exitY * GRID_SIZE + GRID_SIZE / 2
@@ -295,44 +295,45 @@ class Monster implements IMonster {
       return
     }
 
-    // 获取目标格子中心
+    // Get target cell center
     const [targetGridX, targetGridY] = this.path[this.targetGridIndex]
     const targetPixelX = targetGridX * GRID_SIZE + GRID_SIZE / 2
     const targetPixelY = targetGridY * GRID_SIZE + GRID_SIZE / 2
 
-    // 计算到目标的距离和方向
+    // Calculate distance and direction to target
     const dx = targetPixelX - this.pixelX
     const dy = targetPixelY - this.pixelY
 
-    // 计算每帧移动的像素距离
-    // 旧实现 (24 FPS): 每帧移动 speed * GLOBAL_SPEED 像素
-    // 新实现 (60 FPS): 需要乘以帧率比例 (24/60) 以保持相同的实际移动速度
+    // Calculate per-frame pixel movement distance
+    // Old implementation (24 FPS): moves speed * GLOBAL_SPEED pixels per frame
+    // New implementation (60 FPS): multiply by frame rate ratio (24/60) to maintain the same actual speed
     const speed = this.speed * GLOBAL_SPEED * (OLD_FPS / FPS)
 
-    // 检查是否能在这一帧到达目标
-    // 参考旧实现: td-obj-monster.js:264-274
+    // Check if the target can be reached in this frame
+    // Reference: td-obj-monster.js:264-274
     if (Math.abs(dx) < speed && Math.abs(dy) < speed) {
-      // 到达目标格子中心
+      // Reached the target cell center
       this.pixelX = targetPixelX
       this.pixelY = targetPixelY
       this.targetGridIndex++
 
-      // 检查是否到达终点
+      // Check if the end has been reached
       if (this.targetGridIndex >= this.path.length) {
         this._progress = 1
         this.isValid = false
         return
       }
 
-      // 10% 概率重新寻路（只在到达格子中心时触发）
-      // 参考旧实现: td-obj-monster.js:184-188 getNextGrid() 只在 next_grid 为空时调用
-      // 旧实现中 next_grid 在到达目标后才设为 null，因此 10% 检查只在格子交接点触发
+      // 10% chance to re-path (only triggered when reaching a cell center)
+      // Reference: td-obj-monster.js:184-188 getNextGrid() only calls when next_grid is null
+      // In the old implementation, next_grid is set to null after reaching the target,
+      // so the 10% check only triggers at cell transition points
       if (Math.random() < REPATH_PROBABILITY) {
         this.findPath()
       }
     } else {
-      // 朝目标移动
-      // 参考旧实现: td-obj-monster.js:270-273
+      // Move toward the target
+      // Reference: td-obj-monster.js:270-273
       if (dx !== 0) {
         const sx = dx < 0 ? -1 : 1
         this.pixelX += sx * speed
@@ -343,8 +344,8 @@ class Monster implements IMonster {
       }
     }
 
-    // 更新全局进度（用于外部查询）
-    // 注意：使用 _progress 直接赋值，避免触发 setter 覆盖像素位置
+    // Update global progress (for external queries)
+    // Note: use _progress directly to avoid triggering the setter which would overwrite pixel position
     const totalLength = this.calculateTotalPathLength()
     if (totalLength > 0) {
       const traveled = this.calculateTraveledDistance()
@@ -356,23 +357,23 @@ class Monster implements IMonster {
 }
 
 /**
- * 创建 Monster 实例
+ * Create a Monster instance
  */
 export function createMonster(params: MonsterCreateParams, deps: MonsterDependencies): IMonster & {
-  /** 获取当前像素位置 */
+  /** Get current pixel position */
   getPixelPosition(): { x: number; y: number }
-  /** 每帧更新 */
+  /** Per-frame update */
   update(): void
 } {
   return new Monster(params, deps)
 }
 
 /**
- * 扩展的 Monster 接口（包含运行时方法）
+ * Extended Monster interface (includes runtime methods)
  */
 export interface IMonsterRuntime extends IMonster {
-  /** 获取当前像素位置 */
+  /** Get current pixel position */
   getPixelPosition(): { x: number; y: number }
-  /** 每帧更新 */
+  /** Per-frame update */
   update(): void
 }

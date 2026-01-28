@@ -1,22 +1,22 @@
 /**
- * useI18n composable 测试
+ * useI18n composable tests
  */
 
 import { describe, it, expect } from 'vitest'
 import { useI18n, setGlobalLocale, getGlobalLocale } from './useI18n'
 
 describe('useI18n', () => {
-  it('应返回翻译函数', () => {
+  it('should return a translation function', () => {
     const { t } = useI18n()
     expect(typeof t).toBe('function')
   })
 
-  it('应返回当前语言', () => {
+  it('should return the current locale', () => {
     const { locale } = useI18n()
     expect(['zh', 'en']).toContain(locale.value)
   })
 
-  it('应能切换语言', () => {
+  it('should switch locale', () => {
     const { locale, setLocale } = useI18n()
 
     setLocale('en')
@@ -26,7 +26,7 @@ describe('useI18n', () => {
     expect(locale.value).toBe('zh')
   })
 
-  it('翻译应随语言切换更新', () => {
+  it('should update translations after locale switch', () => {
     const { t, setLocale } = useI18n()
 
     setLocale('zh')
@@ -37,8 +37,8 @@ describe('useI18n', () => {
   })
 })
 
-describe('全局语言设置', () => {
-  it('setGlobalLocale 应设置全局语言', () => {
+describe('global locale settings', () => {
+  it('setGlobalLocale should set the global locale', () => {
     setGlobalLocale('en')
     expect(getGlobalLocale()).toBe('en')
 
@@ -46,7 +46,7 @@ describe('全局语言设置', () => {
     expect(getGlobalLocale()).toBe('zh')
   })
 
-  it('useI18n 应使用全局语言', () => {
+  it('useI18n should use the global locale', () => {
     setGlobalLocale('en')
     const { locale } = useI18n()
     expect(locale.value).toBe('en')

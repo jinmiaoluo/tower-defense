@@ -1,5 +1,5 @@
 /**
- * 游戏系统模块导出
+ * Game systems module exports
  */
 
 export { createPathSystem, type PathSystem } from './PathSystem'

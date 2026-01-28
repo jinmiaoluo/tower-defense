@@ -1,8 +1,8 @@
 /**
- * Mock 模块导出入口
+ * Mock module export entry point
  */
 
-// 配置数据
+// Configuration data
 export {
   MOCK_BUILDINGS,
   MOCK_GAME_CONFIG,
@@ -12,14 +12,14 @@ export {
   MOCK_MONSTERS,
 } from './config'
 
-// 波次生成
+// Wave generation
 export {
   calculateLifeReward,
   generateWaveConfig,
   PREDEFINED_WAVES,
 } from './waves'
 
-// API Mock
+// API mock
 export {
   mockEndGame,
   mockGetLeaderboard,

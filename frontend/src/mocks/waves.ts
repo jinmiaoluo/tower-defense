@@ -1,15 +1,15 @@
 /**
- * 波次配置 Mock 数据
- * 数据来源：docs/BACKEND_GUIDE.md
+ * Wave configuration mock data
+ * Data source: docs/BACKEND_GUIDE.md
  */
 
 import type { MonsterConfig, MonsterTypeId, WaveConfig } from '@/types'
 import { MOCK_MONSTER_BASE_STATS } from './config'
 
 /**
- * 预定义波次配置（波次 1-10）
- * 来源：旧实现 td-data-stage-1.js:184-250
- * 前 10 波只使用 type 0/1/2 三种基础怪物，难度渐进
+ * Predefined wave configs (waves 1-10)
+ * Source: old implementation td-data-stage-1.js:184-250
+ * First 10 waves only use type 0/1/2 basic monsters with progressive difficulty
  */
 export const PREDEFINED_WAVES: Record<number, { type: MonsterTypeId; count: number }[]> = {
   1: [{ type: 0, count: 1 }],
@@ -24,7 +24,7 @@ export const PREDEFINED_WAVES: Record<number, { type: MonsterTypeId; count: numb
   10: [{ type: 0, count: 8 }, { type: 1, count: 4 }, { type: 2, count: 3 }],
 }
 
-/** 生成 UUID（简化版，用于 Mock） */
+/** Generate UUID (simplified version for mock) */
 function generateUUID(): string {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0
@@ -34,9 +34,9 @@ function generateUUID(): string {
 }
 
 /**
- * 根据难度系数计算怪物属性
- * 公式来源：docs/SPEC.md
- * speed 受 max_speed 上限限制，防止高难度时怪物过快
+ * Calculate monster attributes based on difficulty coefficient
+ * Formula source: docs/SPEC.md
+ * speed is capped by max_speed to prevent monsters from being too fast at high difficulty
  */
 function applyDifficulty(
   base: { life: number; speed: number; max_speed: number; shield: number },
@@ -51,15 +51,15 @@ function applyDifficulty(
 }
 
 /**
- * 生成波次怪物配置
- * @param waveNumber 波次号
- * @param difficulty 难度系数
+ * Generate wave monster configuration
+ * @param waveNumber Wave number
+ * @param difficulty Difficulty coefficient
  */
 export function generateWaveConfig(waveNumber: number, difficulty: number = 1.0): WaveConfig {
   const waveDefinition = PREDEFINED_WAVES[waveNumber]
 
   if (!waveDefinition) {
-    // 波次 11+ 使用随机生成
+    // Waves 11+ use random generation
     return generateRandomWave(waveNumber, difficulty)
   }
 
@@ -88,9 +88,9 @@ export function generateWaveConfig(waveNumber: number, difficulty: number = 1.0)
 }
 
 /**
- * 生成随机波次（波次 11+）
- * 怪物数量公式：min(wave^1.1, 100)
- * 同一类型最多 3 个
+ * Generate random wave (wave 11+)
+ * Monster count formula: min(wave^1.1, 100)
+ * Max 3 of the same type per group
  */
 function generateRandomWave(waveNumber: number, difficulty: number): WaveConfig {
   const totalMonsters = Math.min(Math.floor(Math.pow(waveNumber, 1.1)), 100)
@@ -126,8 +126,8 @@ function generateRandomWave(waveNumber: number, difficulty: number): WaveConfig 
 }
 
 /**
- * 计算生命恢复奖励
- * 每 5 波 +5，每 10 波 +10，上限 100
+ * Calculate life recovery reward
+ * Every 5 waves +5, every 10 waves +10, capped at 100
  */
 export function calculateLifeReward(waveNumber: number): number | undefined {
   if (waveNumber % 10 === 0) {

@@ -1,7 +1,7 @@
 /**
- * Building - 建筑实体
- * 负责建筑的状态管理、目标搜索和攻击行为
- * 参考旧实现：html5-tower-defense/src/js/td-obj-building.js
+ * Building - Building entity
+ * Handles building state management, target searching, and attack behavior
+ * Reference: html5-tower-defense/src/js/td-obj-building.js
  */
 
 import type { IBuilding, IMonster, BuildingCreateParams } from '@/types/entities'
@@ -9,42 +9,42 @@ import type { IWaveRecorder } from '@/types/recorder'
 import type { BuildingType, Position } from '@/types'
 
 /**
- * Building 依赖接口
- * 通过依赖注入方式获取 BuildingSystem 功能，便于测试和解耦
+ * Building dependencies interface
+ * Uses dependency injection to access BuildingSystem functionality for testability and decoupling
  */
 export interface BuildingDependencies {
-  /** 获取指定等级的伤害值 */
+  /** Get damage value at the specified level */
   getDamageAtLevel: (type: BuildingType, level: number) => number
-  /** 获取指定等级的射程 */
+  /** Get range at the specified level */
   getRangeAtLevel: (type: BuildingType, level: number) => number
-  /** 获取攻击间隔帧数 */
+  /** Get attack interval in frames */
   getAttackSpeedFrames: (type: BuildingType) => number
-  /** 检查目标是否在射程内 */
+  /** Check whether the target is within range */
   isInRange: (building: { type: BuildingType; level: number; position: Position }, targetPos: Position) => boolean
-  /** 判断是否为武器（可攻击） */
+  /** Check whether the type is a weapon (can attack) */
   isWeapon: (type: BuildingType) => boolean
-  /** 获取子弹速度 */
+  /** Get bullet speed */
   getBulletSpeed: (type: BuildingType) => number
 }
 
 /**
- * 子弹创建参数
+ * Bullet creation parameters
  */
 export interface BulletCreateInfo {
-  /** 所属建筑 */
+  /** Owning building */
   building: IBuilding
-  /** 伤害值 */
+  /** Damage value */
   damage: number
-  /** 子弹速度 */
+  /** Bullet speed */
   speed: number
-  /** 原始目标 ID */
+  /** Original target ID */
   originalTargetId: string
-  /** 原始目标位置 */
+  /** Original target position */
   originalTargetPosition: Position
 }
 
 /**
- * Building 实现类
+ * Building implementation class
  */
 class Building implements IBuilding {
   readonly id: string
@@ -70,7 +70,7 @@ class Building implements IBuilding {
     this.deps = deps
   }
 
-  /** 是否可以攻击（冷却结束且是武器类型） */
+  /** Whether the building can attack (cooldown finished and is a weapon type) */
   canAttack(): boolean {
     if (!this.deps.isWeapon(this.type)) {
       return false
@@ -79,9 +79,9 @@ class Building implements IBuilding {
   }
 
   /**
-   * 在怪物列表中寻找目标
-   * 策略：优先选择路径进度最高的怪物（更接近出口的威胁更大）
-   * 参考旧实现: td-obj-building.js:187-204
+   * Find a target among the monster list
+   * Strategy: prioritize the monster with the highest path progress (closer to exit = greater threat)
+   * Reference: td-obj-building.js:187-204
    */
   findTarget(monsters: IMonster[]): IMonster | null {
     if (!this.deps.isWeapon(this.type)) {
@@ -89,7 +89,7 @@ class Building implements IBuilding {
       return null
     }
 
-    // 如果当前目标仍然有效且在射程内，保持目标
+    // If the current target is still valid and in range, keep it
     if (this.currentTarget && this.currentTarget.isValid) {
       const targetPos = this.currentTarget.getGridPosition()
       if (this.deps.isInRange(
@@ -100,7 +100,7 @@ class Building implements IBuilding {
       }
     }
 
-    // 筛选有效且在射程内的怪物
+    // Filter valid monsters within range
     const validTargets = monsters.filter((monster) => {
       if (!monster.isValid) {
         return false
@@ -118,7 +118,7 @@ class Building implements IBuilding {
       return null
     }
 
-    // 选择路径进度最高的怪物
+    // Select the monster with the highest path progress
     this.currentTarget = validTargets.reduce((best, current) => {
       return current.progress > best.progress ? current : best
     })
@@ -127,30 +127,30 @@ class Building implements IBuilding {
   }
 
   /**
-   * 攻击目标
-   * - 激光枪：立即命中，直接造成伤害
-   * - 其他武器：设置冷却，由外部 BulletSystem 创建子弹
+   * Attack the target
+   * - Laser gun: hits immediately, deals damage directly
+   * - Other weapons: sets cooldown, bullets created externally by BulletSystem
    */
   attack(target: IMonster, recorder: IWaveRecorder, frame: number): void {
-    // 设置攻击冷却
+    // Set attack cooldown
     this.cooldown = this.deps.getAttackSpeedFrames(this.type)
 
     const damage = this.getDamage()
     const targetPos = target.getGridPosition()
 
-    // 激光枪特殊处理：立即命中
+    // Laser gun special handling: instant hit
     if (this.type === 'laser_gun') {
       const actualDamage = target.takeDamage(damage)
 
-      // 更新统计
+      // Update stats
       this.damageDealt += actualDamage
 
-      // 检查是否击杀
+      // Check for kill
       if (target.isDead()) {
         this.kills += 1
       }
 
-      // 记录攻击事件
+      // Record attack event
       recorder.recordAttack({
         frame,
         buildingId: this.id,
@@ -161,46 +161,46 @@ class Building implements IBuilding {
         damage: actualDamage,
       })
     }
-    // 其他武器类型不在这里处理，由外部通过 getBulletParams 创建子弹
+    // Other weapon types are not handled here; bullets are created externally via getBulletParams
   }
 
-  /** 获取当前等级的伤害值 */
+  /** Get damage value at the current level */
   getDamage(): number {
     return this.deps.getDamageAtLevel(this.type, this.level)
   }
 
-  /** 获取当前等级的射程 */
+  /** Get range at the current level */
   getRange(): number {
     return this.deps.getRangeAtLevel(this.type, this.level)
   }
 
-  /** 获取攻击速度（帧间隔） */
+  /** Get attack speed (frame interval) */
   getAttackSpeed(): number {
     return this.deps.getAttackSpeedFrames(this.type)
   }
 
-  /** 重置波次统计 */
+  /** Reset wave statistics */
   resetWaveStats(): void {
     this.damageDealt = 0
     this.kills = 0
   }
 
-  /** 获取当前目标的格子位置（用于渲染炮管指向） */
+  /** Get the current target's grid position (used for rendering turret direction) */
   getCurrentTargetPosition(): Position | null {
     if (this.currentTarget && this.currentTarget.isValid) {
       this.lastTargetPosition = this.currentTarget.getGridPosition()
       return this.lastTargetPosition
     }
-    // 没有目标时返回最后的目标位置，保持炮管方向
+    // When there is no target, return the last target position to maintain turret direction
     return this.lastTargetPosition
   }
 
-  /** 是否有活跃目标 */
+  /** Whether there is an active target */
   hasActiveTarget(): boolean {
     return this.currentTarget !== null && this.currentTarget.isValid
   }
 
-  /** 每帧更新冷却 */
+  /** Update cooldown each frame */
   updateCooldown(): void {
     if (this.cooldown > 0) {
       this.cooldown -= 1
@@ -208,11 +208,11 @@ class Building implements IBuilding {
   }
 
   /**
-   * 获取子弹创建参数
-   * 激光枪返回 null（不使用子弹）
+   * Get bullet creation parameters
+   * Returns null for laser gun (does not use bullets)
    */
   getBulletParams(target: IMonster): BulletCreateInfo | null {
-    // 激光枪不使用子弹
+    // Laser gun does not use bullets
     if (this.type === 'laser_gun') {
       return null
     }
@@ -228,14 +228,14 @@ class Building implements IBuilding {
     }
   }
 
-  /** 升级建筑 */
+  /** Upgrade building */
   upgrade(): void {
     this.level += 1
   }
 }
 
 /**
- * 创建 Building 实例
+ * Create a Building instance
  */
 export function createBuilding(
   params: BuildingCreateParams,
@@ -245,13 +245,13 @@ export function createBuilding(
 }
 
 /**
- * 扩展的 Building 接口（包含运行时方法）
+ * Extended Building interface (includes runtime methods)
  */
 export interface IBuildingRuntime {
-  /** 每帧更新冷却 */
+  /** Update cooldown each frame */
   updateCooldown(): void
-  /** 获取子弹创建参数 */
+  /** Get bullet creation parameters */
   getBulletParams(target: IMonster): BulletCreateInfo | null
-  /** 升级建筑 */
+  /** Upgrade building */
   upgrade(): void
 }

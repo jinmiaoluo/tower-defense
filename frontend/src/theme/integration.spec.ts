@@ -1,6 +1,6 @@
 /**
- * 主题系统集成测试
- * 测试主题初始化、CSS 变量应用和系统主题自动切换
+ * Theme system integration tests.
+ * Tests theme initialization, CSS variable application, and automatic system theme switching.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
@@ -61,8 +61,8 @@ describe('Theme Integration', () => {
     mediaQueryChangeHandler = null
   })
 
-  describe('CSS 变量应用', () => {
-    it('应用暗色主题时设置正确的 CSS 变量', () => {
+  describe('CSS variable application', () => {
+    it('should set correct CSS variables when applying dark theme', () => {
       applyThemeToCSSVariables(darkTheme)
 
       expect(cssProperties['--color-background']).toBe('#1a1a2e')
@@ -71,7 +71,7 @@ describe('Theme Integration', () => {
       expect(dataTheme).toBe('dark')
     })
 
-    it('应用亮色主题时设置正确的 CSS 变量', () => {
+    it('should set correct CSS variables when applying light theme', () => {
       applyThemeToCSSVariables(lightTheme)
 
       expect(cssProperties['--color-background']).toBe('#f5f5f5')
@@ -80,14 +80,14 @@ describe('Theme Integration', () => {
       expect(dataTheme).toBe('light')
     })
 
-    it('getTheme 返回正确的主题配置', () => {
+    it('getTheme should return the correct theme config', () => {
       expect(getTheme('dark')).toBe(darkTheme)
       expect(getTheme('light')).toBe(lightTheme)
     })
   })
 
-  describe('系统主题自动切换', () => {
-    it('始终响应系统主题变化', () => {
+  describe('automatic system theme switching', () => {
+    it('should always respond to system theme changes', () => {
       const store = useThemeStore()
       store.initTheme()
 
@@ -100,7 +100,7 @@ describe('Theme Integration', () => {
       expect(store.current).toBe('light')
     })
 
-    it('手动切换后仍响应系统主题变化', () => {
+    it('should still respond to system theme changes after manual toggle', () => {
       const store = useThemeStore()
       store.initTheme()
       store.toggleTheme()
@@ -114,8 +114,8 @@ describe('Theme Integration', () => {
     })
   })
 
-  describe('主题配置完整性', () => {
-    it('darkTheme 包含所有必需的游戏颜色', () => {
+  describe('theme config completeness', () => {
+    it('darkTheme should contain all required game colors', () => {
       expect(darkTheme.gameColors.gridLine).toBeDefined()
       expect(darkTheme.gameColors.gridFill).toBeDefined()
       expect(darkTheme.gameColors.path).toBeDefined()
@@ -126,7 +126,7 @@ describe('Theme Integration', () => {
       expect(darkTheme.gameColors.selected).toBeDefined()
     })
 
-    it('lightTheme 包含所有必需的游戏颜色', () => {
+    it('lightTheme should contain all required game colors', () => {
       expect(lightTheme.gameColors.gridLine).toBeDefined()
       expect(lightTheme.gameColors.gridFill).toBeDefined()
       expect(lightTheme.gameColors.path).toBeDefined()
@@ -138,8 +138,8 @@ describe('Theme Integration', () => {
     })
   })
 
-  describe('首次加载时 Canvas 主题同步', () => {
-    it('系统为暗色主题时返回暗色游戏颜色', () => {
+  describe('canvas theme sync on first load', () => {
+    it('should return dark game colors when system theme is dark', () => {
       mockMatchMedia = vi.fn(() => ({
         matches: true,
         media: '',
@@ -157,7 +157,7 @@ describe('Theme Integration', () => {
       expect(colors.canvasBackground).toBe(darkTheme.gameColors.canvasBackground)
     })
 
-    it('系统为亮色主题时返回亮色游戏颜色', () => {
+    it('should return light game colors when system theme is light', () => {
       mockMatchMedia = vi.fn(() => ({
         matches: false,
         media: '',

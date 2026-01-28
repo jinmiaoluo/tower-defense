@@ -1,6 +1,6 @@
 /**
- * API Mock 实现
- * 模拟后端 API 接口，用于前端独立开发
+ * API Mock implementation
+ * Simulate backend API endpoints for frontend standalone development
  */
 
 import type {
@@ -17,10 +17,10 @@ import type {
 import { MOCK_BUILDINGS, MOCK_GAME_CONFIG, MOCK_INITIAL } from './config'
 import { calculateLifeReward, generateWaveConfig } from './waves'
 
-/** 模拟延迟（毫秒） */
+/** Simulated delay (milliseconds) */
 const MOCK_DELAY = 100
 
-/** 模拟会话存储 */
+/** Mock session storage */
 interface MockSession {
   id: string
   state: ServerState
@@ -29,21 +29,21 @@ interface MockSession {
 
 const sessions = new Map<string, MockSession>()
 
-/** 生成 Session ID */
+/** Generate session ID */
 function generateSessionId(): string {
   return `session-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`
 }
 
-/** 模拟网络延迟 */
+/** Simulate network delay */
 function delay(ms: number = MOCK_DELAY): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-/** 建筑累计花费缓存（简化实现） */
+/** Building cumulative cost cache (simplified implementation) */
 const buildingCosts = new Map<string, number>()
 
 /**
- * 计算 actions 中的花费和收入
+ * Calculate spending and income from actions
  * spent = BUILD + UPGRADE
  * income = SELL
  */
@@ -72,7 +72,7 @@ function calculateMoneyFromActions(actions: Action[]): { spent: number; income: 
 }
 
 /**
- * POST /api/game/sessions - 创建游戏会话
+ * POST /api/game/sessions - Create a game session
  */
 export async function mockStartGame(): Promise<GameStartResponse> {
   await delay()
@@ -99,7 +99,7 @@ export async function mockStartGame(): Promise<GameStartResponse> {
 }
 
 /**
- * POST /api/game/sessions/wave - 提交波次结果
+ * POST /api/game/sessions/wave - Submit wave result
  */
 export async function mockSubmitWave(request: WaveRequest): Promise<WaveResponse> {
   await delay()
@@ -117,15 +117,15 @@ export async function mockSubmitWave(request: WaveRequest): Promise<WaveResponse
       },
       error: {
         code: 'SESSION_NOT_FOUND',
-        message: '会话不存在',
+        message: 'Session not found',
       },
     }
   }
 
-  // 计算建筑操作的金钱变化
+  // Calculate money changes from building actions
   const { spent, income } = calculateMoneyFromActions(request.actions)
 
-  // 更新服务端状态
+  // Update server state
   // new_money = old_money - spent + income + moneyGained
   const newState: ServerState = {
     money: session.state.money - spent + income + request.result.moneyGained,
@@ -141,7 +141,7 @@ export async function mockSubmitWave(request: WaveRequest): Promise<WaveResponse
   session.state = newState
   session.currentWave = request.waveNumber + 1
 
-  // 检查游戏是否结束
+  // Check if game is over
   if (newState.life <= 0) {
     return {
       valid: true,
@@ -149,7 +149,7 @@ export async function mockSubmitWave(request: WaveRequest): Promise<WaveResponse
     }
   }
 
-  // 生成下一波
+  // Generate next wave
   const nextWave = generateWaveConfig(session.currentWave, newState.difficulty)
   const lifeReward = calculateLifeReward(request.waveNumber)
 
@@ -168,10 +168,10 @@ export async function mockSubmitWave(request: WaveRequest): Promise<WaveResponse
 }
 
 /**
- * POST /api/game/sessions/end - 游戏结束
- * 支持两种模式：
- * 1. 带 lastWave：提交最后一波数据并结束（正常结束）
- * 2. 不带 lastWave：直接结束游戏（提前结束），使用已提交的波次数据
+ * POST /api/game/sessions/end - End game
+ * Supports two modes:
+ * 1. With lastWave: submit last wave data and end (normal ending)
+ * 2. Without lastWave: end game immediately (early ending), using already submitted wave data
  */
 export async function mockEndGame(request: GameEndRequest): Promise<GameEndResponse> {
   await delay()
@@ -183,21 +183,21 @@ export async function mockEndGame(request: GameEndRequest): Promise<GameEndRespo
       verified: false,
       error: {
         code: 'SESSION_NOT_FOUND',
-        message: '会话不存在',
+        message: 'Session not found',
       },
     }
   }
 
-  // 如果有 lastWave，更新最后一波的状态
+  // If lastWave is provided, update state with the last wave's data
   if (request.lastWave) {
     session.state.score += request.lastWave.result.scoreGained
   }
-  // 如果没有 lastWave（提前结束），使用已提交波次的累计状态
+  // If no lastWave (early ending), use accumulated state from submitted waves
 
-  // 模拟排名
+  // Simulate ranking
   const rank = Math.floor(Math.random() * 100) + 1
 
-  // 清理会话
+  // Clean up session
   sessions.delete(request.sessionId)
 
   return {
@@ -211,8 +211,8 @@ export async function mockEndGame(request: GameEndRequest): Promise<GameEndRespo
 }
 
 /**
- * GET /api/game/leaderboard - 获取排行榜
- * @param limit 返回条数，默认 10，最大 100
+ * GET /api/game/leaderboard - Get leaderboard
+ * @param limit Number of entries to return, default 10, max 100
  */
 export async function mockGetLeaderboard(limit: number = 10): Promise<LeaderboardResponse> {
   await delay()
@@ -236,8 +236,8 @@ export async function mockGetLeaderboard(limit: number = 10): Promise<Leaderboar
 }
 
 /**
- * 计算新的难度系数
- * 公式来源：docs/SPEC.md
+ * Calculate new difficulty coefficient
+ * Formula source: docs/SPEC.md
  */
 function calculateNewDifficulty(
   currentDifficulty: number,
@@ -247,7 +247,7 @@ function calculateNewDifficulty(
   let newDifficulty: number
 
   if (lifeLost === 0) {
-    // 未受伤，增加难度
+    // No damage taken, increase difficulty
     if (waveNumber < 5) {
       newDifficulty = currentDifficulty * 1.05
     } else if (currentDifficulty > 30) {

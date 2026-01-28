@@ -1,5 +1,5 @@
 /**
- * 主题系统统一导出
+ * Theme system barrel exports
  */
 
 export {
