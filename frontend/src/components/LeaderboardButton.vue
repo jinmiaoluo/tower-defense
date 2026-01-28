@@ -5,7 +5,7 @@ import { useI18n } from '@/i18n'
 const { t, locale } = useI18n()
 
 const tooltipText = computed(() => {
-  locale.value
+  void locale.value
   return t('toolbar_view_leaderboard')
 })
 
@@ -24,8 +24,13 @@ function handleClick(): void {
     :title="tooltipText"
     @click="handleClick"
   >
-    <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-      <path d="M2 20h20v2H2v-2zm2-8h2v7H4v-7zm5-4h2v11H9V8zm5-4h2v15h-2V4zm5 6h2v9h-2v-9z"/>
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      width="16"
+      height="16"
+    >
+      <path d="M2 20h20v2H2v-2zm2-8h2v7H4v-7zm5-4h2v11H9V8zm5-4h2v15h-2V4zm5 6h2v9h-2v-9z" />
     </svg>
   </button>
 </template>

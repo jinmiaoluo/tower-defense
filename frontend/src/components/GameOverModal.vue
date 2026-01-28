@@ -93,11 +93,19 @@ defineExpose({
 </script>
 
 <template>
-  <div v-if="visible" class="modal-overlay">
+  <div
+    v-if="visible"
+    class="modal-overlay"
+  >
     <div class="modal-content">
-      <h2 class="modal-title">GAME OVER</h2>
+      <h2 class="modal-title">
+        GAME OVER
+      </h2>
 
-      <div v-if="gameData" class="game-stats">
+      <div
+        v-if="gameData"
+        class="game-stats"
+      >
         <div class="stat-item">
           <span class="stat-label">Final Score</span>
           <span class="stat-value">{{ gameData.score }}</span>
@@ -108,7 +116,10 @@ defineExpose({
         </div>
       </div>
 
-      <div v-if="!isSubmitted" class="submit-section">
+      <div
+        v-if="!isSubmitted"
+        class="submit-section"
+      >
         <div class="input-group">
           <label for="nickname">Enter your nickname:</label>
           <input
@@ -123,7 +134,12 @@ defineExpose({
           >
         </div>
 
-        <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
+        <p
+          v-if="errorMessage"
+          class="error-message"
+        >
+          {{ errorMessage }}
+        </p>
 
         <button
           class="btn btn-primary"
@@ -134,20 +150,37 @@ defineExpose({
         </button>
       </div>
 
-      <div v-else class="result-section">
-        <div v-if="rankingInfo" class="ranking-info">
+      <div
+        v-else
+        class="result-section"
+      >
+        <div
+          v-if="rankingInfo"
+          class="ranking-info"
+        >
           <p class="rank-text">
             Your Rank: <span class="rank-number">#{{ rankingInfo.rank }}</span>
             <span class="rank-total">/ {{ rankingInfo.total }}</span>
           </p>
-          <p v-if="rankingInfo.isNewRecord" class="new-record">New Record!</p>
+          <p
+            v-if="rankingInfo.isNewRecord"
+            class="new-record"
+          >
+            New Record!
+          </p>
         </div>
 
         <div class="button-group">
-          <button class="btn btn-secondary" @click="handleViewLeaderboard">
+          <button
+            class="btn btn-secondary"
+            @click="handleViewLeaderboard"
+          >
             View Leaderboard
           </button>
-          <button class="btn btn-primary" @click="handlePlayAgain">
+          <button
+            class="btn btn-primary"
+            @click="handlePlayAgain"
+          >
             Play Again
           </button>
         </div>

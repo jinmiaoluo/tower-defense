@@ -31,5 +31,5 @@ defineExpose({ scene, game })
 </script>
 
 <template>
-  <div id="game-container"></div>
+  <div id="game-container" />
 </template>

@@ -57,61 +57,99 @@ defineExpose({
 
 <template>
   <Transition name="modal">
-    <div v-if="visible" class="modal-overlay" @click.self="handleClose">
+    <div
+      v-if="visible"
+      class="modal-overlay"
+      @click.self="handleClose"
+    >
       <div class="modal-content">
-      <div class="modal-header">
-        <h2 class="modal-title">{{ t('leaderboard') }}</h2>
-        <button class="close-btn" @click="handleClose">&times;</button>
-      </div>
-
-      <div v-if="isLoading" class="loading">
-        {{ t('loading') }}
-      </div>
-
-      <div v-else-if="hasError" class="error">
-        {{ t('leaderboard_error') }}
-        <button class="btn btn-secondary" @click="fetchLeaderboard">
-          {{ t('retry') }}
-        </button>
-      </div>
-
-      <div v-else class="leaderboard-list">
-        <div class="list-header">
-          <span class="col-rank">{{ t('rank') }}</span>
-          <span class="col-name">{{ t('player') }}</span>
-          <span class="col-score">{{ t('score') }}</span>
-          <span class="col-waves">{{ t('waves') }}</span>
-          <span class="col-date">{{ t('date') }}</span>
+        <div class="modal-header">
+          <h2 class="modal-title">
+            {{ t('leaderboard') }}
+          </h2>
+          <button
+            class="close-btn"
+            @click="handleClose"
+          >
+            &times;
+          </button>
         </div>
 
         <div
-          v-for="entry in entries"
-          :key="entry.rank"
-          class="list-item"
-          :class="{ 'top-three': entry.rank <= 3 }"
+          v-if="isLoading"
+          class="loading"
         >
-          <span class="col-rank">
-            <span v-if="entry.rank === 1" class="medal gold">1</span>
-            <span v-else-if="entry.rank === 2" class="medal silver">2</span>
-            <span v-else-if="entry.rank === 3" class="medal bronze">3</span>
-            <span v-else>{{ entry.rank }}</span>
-          </span>
-          <span class="col-name">{{ entry.nickname }}</span>
-          <span class="col-score">{{ entry.score.toLocaleString() }}</span>
-          <span class="col-waves">{{ entry.wavesCompleted }}</span>
-          <span class="col-date">{{ formatDate(entry.createdAt) }}</span>
+          {{ t('loading') }}
         </div>
 
-        <p v-if="entries.length === 0" class="empty-message">
-          {{ t('leaderboard_empty') }}
-        </p>
-      </div>
+        <div
+          v-else-if="hasError"
+          class="error"
+        >
+          {{ t('leaderboard_error') }}
+          <button
+            class="btn btn-secondary"
+            @click="fetchLeaderboard"
+          >
+            {{ t('retry') }}
+          </button>
+        </div>
 
-      <div class="modal-footer">
-        <button class="btn btn-primary" @click="handleClose">
-          {{ t('close') }}
-        </button>
-      </div>
+        <div
+          v-else
+          class="leaderboard-list"
+        >
+          <div class="list-header">
+            <span class="col-rank">{{ t('rank') }}</span>
+            <span class="col-name">{{ t('player') }}</span>
+            <span class="col-score">{{ t('score') }}</span>
+            <span class="col-waves">{{ t('waves') }}</span>
+            <span class="col-date">{{ t('date') }}</span>
+          </div>
+
+          <div
+            v-for="entry in entries"
+            :key="entry.rank"
+            class="list-item"
+            :class="{ 'top-three': entry.rank <= 3 }"
+          >
+            <span class="col-rank">
+              <span
+                v-if="entry.rank === 1"
+                class="medal gold"
+              >1</span>
+              <span
+                v-else-if="entry.rank === 2"
+                class="medal silver"
+              >2</span>
+              <span
+                v-else-if="entry.rank === 3"
+                class="medal bronze"
+              >3</span>
+              <span v-else>{{ entry.rank }}</span>
+            </span>
+            <span class="col-name">{{ entry.nickname }}</span>
+            <span class="col-score">{{ entry.score.toLocaleString() }}</span>
+            <span class="col-waves">{{ entry.wavesCompleted }}</span>
+            <span class="col-date">{{ formatDate(entry.createdAt) }}</span>
+          </div>
+
+          <p
+            v-if="entries.length === 0"
+            class="empty-message"
+          >
+            {{ t('leaderboard_empty') }}
+          </p>
+        </div>
+
+        <div class="modal-footer">
+          <button
+            class="btn btn-primary"
+            @click="handleClose"
+          >
+            {{ t('close') }}
+          </button>
+        </div>
       </div>
     </div>
   </Transition>

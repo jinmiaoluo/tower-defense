@@ -64,33 +64,59 @@ onUnmounted(() => {
 
 <template>
   <Transition name="modal">
-    <div v-if="visible" class="modal-overlay" @click.self="handleClose">
+    <div
+      v-if="visible"
+      class="modal-overlay"
+      @click.self="handleClose"
+    >
       <div class="modal-content">
-        <h2 class="modal-title">{{ t('guide_title') }}</h2>
+        <h2 class="modal-title">
+          {{ t('guide_title') }}
+        </h2>
 
         <div class="guide-sections">
           <div class="guide-section">
-            <h3 class="section-title">{{ t('guide_objective_title') }}</h3>
-            <p class="section-content">{{ t('guide_objective') }}</p>
+            <h3 class="section-title">
+              {{ t('guide_objective_title') }}
+            </h3>
+            <p class="section-content">
+              {{ t('guide_objective') }}
+            </p>
           </div>
 
           <div class="guide-section">
-            <h3 class="section-title">{{ t('guide_build_title') }}</h3>
-            <p class="section-content">{{ t('guide_build') }}</p>
+            <h3 class="section-title">
+              {{ t('guide_build_title') }}
+            </h3>
+            <p class="section-content">
+              {{ t('guide_build') }}
+            </p>
           </div>
 
           <div class="guide-section">
-            <h3 class="section-title">{{ t('guide_upgrade_title') }}</h3>
-            <p class="section-content">{{ t('guide_upgrade') }}</p>
+            <h3 class="section-title">
+              {{ t('guide_upgrade_title') }}
+            </h3>
+            <p class="section-content">
+              {{ t('guide_upgrade') }}
+            </p>
           </div>
 
           <div class="guide-section">
-            <h3 class="section-title">{{ t('guide_tips_title') }}</h3>
-            <p class="section-content">{{ t('guide_tips') }}</p>
+            <h3 class="section-title">
+              {{ t('guide_tips_title') }}
+            </h3>
+            <p class="section-content">
+              {{ t('guide_tips') }}
+            </p>
           </div>
         </div>
 
-        <button ref="closeButtonRef" class="close-button" @click="handleClose">
+        <button
+          ref="closeButtonRef"
+          class="close-button"
+          @click="handleClose"
+        >
           {{ t('guide_start_game') }}
         </button>
       </div>
