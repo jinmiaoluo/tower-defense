@@ -187,8 +187,6 @@
 }
 ```
 
-错误响应的 HTTP 状态码和格式详见 [SPEC.md 错误响应章节](./SPEC.md#http-状态码与错误响应)。
-
 ## 数据模型
 
 ### GameSession
