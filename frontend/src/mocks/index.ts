@@ -25,4 +25,5 @@ export {
   mockGetLeaderboard,
   mockStartGame,
   mockSubmitWave,
+  type MockErrorResponse,
 } from './api'

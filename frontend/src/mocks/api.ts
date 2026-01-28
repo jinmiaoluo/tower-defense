@@ -5,6 +5,7 @@
 
 import type {
   Action,
+  ErrorResponse,
   GameEndRequest,
   GameEndResponse,
   GameStartResponse,
@@ -14,8 +15,14 @@ import type {
   WaveRequest,
   WaveResponse,
 } from '@/types'
+
 import { MOCK_BUILDINGS, MOCK_GAME_CONFIG, MOCK_INITIAL } from './config'
 import { calculateLifeReward, generateWaveConfig } from './waves'
+
+/** Error response returned by mock functions, converted to thrown ApiError by the adapter. */
+export interface MockErrorResponse {
+  error: ErrorResponse
+}
 
 /** Simulated delay (milliseconds) */
 const MOCK_DELAY = 100
@@ -101,20 +108,15 @@ export async function mockStartGame(): Promise<GameStartResponse> {
 /**
  * POST /api/game/sessions/wave - Submit wave result
  */
-export async function mockSubmitWave(request: WaveRequest): Promise<WaveResponse> {
+export async function mockSubmitWave(
+  request: WaveRequest,
+): Promise<WaveResponse | MockErrorResponse> {
   await delay()
 
   const session = sessions.get(request.sessionId)
 
   if (!session) {
     return {
-      valid: false,
-      serverState: {
-        money: 0,
-        score: 0,
-        life: 0,
-        difficulty: 1,
-      },
       error: {
         code: 'SESSION_NOT_FOUND',
         message: 'Session not found',
@@ -173,14 +175,15 @@ export async function mockSubmitWave(request: WaveRequest): Promise<WaveResponse
  * 1. With lastWave: submit last wave data and end (normal ending)
  * 2. Without lastWave: end game immediately (early ending), using already submitted wave data
  */
-export async function mockEndGame(request: GameEndRequest): Promise<GameEndResponse> {
+export async function mockEndGame(
+  request: GameEndRequest,
+): Promise<GameEndResponse | MockErrorResponse> {
   await delay()
 
   const session = sessions.get(request.sessionId)
 
   if (!session) {
     return {
-      verified: false,
       error: {
         code: 'SESSION_NOT_FOUND',
         message: 'Session not found',
