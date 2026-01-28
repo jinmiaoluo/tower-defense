@@ -10,6 +10,7 @@ test:frontend:
     - cd frontend
     - npm ci --prefer-offline
   script:
+    - npm run lint
     - npm run test:run
 
 test:backend:
@@ -24,8 +25,9 @@ test:backend:
     - cd backend
     - pip install --no-cache-dir uv
     - uv pip install --system --no-cache -r pyproject.toml
-    - uv pip install --system --no-cache pytest pytest-django pytest-cov pytest-env
+    - uv pip install --system --no-cache pytest pytest-django pytest-cov pytest-env ruff
   script:
+    - ruff check
     - pytest
 
 .build:
